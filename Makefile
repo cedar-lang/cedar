@@ -2,7 +2,17 @@ CC = clang
 CXX = clang++
 WARNINGS = -Wall -Wformat -Wno-unused-command-line-argument -Wno-deprecated-declarations -Wno-unused
 CFLAGS = -I./include -g -O3
-CXXLDLIBS = -std=c++17 -O3 -pthread -lc -lgc
+CXXLDLIBS =  -std=c++17 -O3 -pthread -lc -lgc
+
+UNAME := $(shell uname)
+
+ifeq ($(UNAME), Darwin)
+	SHAREDARGS = -dynamiclib -flat_namespace
+endif
+ifeq ($(UNAME), Linux)
+	SHAREDARGS = -fPIC -shared
+	CXXLDLIBS += -ldl
+endif
 
 objs = $(srcs:.cc=.o)
 includes = $(wildcard include/*)
@@ -46,9 +56,16 @@ $(OBJDIR)/cc/%.o: $(addprefix $(SRCDIR)/,%.cc) ${includes}
 	@mkdir -p $(dir $@)
 	@$(CXX) $(WARNINGS) $(CFLAGS) -c $< -o $@
 
-$(exe): $(CXXOBJFILES) $(COBJFILES)
+build/libcedar.so: $(CXXOBJFILES) $(COBJFILES)
+	@printf " SO\t$@\n"
+	@$(CXX) $(CXXLDLIBS) $(SHAREDARGS) $(WARNINGS) -o $@ $(CXXOBJFILES) $(COBJFILES)
+
+$(exe): build/libcedar.so main.cc
 	@printf " LD\t$@\n"
-	@$(CXX) $(CXXLDLIBS) $(WARNINGS) -o $@ $(foreach i,$^,$(i) )
+	@cp build/libcedar.so /usr/local/lib/libcedar.so
+	@$(CXX) $(WARNINGS) $(CFLAGS) -c main.cc -o build/main.o
+	@$(CXX) $(CXXLDLIBS) $(WARNINGS) -lcedar -o $@ build/main.o
+
 
 clean:
 	@rm -rf $(OBJDIR)

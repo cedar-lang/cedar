@@ -10,16 +10,18 @@ using namespace cedar;
 
 
 int main(int argc, const char **argv) {
-
 	std::locale utf8(std::locale(), new std::codecvt_utf8_utf16<wchar_t>);
 	std::wcout.imbue(utf8);
 
+
+
+	// src is the program that will be evaulated
+	//  where it is loaded in is determined later
 	std::wstring src;
-	std::cout << argc;
+
 	if (argc > 1) {
 		src = util::read_file(argv[1]);
 	}
-
 
 	try {
 		auto r = std::make_shared<reader>(src);

@@ -97,6 +97,26 @@ token lexer::lex() {
 	if (c == '\'')
 		return token(tok_quote, L"'");
 
+
+	if (c == '"') {
+		std::wstring buf;
+
+
+		bool escaped = false;
+		// ignore the first quote because a string shouldn't
+		// contain the encapsulating quotes in it's internal representation
+		while (true) {
+			c = next();
+			// also ignore the last double quote for the same reason as above
+			if (c == '"' && !escaped) break;
+			escaped = c == '\\';
+			buf += c;
+		}
+
+
+		return token(tok_string, buf);
+	}
+
 	// parse a number
 	if (isdigit(c) || c == '.') {
 		// it's a number (or it should be) so we should parse it as such
@@ -165,5 +185,5 @@ ptr<cedar::object> reader::run(void) {
 		std::cout << t << std::endl;
 
 	}
-	return std::make_shared<cedar::object>();
+	return std::make_shared<cedar::nil>();
 }
