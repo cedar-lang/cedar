@@ -1,9 +1,31 @@
-// (c) 2018 Nick Wanninger
-// This code is licensed under MIT license (see LICENSE for details)
+/*
+ * MIT License
+ *
+ * Copyright (c) 2018 Nick Wanninger
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
 
-#include <cedar/parser.hh>
+#include <cedar/parser.h>
 #include <cedar/exception.hpp>
-#include <cedar.hh>
+#include <cedar/runes.h>
+#include <cedar/memory.h>
 
 #include <iostream>
 #include <string>
@@ -17,25 +39,25 @@ token::token() {
 	type = tok_eof;
 }
 
-token::token(uint8_t t, std::wstring v) {
+token::token(uint8_t t, cedar::runes v) {
 	type = t;
 	val = v;
 }
 
 
-lexer::lexer(std::wstring src) {
+lexer::lexer(cedar::runes src) {
 	source = src;
 	index = 0;
 }
 
 
-wchar_t lexer::next() {
+cedar::rune lexer::next() {
 	auto c = peek();
 	index++;
 	return c;
 }
 
-wchar_t lexer::peek() {
+cedar::rune lexer::peek() {
 	if (index > source.size()) {
 			return -1;
 	}
@@ -54,7 +76,7 @@ bool in_charset(wchar_t c, const wchar_t *set) {
 
 token lexer::lex() {
 
-	wchar_t c = next();
+	auto c = next();
 
 
 	if (c == ';') {
@@ -68,38 +90,38 @@ token lexer::lex() {
 		return lex();
 
 	if (c == -1 || c == 0) {
-		return token(tok_eof, L"");
+		return token(tok_eof, "");
 	}
 
 
 	if (c == '`') {
-		return token(tok_backquote, L"`");
+		return token(tok_backquote, "`");
 	}
 
 
 	if (c == ',') {
 		if (peek() == '@') {
 			next();
-			return token(tok_comma_at, L",@");
+			return token(tok_comma_at, ",@");
 		}
 
-		return token(tok_comma, L",");
+		return token(tok_comma, ",");
 	}
 
 
 	if (c == '(')
-		return token(tok_left_paren, L"(");
+		return token(tok_left_paren, "(");
 
 	if (c == ')')
-		return token(tok_right_paren, L")");
+		return token(tok_right_paren, ")");
 
 
 	if (c == '\'')
-		return token(tok_quote, L"'");
+		return token(tok_quote, "'");
 
 
 	if (c == '"') {
-		std::wstring buf;
+		cedar::runes buf;
 
 
 		bool escaped = false;
@@ -120,27 +142,27 @@ token lexer::lex() {
 	// parse a number
 	if (isdigit(c) || c == '.') {
 		// it's a number (or it should be) so we should parse it as such
-		std::wostringstream buf;
+
+		cedar::runes buf;
 
 
-		buf << c;
+		buf += c;
 		bool has_decimal = c == '.';
 
 		while (isdigit(peek()) || peek() == '.') {
 			c = next();
-			buf << c;
+			buf += c;
 			if (c == '.') {
 				if (has_decimal)
-					throw make_exception("invalid number syntax: '", buf.str(), "' too many decimal points");
+					throw make_exception("invalid number syntax: '", buf, "' too many decimal points");
 				has_decimal = true;
 			}
 		}
 
-		std::wstring val = buf.str();
-		if (val == L".") {
-			return token(tok_ident, val);
+		if (buf == ".") {
+			return token(tok_ident, buf);
 		}
-		return token(tok_number, val);
+		return token(tok_number, buf);
 	} // digit parsing
 
 
@@ -148,7 +170,7 @@ token lexer::lex() {
 	// either an ident or a keyword token
 
 
-	std::wstring ident;
+	cedar::runes ident;
 	ident += c;
 
 	while (!in_charset(peek(), L" \n\t(){},'`@") && peek() != -1) {
@@ -167,23 +189,69 @@ token lexer::lex() {
 	return token(type, ident);
 }
 
+// ----------- reader -----------
+reader::reader() {}
 
-reader::reader(std::wstring source) {
-	lexer = std::make_shared<cedar::lexer>(source);
-}
+std::vector<ref> reader::read_top_level_objects(cedar::runes source) {
+	std::vector<ref> statements;
 
-token reader::lex() {
-	return lexer->lex();
-}
+	lexer = make<cedar::lexer>(source);
 
+	// reset the parser's lexer state
+	tokens.empty();
 
-ptr<cedar::object> reader::run(void) {
-	while (true) {
-		const token t = lex();
-		if (t.type == tok_eof) break;
+	// read all the tokens from the source code
+	token t;
+	while ((t = lexer->lex()).type != tok_eof)
+		tokens.push_back(t);
+	// reset internal state of the reader
+	tok = tokens[0];
+	index = 0;
 
-		std::cout << t << std::endl;
-
+	while (tok.type != tok_eof) {
+		
 	}
-	return std::make_shared<cedar::nil>();
+
+	// delete the lexer state
+	lexer = nullptr;
+
+	return statements;
 }
+
+
+token reader::peek(int offset) {
+	int new_i = index + offset;
+	if (new_i < 0 || new_i > tokens.size()) {
+		return token(tok_eof, "");
+	}
+
+	return tokens[new_i];
+}
+
+token reader::move(int offset) {
+	tok = peek(offset);
+	index += offset;
+	return tok;
+}
+
+token reader::next(void) {
+	return move(1);
+}
+
+token reader::prev(void) {
+	return move(-1);
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+

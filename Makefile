@@ -2,7 +2,7 @@ CC = clang
 CXX = clang++
 WARNINGS = -Wall -Wformat -Wno-unused-command-line-argument -Wno-deprecated-declarations -Wno-unused
 CFLAGS = -I./include -g -O3
-CXXLDLIBS =  -std=c++17 -O3 -pthread -lc -lgc
+CXXLDLIBS =  -std=c++17 -O3 -pthread  -lpython -lc -lgc
 
 UNAME := $(shell uname)
 
@@ -33,7 +33,7 @@ CSRCFILES := $(filter %.c,$(CODEFILES))
 COBJFILES := $(subst $(SRCDIR),$(OBJDIR)/c,$(CSRCFILES:%.c=%.o))
 
 
-.PHONY: all clean gen lib
+.PHONY: all clean gen lib install
 
 default:
 	@$(MAKE) -j $(shell getconf _NPROCESSORS_ONLN) all
@@ -63,8 +63,8 @@ build/libcedar.so: $(CXXOBJFILES) $(COBJFILES)
 $(exe): build/libcedar.so main.cc
 	@printf " LD\t$@\n"
 	@cp build/libcedar.so /usr/local/lib/libcedar.so
-	@$(CXX) $(WARNINGS) $(CFLAGS) -c main.cc -o build/main.o
-	@$(CXX) $(CXXLDLIBS) $(WARNINGS) -lcedar -o $@ build/main.o
+	@$(CXX) $(WARNINGS) $(CFLAGS) -g -c main.cc -o build/main.o
+	@$(CXX) $(CXXLDLIBS) $(WARNINGS) -g -lcedar -o $@ build/main.o
 
 
 clean:
@@ -78,3 +78,9 @@ lib: lib/runtime.wl lib/stdbind.so
 	@cp -a lib/ /usr/local/lib/cedar
 	@mkdir -p /usr/local/include/cedar
 	@cp -a include/ /usr/local/include/cedar
+
+
+install:
+	cp -a ./include/. /usr/local/include/
+	cp -a ./build/libcedar.so /usr/local/lib/
+	cp -a ./cedar /usr/local/bin/

@@ -22,17 +22,36 @@
  * SOFTWARE.
  */
 
-#pragma once
-#ifndef CEDAR_HH
-#define CEDAR_HH
+#include <cstdio>
 
-#include <cedar/exception.hpp>
-#include <cedar/memory.h>
 #include <cedar/object.h>
-#include <cedar/parser.h>
-#include <cedar/runes.h>
-#include <cedar/util.hpp>
-#include <cedar/context.h>
-#include <cedar/ref.hpp>
+#include <cedar/object/nil.h>
+#include <cedar/memory.h>
 
-#endif
+
+using namespace cedar;
+
+
+ref cedar::get_nil(void) {
+
+	static ref the_nil = nullptr;
+	if (the_nil == nullptr) {
+		the_nil = new_obj<nil>();
+		the_nil->no_autofree = 1;
+	}
+
+	return the_nil;
+}
+
+
+cedar::nil::nil() {}
+cedar::nil::~nil() {}
+
+cedar::runes nil::to_string(bool human) {
+	return U"nil";
+}
+
+
+ref nil::to_number() {
+	throw cedar::make_exception("Attempt to cast nil to number failed");
+}

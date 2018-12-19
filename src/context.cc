@@ -22,17 +22,26 @@
  * SOFTWARE.
  */
 
-#pragma once
-#ifndef CEDAR_HH
-#define CEDAR_HH
-
-#include <cedar/exception.hpp>
-#include <cedar/memory.h>
-#include <cedar/object.h>
-#include <cedar/parser.h>
-#include <cedar/runes.h>
-#include <cedar/util.hpp>
 #include <cedar/context.h>
-#include <cedar/ref.hpp>
+#include <cedar/memory.h>
+#include <cedar/util.hpp>
 
-#endif
+
+using namespace cedar;
+
+context::context() {
+	reader = make<cedar::reader>();
+}
+
+void context::eval_file(cedar::runes name) {
+	cedar::runes src = cedar::util::read_file(name);
+	return this->eval_expr(src);
+}
+
+void context::eval_expr(cedar::runes expr) {
+	parse_lock.lock();
+	std::cout << "evaluate expr: " << expr << std::endl;
+
+	parse_lock.unlock();
+}
+

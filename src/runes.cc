@@ -1,8 +1,37 @@
-#include <cedar.hh>
+/*
+ * MIT License
+ *
+ * Copyright (c) 2018 Nick Wanninger
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
 
+
+#include <iostream>
+#include <string>
+#include <locale>
+#include <codecvt>
+
+
+#include <cedar/runes.h>
 
 using namespace cedar;
-
 
 
 #define ALIGNMENT 8
@@ -41,9 +70,14 @@ void runes::resize(uint32_t size, rune c) {
 void runes::ingest_utf8(std::string s) {
 	init(1);
 	len = 0;
-	std::string corrected;
-	utf8::replace_invalid(s.begin(), s.end(), back_inserter(corrected));
-	utf8::utf8to32(corrected.begin(), corrected.end(), std::back_inserter(*this));
+
+	std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> cvt;
+	std::u32string utf32 = cvt.from_bytes(s);
+
+
+	for (rune r : utf32) {
+		push_back(r);
+	}
 }
 
 
@@ -53,6 +87,10 @@ runes::runes() {
 
 
 runes::runes(const char *s) {
+	ingest_utf8(std::string(s));
+}
+
+runes::runes(char *s) {
 	ingest_utf8(std::string(s));
 }
 
@@ -68,21 +106,50 @@ runes::runes(const char32_t *s) {
 runes::runes(std::string s) {
 	ingest_utf8(s);
 }
+// copy constructor
+runes::runes(const cedar::runes &other) {
+	operator=(other);
+	return;
+}
+
+
+runes& runes::operator=(const runes& o) {
+
+	bool alloc_again = false;
+
+	if (o.len > cap) {
+		alloc_again = true;
+	}
+
+
+	if (alloc_again || buf == nullptr) {
+		if (buf != nullptr) delete buf;
+		cap = o.cap;
+		buf = new rune[cap];
+	}
+
+	// update the len locally to be the other string's length
+	len = o.len;
+	for (int i = 0; i < cap; i++)
+		buf[i] = o.buf[i];
+
+	return *this;
+}
 
 
 runes::~runes() {
-	// delete buf;
+	delete buf;
 }
 
 rune *runes::begin(void) { return buf; }
 
 rune *runes::end(void) {
-	return buf + len + 1;
+	return buf + len;
 }
 
-const rune *runes::cbegin(void) { return buf; }
+rune *runes::cbegin(void) const { return buf; }
 
-const rune *runes::cend(void) { return buf + len + 1; }
+rune *runes::cend(void) const { return buf + len; }
 
 uint32_t runes::size(void) { return len; }
 
@@ -103,37 +170,62 @@ bool runes::empty(void) {
 
 
 runes& runes::operator+=(const runes& other) {
-	if (other.len + len >= cap) {
-		resize(other.len + len);
+
+	for (auto it = other.cbegin(); it != other.cend(); it++) {
+		push_back(*it);
 	}
-
-	for (int i = 0; i < other.len; i++) {
-		buf[len + i] = other.buf[i];
-	}
-
-	len += other.len;
-
 	return *this;
 }
 
+
 runes& runes::operator+=(const char *other) {
-	return operator+=(runes(other));
+
+	for (int i = 0; other[i]; i++)
+		push_back(other[i]);
+	return *this;
 }
 
 
 runes& runes::operator+=(std::string other) {
 	return operator+=(runes(other));
 }
+runes& runes::operator+=(char c) {
+	push_back(c);
+	return *this;
+}
 
+runes& runes::operator+=(rune c) {
+	push_back(c);
+	return *this;
+}
 
-runes::operator std::string() {
-	std::string s;
-	utf8::utf32to8(begin(), end(), std::back_inserter(s));
-	return s;
+bool runes::operator==(const runes& other) {
+	if (other.len != len) return false;
+	// they are the same length...
+	for (int i = 0; i < len; i++) {
+		if (other[i] != buf[i]) return false;
+	}
+	return true;
 }
 
 
-rune runes::operator[](size_t pos) {
+runes::operator std::string() const {
+	std::string s;
+
+	std::u32string utf32;
+
+	for(auto it = cbegin(); it != cend(); ++it) {
+		utf32.push_back(*it);
+	}
+
+	std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> cvt;
+	std::string utf8 = cvt.to_bytes(utf32);
+
+	return utf8;
+}
+
+
+rune runes::operator[](size_t pos) const {
 	return *(buf + pos);
 }
 

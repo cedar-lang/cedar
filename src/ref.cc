@@ -22,17 +22,31 @@
  * SOFTWARE.
  */
 
-#pragma once
-#ifndef CEDAR_HH
-#define CEDAR_HH
-
-#include <cedar/exception.hpp>
-#include <cedar/memory.h>
-#include <cedar/object.h>
-#include <cedar/parser.h>
-#include <cedar/runes.h>
-#include <cedar/util.hpp>
-#include <cedar/context.h>
 #include <cedar/ref.hpp>
+#include <cedar/object.h>
+#include <cedar/object/sequence.h>
 
-#endif
+using namespace cedar;
+
+uint16_t cedar::change_refcount(object *o, int change) {
+	if (o->refcount == 0 && change < 0) return 0;
+	return o->refcount += change;
+}
+
+uint16_t cedar::get_refcount(object *o) {
+	return o->refcount;
+}
+
+void cedar::delete_object(object *o) {
+	if (!o->no_autofree)
+		delete o;
+}
+
+
+ref& cedar::ref::first() const {
+	return reinterpret_cast<sequence*>(obj)->first();
+}
+
+ref& cedar::ref::rest() const {
+	return reinterpret_cast<sequence*>(obj)->rest();
+}

@@ -22,17 +22,44 @@
  * SOFTWARE.
  */
 
-#pragma once
-#ifndef CEDAR_HH
-#define CEDAR_HH
 
-#include <cedar/exception.hpp>
-#include <cedar/memory.h>
-#include <cedar/object.h>
-#include <cedar/parser.h>
-#include <cedar/runes.h>
-#include <cedar/util.hpp>
-#include <cedar/context.h>
+#include <cedar/object/list.h>
+#include <cedar/object/nil.h>
 #include <cedar/ref.hpp>
 
-#endif
+using namespace cedar;
+
+
+list::list(void) {
+	m_first = get_nil();
+	m_rest = get_nil();
+}
+
+list::~list(void) {
+
+}
+
+ref& list::first(void) {
+	return this->m_first;
+}
+
+
+ref& list::rest(void) {
+	return this->m_rest;
+}
+
+
+cedar::runes list::to_string(bool human) {
+	cedar::runes s;
+
+	s += "(";
+	s += m_first->to_string();
+	s += " . ";
+	s += m_rest->to_string();
+	s += ")";
+	return s;
+}
+
+ref list::to_number() {
+	throw cedar::make_exception("Attempt to cast list to number failed");
+}
