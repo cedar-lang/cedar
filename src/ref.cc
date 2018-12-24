@@ -43,10 +43,24 @@ void cedar::delete_object(object *o) {
 }
 
 
-ref& cedar::ref::first() const {
-	return reinterpret_cast<sequence*>(obj)->first();
+ref cedar::ref::get_first() const {
+	return reinterpret_cast<sequence*>(obj)->get_first();
 }
 
-ref& cedar::ref::rest() const {
-	return reinterpret_cast<sequence*>(obj)->rest();
+ref cedar::ref::get_rest() const {
+	return reinterpret_cast<sequence*>(obj)->get_rest();
+}
+
+
+void cedar::ref::set_first(ref val) {
+	return reinterpret_cast<sequence*>(obj)->set_first(val);
+}
+
+void cedar::ref::set_rest(ref val) {
+	return reinterpret_cast<sequence*>(obj)->set_rest(val);
+}
+
+
+void cedar::ref::set_const(bool c) {
+	obj->no_autofree = c;
 }

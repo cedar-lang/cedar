@@ -28,61 +28,19 @@
 #include <locale>
 #include <codecvt>
 
-
+#include <utf8.h>
 #include <cedar/runes.h>
 
 using namespace cedar;
 
 
-#define ALIGNMENT 8
-// rounds up to the nearest multiple of ALIGNMENT
-#define ALIGN(size) (((size) + (ALIGNMENT-1)) & ~0x7)
-
-
-void runes::init(uint32_t size) {
-	cap = ALIGN(size);
-	len = 0;
-	buf = new rune[cap];
-
-	for (int i = 0; i < cap; i++) buf[i] = 0;
-}
-
-void runes::resize(uint32_t size, rune c) {
-	uint32_t new_cap = ALIGN(size);
-
-	if (new_cap > cap) {
-		new_cap = ALIGN(cap * 2);
-
-		rune *new_buf = new rune[new_cap];
-		for (int i = 0; i < cap; i++)
-			new_buf[i] = buf[i];
-
-		for (int i = cap; i < new_cap; i++)
-			new_buf[i] = c;
-
-		delete buf;
-		buf = new_buf;
-		cap = new_cap;
-	}
-}
-
-
 void runes::ingest_utf8(std::string s) {
-	init(1);
-	len = 0;
-
-	std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> cvt;
-	std::u32string utf32 = cvt.from_bytes(s);
-
-
-	for (rune r : utf32) {
-		push_back(r);
-	}
+	auto end_it = utf8::find_invalid(s.begin(), s.end());
+  utf8::utf8to32(s.begin(), end_it, back_inserter(vec));
 }
 
 
 runes::runes() {
-	init();
 }
 
 
@@ -96,11 +54,10 @@ runes::runes(char *s) {
 
 
 runes::runes(const char32_t *s) {
-	uint32_t l;
-	for (l = 0; s[l]; l++);
-	init(l);
-	len = l;
-	for (int i = 0; i < l; i++) buf[i] = s[i];
+	vec.clear();
+	for (uint64_t l = 0; s[l]; l++) {
+		vec.push_back(s[l]);
+	}
 }
 
 runes::runes(std::string s) {
@@ -114,133 +71,95 @@ runes::runes(const cedar::runes &other) {
 
 
 runes& runes::operator=(const runes& o) {
-
-	bool alloc_again = false;
-
-	if (o.len > cap) {
-		alloc_again = true;
-	}
-
-
-	if (alloc_again || buf == nullptr) {
-		if (buf != nullptr) delete buf;
-		cap = o.cap;
-		buf = new rune[cap];
-	}
-
-	// update the len locally to be the other string's length
-	len = o.len;
-	for (int i = 0; i < cap; i++)
-		buf[i] = o.buf[i];
-
+	vec = o.vec;
 	return *this;
 }
 
 
 runes::~runes() {
-	delete buf;
 }
 
-rune *runes::begin(void) { return buf; }
 
-rune *runes::end(void) {
-	return buf + len;
-}
+runes::iterator runes::begin(void) { return vec.begin(); }
+runes::iterator runes::end(void)   { return vec.end();   }
 
-rune *runes::cbegin(void) const { return buf; }
+runes::const_iterator runes::cbegin(void) const { return vec.cbegin(); }
+runes::const_iterator runes::cend(void) const { return vec.cend(); }
 
-rune *runes::cend(void) const { return buf + len; }
+uint32_t runes::size(void) { return vec.size(); }
 
-uint32_t runes::size(void) { return len; }
+uint32_t runes::length(void) { return vec.size(); }
 
-uint32_t runes::length(void) { return len; }
+uint32_t runes::max_size(void) { return vec.max_size(); }
 
-uint32_t runes::max_size(void) { return -1; }
-
-uint32_t runes::capacity(void) { return cap; }
+uint32_t runes::capacity(void) { return vec.capacity(); }
 
 void runes::clear(void) {
-	for (int i = 0; i < len; i++) buf[i] = '\0';
-	len = 0;
+	vec.clear();
 }
 
 bool runes::empty(void) {
-	return len == 0;
+	return vec.empty();
 }
 
 
 runes& runes::operator+=(const runes& other) {
-
 	for (auto it = other.cbegin(); it != other.cend(); it++) {
-		push_back(*it);
+		vec.push_back(*it);
 	}
+
 	return *this;
 }
 
 
 runes& runes::operator+=(const char *other) {
-
-	for (int i = 0; other[i]; i++)
-		push_back(other[i]);
-	return *this;
+	return operator+=(runes(other));
 }
 
 
 runes& runes::operator+=(std::string other) {
 	return operator+=(runes(other));
 }
+
+
 runes& runes::operator+=(char c) {
-	push_back(c);
+	vec.push_back(c);
 	return *this;
 }
 
 runes& runes::operator+=(rune c) {
-	push_back(c);
+	vec.push_back(c);
 	return *this;
 }
 
 bool runes::operator==(const runes& other) {
-	if (other.len != len) return false;
-	// they are the same length...
-	for (int i = 0; i < len; i++) {
-		if (other[i] != buf[i]) return false;
-	}
-	return true;
+	return other.vec == vec;
 }
 
 
 runes::operator std::string() const {
-	std::string s;
-
-	std::u32string utf32;
-
-	for(auto it = cbegin(); it != cend(); ++it) {
-		utf32.push_back(*it);
-	}
-
-	std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> cvt;
-	std::string utf8 = cvt.to_bytes(utf32);
-
-	return utf8;
+	std::string unicode;
+  utf8::utf32to8(vec.begin(), vec.end(), back_inserter(unicode));
+	return unicode;
 }
 
 
-rune runes::operator[](size_t pos) const {
-	return *(buf + pos);
+
+rune runes::operator[](size_t i) {
+	return vec[i];
+}
+
+rune runes::operator[](size_t i) const {
+	if (i >= vec.size() || i < 0) {
+		return 0;
+	}
+	return vec[i];
 }
 
 void runes::push_back(rune& r) {
-	if (len >= cap) {
-		resize(len+1);
-	}
-	buf[len] = r;
-	len += 1;
+	vec.push_back(r);
 }
 
 void runes::push_back(rune&& r) {
-	if (len >= cap) {
-		resize(len+1);
-	}
-	buf[len] = r;
-	len += 1;
+	vec.push_back(r);
 }

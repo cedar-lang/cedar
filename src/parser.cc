@@ -27,6 +27,11 @@
 #include <cedar/runes.h>
 #include <cedar/memory.h>
 
+#include <cedar/object/list.h>
+#include <cedar/object/symbol.h>
+#include <cedar/object/number.h>
+#include <cedar/object/nil.h>
+
 #include <iostream>
 #include <string>
 #include <cctype>
@@ -160,39 +165,39 @@ token lexer::lex() {
 		}
 
 		if (buf == ".") {
-			return token(tok_ident, buf);
+			return token(tok_symbol, buf);
 		}
 		return token(tok_number, buf);
 	} // digit parsing
 
 
 	// it wasn't anything else, so it must be
-	// either an ident or a keyword token
+	// either an symbol or a keyword token
 
 
-	cedar::runes ident;
-	ident += c;
+	cedar::runes symbol;
+	symbol += c;
 
 	while (!in_charset(peek(), L" \n\t(){},'`@") && peek() != -1) {
-		ident += next();
+		symbol += next();
 	}
 
 
-	if (ident.length() == 0)
+	if (symbol.length() == 0)
 		throw make_exception("lexer encountered zero-length identifier");
 
-	uint8_t type = tok_ident;
+	uint8_t type = tok_symbol;
 
-	if (ident[0] == ':')
+	if (symbol[0] == ':')
 		type = tok_keyword;
 
-	return token(type, ident);
+	return token(type, symbol);
 }
 
 // ----------- reader -----------
 reader::reader() {}
 
-std::vector<ref> reader::read_top_level_objects(cedar::runes source) {
+std::vector<ref> reader::run(cedar::runes source) {
 	std::vector<ref> statements;
 
 	lexer = make<cedar::lexer>(source);
@@ -202,14 +207,16 @@ std::vector<ref> reader::read_top_level_objects(cedar::runes source) {
 
 	// read all the tokens from the source code
 	token t;
-	while ((t = lexer->lex()).type != tok_eof)
+	while ((t = lexer->lex()).type != tok_eof) {
 		tokens.push_back(t);
+	}
 	// reset internal state of the reader
 	tok = tokens[0];
 	index = 0;
 
 	while (tok.type != tok_eof) {
-		
+		ref obj = parse_expr();
+		statements.push_back(obj);
 	}
 
 	// delete the lexer state
@@ -244,14 +251,116 @@ token reader::prev(void) {
 
 
 
+ref reader::parse_expr(void) {
+
+	print(tok);
+	switch (tok.type) {
+		case tok_keyword:
+		case tok_symbol:
+			return parse_symbol();
+		case tok_number:
+			return parse_number();
+		case tok_left_paren:
+			return parse_list();
+		case tok_backquote:
+			return parse_special_syntax(U"quasiquote");
+		case tok_quote:
+			return parse_special_syntax(U"quote");
+		case tok_comma:
+			return parse_special_syntax(U"unquote");
+		case tok_comma_at:
+			return parse_special_syntax(U"unquote-splicing");
+	}
+	throw cedar::make_exception("Unimplmented token: ", tok);
+}
+
+ref reader::parse_list(void) {
+	ref obj = new_const_obj<list>();
+
+	std::vector<ref> items;
+
+	// skip over the first paren
+	next();
+
+
+	while (tok.type != tok_right_paren) {
+
+		if (tok.type == tok_eof) {
+			throw make_exception("unexpected eof in list");
+		}
+
+		ref item = parse_expr();
+		items.push_back(item);
+	}
+
+	unsigned len = items.size();
+	unsigned last_i = len - 1;
+	ref curr = obj;
+	for (unsigned i = 0; i < len; i++) {
+		ref lst = new_const_obj<list>();
+		curr.set_first(items[i]);
+
+		if (i+1 <= last_i && items[i+1]->is<symbol>() && items[i+1]->as<symbol>()->get_content() == ".") {
+			if (i+1 != last_i-1) throw make_exception("Illegal end of dotted list");
+			curr.set_rest(items[last_i]);
+			if (curr.get_rest()->is<nil>()) {
+				curr.set_rest(new_const_obj<list>());
+			}
+			break;
+		}
+
+		curr.set_rest(lst);
+		curr = lst;
+	}
+
+	// skip over the closing paren
+	next();
+	return obj;
+}
 
 
 
 
+ref reader::parse_special_syntax(cedar::runes function_name) {
+	ref obj = new_const_obj<list>();
+	obj.set_first(new_const_obj<symbol>(function_name));
+	next();
+	obj.set_rest(new_const_obj<list>());
+	ref val = parse_expr();
+	// print(obj.get_rest());
+	// obj.get_rest().set_first(val);
+	// print(obj);
+	return obj;
+}
+
+
+
+ref reader::parse_symbol(void) {
+	ref return_obj;
+
+	// since parse_symbol also parses keywords, the parser
+	// needs to special case symbols that start with ':'
+	if (tok.val[0] == ':') {
+		throw cedar::make_exception("Keyword generation unimplemented, plz fix");
+	} else if (tok.val == "nil") {
+		return_obj = get_nil();
+	} else {
+		return_obj = new_const_obj<cedar::symbol>(tok.val);
+	}
+	next();
+	return return_obj;
+}
 
 
 
 
+ref reader::parse_number(void) {
+	std::string str = tok.val;
+	double value = atof(str.c_str());
+	ref obj = new_const_obj<number>(value);
+	next();
+	return obj;
+}
 
 
 

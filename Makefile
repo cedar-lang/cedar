@@ -2,7 +2,7 @@ CC = clang
 CXX = clang++
 WARNINGS = -Wall -Wformat -Wno-unused-command-line-argument -Wno-deprecated-declarations -Wno-unused
 CFLAGS = -I./include -g -O3
-CXXLDLIBS =  -std=c++17 -O3 -pthread  -lpython -lc -lgc
+CXXLDLIBS =  -std=c++17 -O3 -pthread -lffi -lc -lgc
 
 UNAME := $(shell uname)
 

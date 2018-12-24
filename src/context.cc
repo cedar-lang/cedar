@@ -40,8 +40,12 @@ void context::eval_file(cedar::runes name) {
 
 void context::eval_expr(cedar::runes expr) {
 	parse_lock.lock();
-	std::cout << "evaluate expr: " << expr << std::endl;
 
+	auto top_level = reader->run(expr);
+
+	for (auto obj : top_level) {
+		// std::cout << obj->to_string() << std::endl;
+	}
 	parse_lock.unlock();
 }
 

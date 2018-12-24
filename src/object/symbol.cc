@@ -22,23 +22,39 @@
  * SOFTWARE.
  */
 
+#include <cstdio>
 
-#include <cedar/memory.h>
 #include <cedar/object.h>
-#include <cedar/ref.hpp>
-
-#include <cedar/object/list.h>
-#include <cedar/object/nil.h>
+#include <cedar/object/symbol.h>
+#include <cedar/memory.h>
+#include <cedar/util.hpp>
 
 using namespace cedar;
 
+static ref the_nil = nullptr;
 
-bool object::is_pair(void) {
-	// a thing cannot be a pair if it isn't a list
-	if (!is<list>()) return false;
-	list *lst = as<list>();
-	ref rest = lst->get_rest();
-	if (rest->is<nil>() || rest->is<list>()) return false;
-	return true;
+cedar::symbol::symbol(void) {}
+cedar::symbol::symbol(cedar::runes content) {
+	m_content = content;
 }
 
+
+cedar::symbol::~symbol() {
+}
+
+cedar::runes symbol::to_string(bool human) {
+	return m_content;
+}
+
+void symbol::set_content(cedar::runes content) {
+	m_content = content;
+}
+
+cedar::runes symbol::get_content(void) {
+	return m_content;
+}
+
+
+ref symbol::to_number() {
+	throw cedar::make_exception("Attempt to cast symbol to number failed");
+}

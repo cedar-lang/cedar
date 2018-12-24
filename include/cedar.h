@@ -22,4 +22,29 @@
  * SOFTWARE.
  */
 
-#include <cedar.hh>
+#pragma once
+#ifndef CEDAR_HH
+#define CEDAR_HH
+
+#include "cedar/version.h"
+
+#include "cedar/exception.hpp"
+#include "cedar/memory.h"
+
+// object includes
+#include "cedar/object.h"
+#include "cedar/object/sequence.h"
+#include "cedar/object/list.h"
+#include "cedar/object/nil.h"
+#include "cedar/object/number.h"
+
+#include "cedar/parser.h"
+#include "cedar/runes.h"
+#include "cedar/util.hpp"
+#include "cedar/context.h"
+#include "cedar/ref.hpp"
+
+// virtual machine includes
+#include "cedar/vm/instruction.h"
+
+#endif

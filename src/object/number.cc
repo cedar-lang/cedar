@@ -22,17 +22,36 @@
  * SOFTWARE.
  */
 
-#pragma once
-#ifndef CEDAR_HH
-#define CEDAR_HH
-
-#include <cedar/exception.hpp>
-#include <cedar/memory.h>
 #include <cedar/object.h>
-#include <cedar/parser.h>
+#include <cedar/object/number.h>
 #include <cedar/runes.h>
-#include <cedar/util.hpp>
-#include <cedar/context.h>
-#include <cedar/ref.hpp>
 
-#endif
+#include <string>
+
+using namespace cedar;
+
+
+number::number(void) {}
+
+number::number(double val) {
+	m_val = val;
+}
+
+number::~number(void) {}
+
+cedar::runes number::to_string(bool human) {
+	return std::to_string(m_val);
+}
+
+cedar::ref number::to_number() {
+	return this;
+}
+
+
+
+
+
+
+
+
+

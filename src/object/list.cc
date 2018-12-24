@@ -39,24 +39,64 @@ list::~list(void) {
 
 }
 
-ref& list::first(void) {
+ref list::get_first(void) {
 	return this->m_first;
 }
 
 
-ref& list::rest(void) {
+ref list::get_rest(void) {
 	return this->m_rest;
 }
 
+void list::set_first(ref n_first) {
+	this->m_first = n_first;
+}
+
+
+void list::set_rest(ref n_rest) {
+	this->m_rest = n_rest;
+}
 
 cedar::runes list::to_string(bool human) {
 	cedar::runes s;
 
+
+	if (m_first->is<nil>()) {
+		return "()";
+	}
+
+	if (is_pair()) {
+		s += "(";
+		s += m_first->to_string();
+		s += " . ";
+		s += m_rest->to_string();
+		s += ")";
+		return s;
+	}
+
+
 	s += "(";
-	s += m_first->to_string();
-	s += " . ";
-	s += m_rest->to_string();
+	ref curr = this;
+
+	while (!curr.get_first()->is<nil>()) {
+
+		s += curr.get_first()->to_string();
+		if (!curr.get_rest()->is<nil>()) {
+			if (curr.get_rest()->is_pair()) {
+				s += " ";
+				s += curr.get_rest().get_first()->to_string();
+				s += " . ";
+				s += curr.get_rest().get_rest()->to_string();
+				break;
+			}
+			if (!curr.get_rest().get_first()->is<nil>()) {
+				s += " ";
+			}
+			curr = curr.get_rest();
+		}
+	}
 	s += ")";
+
 	return s;
 }
 

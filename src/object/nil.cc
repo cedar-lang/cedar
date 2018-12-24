@@ -31,10 +31,17 @@
 
 using namespace cedar;
 
+static ref the_nil = nullptr;
+
+object *cedar::get_nil_object(void) {
+	if (the_nil == nullptr) {
+		the_nil = new_obj<nil>();
+		the_nil->no_autofree = 1;
+	}
+	return the_nil.get<cedar::nil>();
+}
 
 ref cedar::get_nil(void) {
-
-	static ref the_nil = nullptr;
 	if (the_nil == nullptr) {
 		the_nil = new_obj<nil>();
 		the_nil->no_autofree = 1;
