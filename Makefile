@@ -1,6 +1,6 @@
-CC = clang
-CXX = clang++
-WARNINGS = -Wall -Wformat -Wno-unused-command-line-argument -Wno-deprecated-declarations -Wno-unused
+CC = gcc
+CXX = g++
+WARNINGS = -Wall -Wformat -Wno-deprecated-declarations -Wno-unused
 CFLAGS = -I./include -g
 CXXLDLIBS =  -std=c++17 -pthread -lffi -lc
 
@@ -12,6 +12,7 @@ endif
 ifeq ($(UNAME), Linux)
 	SHAREDARGS = -fPIC -shared
 	CXXLDLIBS += -ldl
+	CFLAGS += -fPIC
 endif
 
 objs = $(srcs:.cc=.o)
@@ -43,6 +44,7 @@ compile: $(OBJDIR) $(exe)
 all: compile
 
 $(OBJDIR):
+	echo $(SHAREDARGS)
 	@mkdir -p $@
 
 $(OBJDIR)/c/%.o: $(addprefix $(SRCDIR)/,%.c) ${includes}
@@ -58,13 +60,13 @@ $(OBJDIR)/cc/%.o: $(addprefix $(SRCDIR)/,%.cc) ${includes}
 
 build/libcedar.so: $(CXXOBJFILES) $(COBJFILES)
 	@printf " SO\t$@\n"
-	@$(CXX) $(CXXLDLIBS) $(SHAREDARGS) $(WARNINGS) -o $@ $(CXXOBJFILES) $(COBJFILES)
+	$(CXX) $(SHAREDARGS) $(CXXLDLIBS) $(WARNINGS) -o $@ $(CXXOBJFILES) $(COBJFILES)
 
 $(exe): build/libcedar.so main.cc
 	@printf " LD\t$@\n"
 	@cp build/libcedar.so /usr/local/lib/libcedar.so
 	@$(CXX) $(WARNINGS) $(CFLAGS) -g -c main.cc -o build/main.o
-	@$(CXX) $(CXXLDLIBS) $(WARNINGS) -g -lcedar -o $@ build/main.o
+	@$(CXX) $(CXXLDLIBS) $(WARNINGS) -g -Lbuild -lcedar -o $@ build/main.o
 
 
 clean:
@@ -88,8 +90,6 @@ install:
 	cp -a ./include/. /usr/local/include/
 	cp -a ./build/libcedar.so /usr/local/lib/
 	cp -a ./cedar /usr/local/bin/
-
-
 
 
 test: build/libcedar.so

@@ -112,7 +112,7 @@ namespace cedar {
 
 	class reader {
 		private:
-			ptr<lexer> lexer;
+			ptr<lexer> m_lexer;
 
 			std::vector<token> tokens;
 			token tok;

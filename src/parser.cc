@@ -200,14 +200,14 @@ reader::reader() {}
 std::vector<ref> reader::run(cedar::runes source) {
 	std::vector<ref> statements;
 
-	lexer = make<cedar::lexer>(source);
+	m_lexer = make<cedar::lexer>(source);
 
 	// reset the parser's lexer state
 	tokens.empty();
 
 	// read all the tokens from the source code
 	token t;
-	while ((t = lexer->lex()).type != tok_eof) {
+	while ((t = m_lexer->lex()).type != tok_eof) {
 		tokens.push_back(t);
 	}
 	// reset internal state of the reader
@@ -220,7 +220,7 @@ std::vector<ref> reader::run(cedar::runes source) {
 	}
 
 	// delete the lexer state
-	lexer = nullptr;
+	m_lexer = nullptr;
 
 	return statements;
 }
