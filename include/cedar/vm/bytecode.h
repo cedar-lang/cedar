@@ -29,6 +29,7 @@
 #include <stdio.h>
 #include <cstdlib>
 #include <cstdint>
+#include <cstring>
 #include <map>
 #include <list>
 
@@ -105,7 +106,7 @@ namespace cedar {
 					inline uint64_t write(T val) {
 						if (size + sizeof(val) >= cap-1) {
 							uint8_t *new_code = new uint8_t[cap * 2];
-							memcpy(new_code, code, cap);
+							std::memcpy(new_code, code, cap);
 							cap *= 2;
 							delete code;
 							code = new_code;
