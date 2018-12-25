@@ -90,6 +90,11 @@ int main(int argc, char** argv) {
     for (int index = optind; index < argc; index++) {
       ctx->eval_file(argv[index]);
 		}
+
+
+	} catch (const utf8::invalid_code_point& e) {
+		fprintf(stderr, "\n\n\nunknown code point (%U): %s\n\n\n\n", e.code_point(), e.what());
+		exit(-1);
 	} catch (const std::length_error& le) {
 		std::cerr << "Length error: " << le.what() << '\n';
   } catch (const std::out_of_range& oor) {
@@ -99,7 +104,10 @@ int main(int argc, char** argv) {
 		std::cerr << "Exception name: " << typeid(e).name() << std::endl;
     std::cerr << "Fatal Exception: " << e.what() << std::endl;
     exit(-1);
-  }
+  } catch (...) {
+		printf("unknown\n");
+		exit(-1);
+	}
 
   return 0;
 }

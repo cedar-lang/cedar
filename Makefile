@@ -2,7 +2,7 @@ CC = clang
 CXX = clang++
 WARNINGS = -Wall -Wformat -Wno-unused-command-line-argument -Wno-deprecated-declarations -Wno-unused
 CFLAGS = -I./include -g
-CXXLDLIBS =  -std=c++17 -pthread -lffi -lc -lgc
+CXXLDLIBS =  -std=c++17 -pthread -lffi -lc
 
 UNAME := $(shell uname)
 

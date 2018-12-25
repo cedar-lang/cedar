@@ -35,6 +35,8 @@ using namespace cedar;
 
 
 void runes::ingest_utf8(std::string s) {
+	buf = s;
+	return;
 	buf.clear();
 	auto end_it = utf8::find_invalid(s.begin(), s.end());
   utf8::utf8to32(s.begin(), end_it, back_inserter(buf));
@@ -138,6 +140,8 @@ bool runes::operator==(const runes& other) {
 
 
 runes::operator std::string() const {
+
+	return buf;
 	std::string unicode;
   utf8::utf32to8(buf.begin(), buf.end(), back_inserter(unicode));
 	return unicode;
@@ -146,7 +150,6 @@ runes::operator std::string() const {
 
 
 rune runes::operator[](size_t i) {
-	return 300;
 	return buf[i];
 }
 
