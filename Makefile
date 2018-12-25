@@ -1,8 +1,8 @@
 CC = clang
 CXX = clang++
 WARNINGS = -Wall -Wformat -Wno-unused-command-line-argument -Wno-deprecated-declarations -Wno-unused
-CFLAGS = -I./include -g -O3
-CXXLDLIBS =  -std=c++17 -O3 -pthread -lffi -lc -lgc
+CFLAGS = -I./include -g
+CXXLDLIBS =  -std=c++17 -pthread -lffi -lc -lgc
 
 UNAME := $(shell uname)
 
@@ -33,7 +33,7 @@ CSRCFILES := $(filter %.c,$(CODEFILES))
 COBJFILES := $(subst $(SRCDIR),$(OBJDIR)/c,$(CSRCFILES:%.c=%.o))
 
 
-.PHONY: all clean gen lib install
+.PHONY: all clean gen lib install test
 
 default:
 	@$(MAKE) -j $(shell getconf _NPROCESSORS_ONLN) all
@@ -71,8 +71,12 @@ clean:
 	@rm -rf $(OBJDIR)
 	@rm -rf $(exe)
 	@rm -rf lib/stdbind.so*
+	@rm -rf testbuild
+	@rm -rf test/test
+	@rm -rf test/build
+	@rm -rf test/*.o
 
-lib: lib/runtime.wl lib/stdbind.so
+lib:
 	@rm -rf /usr/local/lib/cedar
 	@mkdir -p /usr/local/lib/cedar
 	@cp -a lib/ /usr/local/lib/cedar
@@ -84,3 +88,10 @@ install:
 	cp -a ./include/. /usr/local/include/
 	cp -a ./build/libcedar.so /usr/local/lib/
 	cp -a ./cedar /usr/local/bin/
+
+
+
+
+test: build/libcedar.so
+	@cd test; $(MAKE)
+	@test/test

@@ -3,3 +3,5 @@ cedar
 .DS_Store
 build
 .idea
+test/test
+test/*.o

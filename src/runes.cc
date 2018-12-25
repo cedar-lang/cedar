@@ -35,8 +35,9 @@ using namespace cedar;
 
 
 void runes::ingest_utf8(std::string s) {
+	buf.clear();
 	auto end_it = utf8::find_invalid(s.begin(), s.end());
-  utf8::utf8to32(s.begin(), end_it, back_inserter(vec));
+  utf8::utf8to32(s.begin(), end_it, back_inserter(buf));
 }
 
 
@@ -54,9 +55,9 @@ runes::runes(char *s) {
 
 
 runes::runes(const char32_t *s) {
-	vec.clear();
-	for (uint64_t l = 0; s[l]; l++) {
-		vec.push_back(s[l]);
+	buf.clear();
+	for (uint64_t l = 0; s[l] != '\0'; l++) {
+		buf.push_back(s[l]);
 	}
 }
 
@@ -71,7 +72,7 @@ runes::runes(const cedar::runes &other) {
 
 
 runes& runes::operator=(const runes& o) {
-	vec = o.vec;
+	buf = o.buf;
 	return *this;
 }
 
@@ -80,34 +81,33 @@ runes::~runes() {
 }
 
 
-runes::iterator runes::begin(void) { return vec.begin(); }
-runes::iterator runes::end(void)   { return vec.end();   }
+runes::iterator runes::begin(void) { return buf.begin(); }
+runes::iterator runes::end(void)   { return buf.end();   }
 
-runes::const_iterator runes::cbegin(void) const { return vec.cbegin(); }
-runes::const_iterator runes::cend(void) const { return vec.cend(); }
+runes::const_iterator runes::cbegin(void) const { return buf.cbegin(); }
+runes::const_iterator runes::cend(void) const { return buf.cend(); }
 
-uint32_t runes::size(void) { return vec.size(); }
+uint32_t runes::size(void) { return buf.size(); }
 
-uint32_t runes::length(void) { return vec.size(); }
+uint32_t runes::length(void) { return buf.size(); }
 
-uint32_t runes::max_size(void) { return vec.max_size(); }
+uint32_t runes::max_size(void) { return buf.max_size(); }
 
-uint32_t runes::capacity(void) { return vec.capacity(); }
+uint32_t runes::capacity(void) { return buf.capacity(); }
 
 void runes::clear(void) {
-	vec.clear();
+	buf.clear();
 }
 
 bool runes::empty(void) {
-	return vec.empty();
+	return buf.empty();
 }
 
 
 runes& runes::operator+=(const runes& other) {
 	for (auto it = other.cbegin(); it != other.cend(); it++) {
-		vec.push_back(*it);
+		buf.push_back(*it);
 	}
-
 	return *this;
 }
 
@@ -123,43 +123,41 @@ runes& runes::operator+=(std::string other) {
 
 
 runes& runes::operator+=(char c) {
-	vec.push_back(c);
+	buf.push_back(c);
 	return *this;
 }
 
 runes& runes::operator+=(rune c) {
-	vec.push_back(c);
+	buf.push_back(c);
 	return *this;
 }
 
 bool runes::operator==(const runes& other) {
-	return other.vec == vec;
+	return other.buf == buf;
 }
 
 
 runes::operator std::string() const {
 	std::string unicode;
-  utf8::utf32to8(vec.begin(), vec.end(), back_inserter(unicode));
+  utf8::utf32to8(buf.begin(), buf.end(), back_inserter(unicode));
 	return unicode;
 }
 
 
 
 rune runes::operator[](size_t i) {
-	return vec[i];
+	return 300;
+	return buf[i];
 }
 
 rune runes::operator[](size_t i) const {
-	if (i >= vec.size() || i < 0) {
-		return 0;
-	}
-	return vec[i];
+	return buf[i];
 }
 
 void runes::push_back(rune& r) {
-	vec.push_back(r);
+	buf.push_back(r);
 }
 
 void runes::push_back(rune&& r) {
-	vec.push_back(r);
+	buf.push_back(r);
 }

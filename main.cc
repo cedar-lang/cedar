@@ -36,10 +36,12 @@
 #include <unistd.h>
 #include <chrono>
 #include <iostream>
+#include <string>
 
 #include <cedar.h>
 #include <cedar/opcode.h>
 #include <cedar/vm/bytecode.h>
+
 
 static void usage(void);
 static void help(void);
@@ -47,6 +49,10 @@ static void help(void);
 constexpr int a = 0;
 
 int main(int argc, char** argv) {
+
+
+	cedar::print(sizeof(int&));
+
   srand((unsigned int)time(nullptr));
 
   // src is the program that will be evaulated
@@ -115,3 +121,11 @@ static void help(void) {
   printf("\n");
 }
 
+
+void *operator new(size_t size) {
+	return calloc(size, 1);
+}
+
+void operator delete(void *ptr) noexcept {
+	free(ptr);
+}
