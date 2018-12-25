@@ -26,6 +26,7 @@
 
 #include <cedar/exception.hpp>
 
+#include <stdio.h>
 #include <cstdlib>
 #include <cstdint>
 #include <map>
