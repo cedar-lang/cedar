@@ -59,7 +59,7 @@ namespace cedar {
 	template<typename... Args>
 		inline cedar::exception make_exception(Args const&... args) {
 			std::ostringstream stream;
-			int a[] = {0, ( (void)(stream << args), 0 ) ... };
+			(void)(int[]){0, ( (void)(stream << args), 0 ) ... };
 
 			return cedar::exception(stream.str());
 		}

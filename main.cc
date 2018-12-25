@@ -46,12 +46,10 @@
 static void usage(void);
 static void help(void);
 
-constexpr int a = 0;
-
 int main(int argc, char** argv) {
 
 
-	cedar::print(sizeof(int&));
+	cedar::print(sizeof(cedar::number));
 
   srand((unsigned int)time(nullptr));
 

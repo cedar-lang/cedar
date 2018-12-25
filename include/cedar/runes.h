@@ -39,7 +39,7 @@ namespace cedar {
 
 		protected:
 
-			typedef std::string container;
+			typedef std::u32string container;
 			container buf;
 
 			void ingest_utf8(std::string);

@@ -1,8 +1,8 @@
-CC = gcc
-CXX = g++
-WARNINGS = -Wall -Wformat -Wno-deprecated-declarations -Wno-unused
+CC = clang
+CXX = clang++
+WARNINGS = -Wall -Wextra -Wformat -Wno-deprecated-declarations -Wno-unused -Weffc++
 CFLAGS = -I./include -g
-CXXLDLIBS =  -std=c++17 -pthread -lffi -lc
+CXXLDLIBS = -std=c++17 -pthread -lffi -lc
 
 UNAME := $(shell uname)
 
@@ -13,6 +13,8 @@ ifeq ($(UNAME), Linux)
 	SHAREDARGS = -fPIC -shared
 	CXXLDLIBS += -ldl
 	CFLAGS += -fPIC
+	CC = gcc
+	CXX = g++
 endif
 
 objs = $(srcs:.cc=.o)
@@ -60,7 +62,7 @@ $(OBJDIR)/cc/%.o: $(addprefix $(SRCDIR)/,%.cc) ${includes}
 
 build/libcedar.so: $(CXXOBJFILES) $(COBJFILES)
 	@printf " SO\t$@\n"
-	$(CXX) $(SHAREDARGS) $(CXXLDLIBS) $(WARNINGS) -o $@ $(CXXOBJFILES) $(COBJFILES)
+	@$(CXX) $(SHAREDARGS) $(CXXLDLIBS) $(WARNINGS) -o $@ $(CXXOBJFILES) $(COBJFILES)
 
 $(exe): build/libcedar.so main.cc
 	@printf " LD\t$@\n"

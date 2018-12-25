@@ -44,7 +44,7 @@ void context::eval_expr(cedar::runes expr) {
 	auto top_level = reader->run(expr);
 
 	for (auto obj : top_level) {
-		//std::cout << obj->to_string() << std::endl;
+		std::cout << obj->to_string() << std::endl;
 	}
 	parse_lock.unlock();
 }

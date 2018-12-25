@@ -54,7 +54,7 @@ ref cedar::get_nil(void) {
 cedar::nil::nil() {}
 cedar::nil::~nil() {}
 
-cedar::runes nil::to_string(bool human) {
+cedar::runes nil::to_string(bool) {
 	return U"nil";
 }
 

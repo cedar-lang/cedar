@@ -64,7 +64,7 @@ namespace cedar {
 
 	template<typename... Args>
 		inline void print(Args const&... args) {
-			int a[] = {0, ( (void)(std::cout << args << " "), 0 ) ... };
+			(void)(int[]){0, ( (void)(std::cout << args << " "), 0 ) ... };
 			putchar('\n');
 		}
 } // namespace cedar

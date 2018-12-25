@@ -39,7 +39,7 @@ number::number(double val) {
 
 number::~number(void) {}
 
-cedar::runes number::to_string(bool human) {
+cedar::runes number::to_string(bool) {
 	return std::to_string(m_val);
 }
 

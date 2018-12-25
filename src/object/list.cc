@@ -57,7 +57,7 @@ void list::set_rest(ref n_rest) {
 	this->m_rest = n_rest;
 }
 
-cedar::runes list::to_string(bool human) {
+cedar::runes list::to_string(bool) {
 	cedar::runes s;
 
 
@@ -79,7 +79,6 @@ cedar::runes list::to_string(bool human) {
 	ref curr = this;
 
 	while (!curr.get_first()->is<nil>()) {
-
 		s += curr.get_first()->to_string();
 		if (!curr.get_rest()->is<nil>()) {
 			if (curr.get_rest()->is_pair()) {

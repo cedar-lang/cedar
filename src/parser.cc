@@ -85,7 +85,7 @@ token lexer::lex() {
 
 
 	if (c == ';') {
-		while (peek() != '\n' && peek() != -1) next();
+		while (peek() != '\n' && (int32_t)peek() != -1) next();
 
 		return lex();
 	}
@@ -94,7 +94,7 @@ token lexer::lex() {
 	if (isspace(c))
 		return lex();
 
-	if (c == -1 || c == 0) {
+	if ((int32_t)c == -1 || c == 0) {
 		return token(tok_eof, "");
 	}
 
@@ -178,7 +178,7 @@ token lexer::lex() {
 	cedar::runes symbol;
 	symbol += c;
 
-	while (!in_charset(peek(), L" \n\t(){},'`@") && peek() != -1) {
+	while (!in_charset(peek(), L" \n\t(){},'`@")) {
 		symbol += next();
 	}
 
@@ -225,11 +225,10 @@ std::vector<ref> reader::run(cedar::runes source) {
 	return statements;
 }
 
-
 token reader::peek(int offset) {
-	int new_i = index + offset;
-	if (new_i < 0 || new_i > tokens.size()) {
-		return token(tok_eof, "");
+	unsigned long new_i = index + offset;
+	if (new_i < 0 || new_i >= tokens.size()) {
+		return token(tok_eof, U"");
 	}
 
 	return tokens[new_i];
@@ -238,6 +237,7 @@ token reader::peek(int offset) {
 token reader::move(int offset) {
 	tok = peek(offset);
 	index += offset;
+
 	return tok;
 }
 
@@ -253,8 +253,8 @@ token reader::prev(void) {
 
 ref reader::parse_expr(void) {
 
-	print(tok);
 	switch (tok.type) {
+		case tok_string:
 		case tok_keyword:
 		case tok_symbol:
 			return parse_symbol();
@@ -284,11 +284,9 @@ ref reader::parse_list(void) {
 
 
 	while (tok.type != tok_right_paren) {
-
 		if (tok.type == tok_eof) {
 			throw make_exception("unexpected eof in list");
 		}
-
 		ref item = parse_expr();
 		items.push_back(item);
 	}
@@ -313,8 +311,10 @@ ref reader::parse_list(void) {
 		curr = lst;
 	}
 
+
 	// skip over the closing paren
 	next();
+
 	return obj;
 }
 

@@ -42,7 +42,7 @@ cedar::symbol::symbol(cedar::runes content) {
 cedar::symbol::~symbol() {
 }
 
-cedar::runes symbol::to_string(bool human) {
+cedar::runes symbol::to_string(bool) {
 	return m_content;
 }
 
