@@ -43,50 +43,61 @@
 #include <cedar/vm/bytecode.h>
 
 
+#include <bitset>
+
 static void usage(void);
 static void help(void);
 
+using ref = cedar::ref;
+ref fib(ref n) {
+    if (n < 2) {
+        return n;
+    }
+    return fib(n - 1) + fib(n - 2);
+}
+
+
 int main(int argc, char** argv) {
 
+	cedar::print(fib(35));
+	exit(0);
 
-	cedar::print(sizeof(cedar::number));
+	srand((unsigned int)time(nullptr));
 
-  srand((unsigned int)time(nullptr));
+	// src is the program that will be evaulated
+	// where it is loaded in is determined later
+	cedar::runes src;
 
-  // src is the program that will be evaulated
-  // where it is loaded in is determined later
-  cedar::runes src;
+	if (argc > 1) {
+		src = cedar::util::read_file(argv[1]);
+	}
 
-  if (argc > 1) {
-    src = cedar::util::read_file(argv[1]);
-  }
-
-  try {
-    auto ctx = cedar::make<cedar::context>();
-    bool interactive = false;
-    char c;
-    while ((c = getopt(argc, argv, "ihe:")) != -1) {
-      switch (c) {
-	case 'h':
-	  help();
-	  exit(0);
-	case 'i':
-	  interactive = true;
-	  break;
-	  // TODO: implement evaluate argument
-	case 'e': {
-	  cedar::runes expr = optarg;
-	  ctx->eval_expr(expr);
-	  break;
-	};
-	default:
-	  usage();
-	  exit(-1);
-	  break;
-      }
-    }
-    for (int index = optind; index < argc; index++) {
-      ctx->eval_file(argv[index]);
+	try {
+		auto ctx = cedar::make<cedar::context>();
+		bool interactive = false;
+		char c;
+		while ((c = getopt(argc, argv, "ihe:")) != -1) {
+			switch (c) {
+				case 'h':
+					help();
+					exit(0);
+				case 'i':
+					interactive = true;
+					break;
+					// TODO: implement evaluate argument
+				case 'e': {
+										cedar::runes expr = optarg;
+										ctx->eval_expr(expr);
+										break;
+									};
+				default:
+									usage();
+									exit(-1);
+									break;
+			}
+		}
+		for (int index = optind; index < argc; index++) {
+			ctx->eval_file(argv[index]);
 		}
 
 
@@ -95,36 +106,36 @@ int main(int argc, char** argv) {
 		exit(-1);
 	} catch (const std::length_error& le) {
 		std::cerr << "Length error: " << le.what() << '\n';
-  } catch (const std::out_of_range& oor) {
-    std::cerr << "Out of Range error: " << oor.what() << '\n';
-  } catch (std::exception& e) {
+	} catch (const std::out_of_range& oor) {
+		std::cerr << "Out of Range error: " << oor.what() << '\n';
+	} catch (std::exception& e) {
 
 		std::cerr << "Exception name: " << typeid(e).name() << std::endl;
-    std::cerr << "Fatal Exception: " << e.what() << std::endl;
-    exit(-1);
-  } catch (...) {
+		std::cerr << "Fatal Exception: " << e.what() << std::endl;
+		exit(-1);
+	} catch (...) {
 		printf("unknown\n");
 		exit(-1);
 	}
 
-  return 0;
+	return 0;
 }
 
 // print out the usage
 static void usage(void) {
-  printf("usage: cedar [-ih] [-e expression] [files ...]\n");
+	printf("usage: cedar [-ih] [-e expression] [files ...]\n");
 }
 
 // print out the help
 static void help(void) {
-  printf("cedar lisp v%s\n", CEDAR_VERSION);
-  printf("  ");
-  usage();
-  printf("Flags:\n");
-  printf("  -i Run in an interactive repl\n");
-  printf("  -h Show this help menu\n");
-  printf("  -e Evaluate an expression\n");
-  printf("\n");
+	printf("cedar lisp v%s\n", CEDAR_VERSION);
+	printf("  ");
+	usage();
+	printf("Flags:\n");
+	printf("  -i Run in an interactive repl\n");
+	printf("  -h Show this help menu\n");
+	printf("  -e Evaluate an expression\n");
+	printf("\n");
 }
 
 

@@ -61,15 +61,15 @@ cedar::runes list::to_string(bool) {
 	cedar::runes s;
 
 
-	if (m_first->is<nil>()) {
+	if (m_first.is<nil>()) {
 		return "()";
 	}
 
 	if (is_pair()) {
 		s += "(";
-		s += m_first->to_string();
+		s += m_first.to_string();
 		s += " . ";
-		s += m_rest->to_string();
+		s += m_rest.to_string();
 		s += ")";
 		return s;
 	}
@@ -78,17 +78,17 @@ cedar::runes list::to_string(bool) {
 	s += "(";
 	ref curr = this;
 
-	while (!curr.get_first()->is<nil>()) {
-		s += curr.get_first()->to_string();
-		if (!curr.get_rest()->is<nil>()) {
+	while (!curr.get_first().is<nil>()) {
+		s += curr.get_first().to_string();
+		if (!curr.get_rest().is<nil>()) {
 			if (curr.get_rest()->is_pair()) {
 				s += " ";
-				s += curr.get_rest().get_first()->to_string();
+				s += curr.get_rest().get_first().to_string();
 				s += " . ";
-				s += curr.get_rest().get_rest()->to_string();
+				s += curr.get_rest().get_rest().to_string();
 				break;
 			}
-			if (!curr.get_rest().get_first()->is<nil>()) {
+			if (!curr.get_rest().get_first().is<nil>()) {
 				s += " ";
 			}
 			curr = curr.get_rest();

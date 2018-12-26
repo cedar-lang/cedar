@@ -56,7 +56,8 @@ namespace cedar {
 			void set_first(ref);
 			void set_rest(ref);
 
-			cedar::runes to_string(bool human = false);
 			ref to_number();
+		protected:
+			cedar::runes to_string(bool human = false);
 	};
 }

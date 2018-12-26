@@ -298,10 +298,10 @@ ref reader::parse_list(void) {
 		ref lst = new_const_obj<list>();
 		curr.set_first(items[i]);
 
-		if (i+1 <= last_i && items[i+1]->is<symbol>() && items[i+1]->as<symbol>()->get_content() == ".") {
+		if (i+1 <= last_i && items[i+1].is<symbol>() && items[i+1].as<symbol>()->get_content() == ".") {
 			if (i+1 != last_i-1) throw make_exception("Illegal end of dotted list");
 			curr.set_rest(items[last_i]);
-			if (curr.get_rest()->is<nil>()) {
+			if (curr.get_rest().is<nil>()) {
 				curr.set_rest(new_const_obj<list>());
 			}
 			break;
@@ -356,10 +356,26 @@ ref reader::parse_symbol(void) {
 
 ref reader::parse_number(void) {
 	std::string str = tok.val;
-	double value = atof(str.c_str());
-	ref obj = new_const_obj<number>(value);
+
+	bool is_float = false;
+
+
+	for (auto & c : tok.val) {
+		if (c == '.') {
+			is_float = true;
+			break;
+		}
+	}
+
+
 	next();
-	return obj;
+
+
+	if (is_float) {
+		return atof(str.c_str());
+	} else {
+		return atoll(str.c_str());
+	}
 }
 
 

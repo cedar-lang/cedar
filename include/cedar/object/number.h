@@ -34,23 +34,23 @@
 #include <cedar/ref.hpp>
 
 namespace cedar {
-	// number is an in-language object representation of a number type
-	// and it's the only kind of type that can be used in calculations
-	//
-	// It will possibly allow different types of numbers (double, int, etc...)
-	// but for now it just is a 64 bit double precsion floating point number
-	class number : public object {
-		private:
-			// a list stores two references, the car/cdr in old lisp
-			// they will default to the `nil` singleton object
-			double m_val = 0.0;
 
+	// number is a special case object. It isn't
+	// meant to be constructed. as all numbers
+	// simply live inside a reference and all
+	// arithmatic is delegated to references
+	// attempting to construct a number class
+	// will result in an exception.
+	//
+	// this class simply exists to allow type checking
+	class number : public object {
 		public:
 			number(void);
 			number(double);
 			~number(void);
 
-			cedar::runes to_string(bool human = false);
 			ref to_number();
+		protected:
+			cedar::runes to_string(bool human = false);
 	};
 }

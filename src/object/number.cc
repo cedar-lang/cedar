@@ -31,27 +31,22 @@
 using namespace cedar;
 
 
-number::number(void) {}
+number::number(void) {
+	throw cedar::make_exception("cedar::number depricated");
+}
 
-number::number(double val) {
-	m_val = val;
+number::number(double) {
+	throw cedar::make_exception("cedar::number depricated");
 }
 
 number::~number(void) {}
 
 cedar::runes number::to_string(bool) {
-	return std::to_string(m_val);
+	return std::to_string(0);
 }
 
 cedar::ref number::to_number() {
 	return this;
 }
-
-
-
-
-
-
-
 
 

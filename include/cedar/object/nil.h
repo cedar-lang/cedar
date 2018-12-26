@@ -42,8 +42,9 @@ namespace cedar {
 			nil(void);
 			~nil(void);
 
-			cedar::runes to_string(bool human = false);
 			ref to_number();
+		protected:
+			cedar::runes to_string(bool human = false);
 	};
 
 

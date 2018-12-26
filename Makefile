@@ -1,8 +1,8 @@
 CC = clang
 CXX = clang++
 WARNINGS = -Wall -Wextra -Wformat -Wno-deprecated-declarations -Wno-unused -Weffc++
-CFLAGS = -I./include -g
-CXXLDLIBS = -std=c++17 -pthread -lffi -lc
+CFLAGS = -flto -I./include -O3
+CXXLDLIBS = -flto -std=c++17 -O3 -pthread -lffi -lc
 
 UNAME := $(shell uname)
 

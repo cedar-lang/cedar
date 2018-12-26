@@ -43,7 +43,8 @@ namespace cedar {
 			void set_content(cedar::runes);
 			cedar::runes get_content(void);
 
-			cedar::runes to_string(bool human = false);
 			ref to_number();
+		protected:
+			cedar::runes to_string(bool human = false);
 	};
 }

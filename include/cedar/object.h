@@ -46,24 +46,33 @@ namespace cedar {
 	class object {
 
 		protected:
-		public:
 
-			// const char *name = "object";
-
-
-			// set no_autofree to true to have the refcount system ignore this object
-			// when it would be freed
-			bool no_autofree = false;
-
-			// refcount is used by the `ref` class to determine how many things hold
-			// references to this particular object on the heap
-			uint32_t refcount = 0;
-
-			virtual ~object() {};
-
-			virtual ref to_number() = 0;
+			friend ref;
 			virtual cedar::runes to_string(bool human = false) = 0;
 
+
+
+			/*
+			 * type_name
+			 *
+			 * returns the c++ abi demangled type name of the polymorphic object class
+			 * that is extending the cedar::object class
+			 */
+			inline cedar::runes type_name() {
+
+				int status;
+
+				const char *given_name = typeid(*this).name();
+				// use the c++ abi to demangle the name that typeid gives back;
+				char *realname = abi::__cxa_demangle(given_name, 0, 0, &status);
+				if (status) {
+					throw cedar::make_exception("unable to demangle name of type with the c++ abi: ", given_name);
+				}
+
+				cedar::runes r = realname;
+				delete realname;
+				return r;
+			}
 			/*
 			 * is<T>
 			 *
@@ -93,41 +102,27 @@ namespace cedar {
 				return typeid(*this).hash_code();
 			}
 
+		public:
+
+			// const char *name = "object";
+
+
+			// set no_autofree to true to have the refcount system ignore this object
+			// when it would be freed
+			bool no_autofree = false;
+
+			// refcount is used by the `ref` class to determine how many things hold
+			// references to this particular object on the heap
+			uint32_t refcount = 0;
+
+			virtual ~object() {};
+
+			virtual ref to_number() = 0;
+
+
 
 			bool is_pair(void);
 
-			/*
-			 * type_name
-			 *
-			 * returns the c++ abi demangled type name of the polymorphic object class
-			 * that is extending the cedar::object class
-			 */
-			inline cedar::runes type_name() {
-
-				int status;
-
-				const char *given_name = typeid(*this).name();
-				// use the c++ abi to demangle the name that typeid gives back;
-				char *realname = abi::__cxa_demangle(given_name, 0, 0, &status);
-				if (status) {
-					throw cedar::make_exception("unable to demangle name of type with the c++ abi: ", given_name);
-				}
-
-				cedar::runes r = realname;
-				delete realname;
-				return r;
-			}
 	};
-
-
-	inline std::ostream& operator<<(std::ostream& os, ptr<object>& o) {
-		os << o->to_string();
-		return os;
-	}
-
-	inline std::ostream& operator<<(std::ostream& os, ref o) {
-		os << o->to_string();
-		return os;
-	}
 
 }
