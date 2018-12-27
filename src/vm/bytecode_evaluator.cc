@@ -1,3 +1,4 @@
+
 /*
  * MIT License
  *
@@ -22,29 +23,14 @@
  * SOFTWARE.
  */
 
-#pragma once
+#include <cedar/vm/bytecode_evaluator.h>
+#include <cedar/ref.hpp>
 
-#include <cedar/vm/instruction.h>
+using namespace cedar;
 
-#define OP_NOP         0x00
-#define OP_PUSH_NIL    0x01
-#define OP_PUSH_NILS   0x02
-#define OP_PUSH_TRUE   0x03
-#define OP_LOAD_CONST  0x04
+vm::bytecode_evaluator::~bytecode_evaluator() {
+}
 
-
-
-
-#define OP_PUSH_FLOAT  0x10
-
-#define inst_push_float(val) cedar::vm::instruction{ .op = OP_PUSH_FLOAT, .arg_float = (val) }
-#define inst_add() cedar::vm::instruction{ .op = OP_ADD }
-
-// CEDAR_FOREACH_OPCODE takes some macro function V(name, opcode)
-#define CEDAR_FOREACH_OPCODE(F) \
-	F(NOP,    OP_NOP,         no_arg)  /* push a single nil to the stack */ \
-	F(NIL,    OP_PUSH_NIL,    no_arg)  /* push a single nil to the stack */ \
-	F(NILS,   OP_PUSH_NILS,   imm_int) /* push n nils to the stack */ \
-	F(T,      OP_PUSH_TRUE,   no_arg)  /* loads a nil onto the stack */  \
-	F(CONST,  OP_LOAD_CONST,  imm_int) /* loads a function's nth constant onto the stack */ \
-	F(PUSH_FLOAT, OP_PUSH_FLOAT, imm_float) /* pushes a single float to the stack */
+ref vm::bytecode_evaluator::eval(ref thing) {
+	return thing;
+}

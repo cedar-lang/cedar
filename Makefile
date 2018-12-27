@@ -1,6 +1,6 @@
 CC = clang
 CXX = clang++
-WARNINGS = -Wall -Wextra -Wformat -Wno-deprecated-declarations -Wno-unused -Weffc++
+WARNINGS = -Wall -Wextra -Wno-deprecated-declarations -Wno-unused -Wno-ignored-qualifiers
 CFLAGS = -flto -I./include -O3
 CXXLDLIBS = -flto -std=c++17 -O3 -pthread -lffi -lc
 
@@ -46,7 +46,6 @@ compile: $(OBJDIR) $(exe)
 all: compile
 
 $(OBJDIR):
-	echo $(SHAREDARGS)
 	@mkdir -p $@
 
 $(OBJDIR)/c/%.o: $(addprefix $(SRCDIR)/,%.c) ${includes}
@@ -64,11 +63,18 @@ build/libcedar.so: $(CXXOBJFILES) $(COBJFILES)
 	@printf " SO\t$@\n"
 	@$(CXX) $(SHAREDARGS) $(CXXLDLIBS) $(WARNINGS) -o $@ $(CXXOBJFILES) $(COBJFILES)
 
-$(exe): build/libcedar.so main.cc
-	@printf " LD\t$@\n"
-	@cp build/libcedar.so /usr/local/lib/libcedar.so
+
+# the main file must be compiled seperately because a cedar shared
+# object file will be compiled in future. Seperating this out makes
+# it slightly easier
+build/main.o: main.cc
+	@printf " CXX\t$@\n"
 	@$(CXX) $(WARNINGS) $(CFLAGS) -g -c main.cc -o build/main.o
-	@$(CXX) $(CXXLDLIBS) $(WARNINGS) -g -Lbuild -lcedar -o $@ build/main.o
+
+
+$(exe): build/main.o $(CXXOBJFILES) $(COBJFILES)
+	@printf " LD\t$@\n"
+	@$(CXX) $(CXXLDLIBS) $(WARNINGS) -g -o $@ build/main.o $(CXXOBJFILES) $(COBJFILES)
 
 
 clean:

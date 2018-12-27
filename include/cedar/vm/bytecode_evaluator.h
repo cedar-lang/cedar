@@ -44,9 +44,7 @@ namespace cedar {
 				friend cedar::vm::bytecode_compiler;
 
 			public:
-				~bytecode_evaluator() {
-					printf("bytecode evaluator destructed\n");
-				}
+				~bytecode_evaluator();
 
 				/*
 				 * given some object reference,

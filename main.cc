@@ -96,13 +96,6 @@ int main(int argc, char** argv) {
 		}
 
 
-	} catch (const utf8::invalid_code_point& e) {
-		fprintf(stderr, "\n\n\nunknown code point (%U): %s\n\n\n\n", e.code_point(), e.what());
-		exit(-1);
-	} catch (const std::length_error& le) {
-		std::cerr << "Length error: " << le.what() << '\n';
-	} catch (const std::out_of_range& oor) {
-		std::cerr << "Out of Range error: " << oor.what() << '\n';
 	} catch (std::exception& e) {
 
 		std::cerr << "Exception name: " << typeid(e).name() << std::endl;
@@ -134,10 +127,3 @@ static void help(void) {
 }
 
 
-void *operator new(size_t size) {
-	return calloc(size, 1);
-}
-
-void operator delete(void *ptr) noexcept {
-	free(ptr);
-}

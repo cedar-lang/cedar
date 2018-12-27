@@ -121,7 +121,7 @@ std::string cedar::vm::instruction::to_string() {
 
 
 	char hexbuf[12];
-	sprintf(hexbuf, "0x%08llx", address);
+	sprintf(hexbuf, "0x%08lx", address);
 
 	buf << hexbuf << "  ";
 	buf << instruction_name(*this);

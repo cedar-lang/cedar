@@ -226,8 +226,8 @@ std::vector<ref> reader::run(cedar::runes source) {
 }
 
 token reader::peek(int offset) {
-	unsigned long new_i = index + offset;
-	if (new_i < 0 || new_i >= tokens.size()) {
+	uint64_t new_i = index + offset;
+	if (new_i >= tokens.size()) {
 		return token(tok_eof, U"");
 	}
 
@@ -351,9 +351,6 @@ ref reader::parse_symbol(void) {
 	return return_obj;
 }
 
-
-
-
 ref reader::parse_number(void) {
 	std::string str = tok.val;
 
@@ -366,15 +363,11 @@ ref reader::parse_number(void) {
 			break;
 		}
 	}
-
-
 	next();
-
-
 	if (is_float) {
 		return atof(str.c_str());
 	} else {
-		return atoll(str.c_str());
+		return (int64_t)atoll(str.c_str());
 	}
 }
 
