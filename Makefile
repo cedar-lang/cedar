@@ -39,7 +39,7 @@ COBJFILES := $(subst $(SRCDIR),$(OBJDIR)/c,$(CSRCFILES:%.c=%.o))
 .PHONY: all clean gen lib install test
 
 default:
-	@$(MAKE) -j $(shell getconf _NPROCESSORS_ONLN) all
+	@$(MAKE) -j 8 all
 
 compile: $(OBJDIR) $(exe)
 

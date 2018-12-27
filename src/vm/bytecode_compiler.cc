@@ -1,4 +1,3 @@
-
 /*
  * MIT License
  *
@@ -23,30 +22,15 @@
  * SOFTWARE.
  */
 
-#pragma once
-
-
+#include <cedar/vm/bytecode_compiler.h>
+#include <cedar/vm/bytecode_evaluator.h>
 #include <cedar/ref.hpp>
-#include <cedar/compiler.h>
-#include <cstdio>
 
-namespace cedar {
-	namespace vm {
-		/*
-		 * bytecode_compiler
-		 */
-		class bytecode_compiler : public compiler {
+using namespace cedar;
 
-			protected:
+vm::bytecode_compiler::~bytecode_compiler() {}
 
-			public:
-				~bytecode_compiler();
-
-				/*
-				 * given some object reference,
-				 * compile it into this specific target
-				 */
-				void compile(ref);
-		};
-	}
+void vm::bytecode_compiler::compile(ref thing) {
 }
+
+
