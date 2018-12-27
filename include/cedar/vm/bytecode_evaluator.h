@@ -24,29 +24,35 @@
 
 #pragma once
 
-#ifndef CEDAR_HH
-#define CEDAR_HH
+#include <cedar/ref.hpp>
+#include <cedar/evaluator.h>
+#include <cedar/vm/bytecode.h>
+#include <cedar/vm/bytecode_compiler.h>
 
-#include "cedar/version.h"
-#include "cedar/compiler.h"
-#include "cedar/evaluator.h"
-#include "cedar/parser.h"
-#include "cedar/context.h"
-#include "cedar/vm/bytecode.h"
-#include "cedar/vm/bytecode_compiler.h"
-#include "cedar/vm/bytecode_evaluator.h"
-#include "cedar/vm/instruction.h"
-#include "cedar/object/symbol.h"
-#include "cedar/object/nil.h"
-#include "cedar/object/list.h"
-#include "cedar/object/sequence.h"
-#include "cedar/object/number.h"
-#include "cedar/memory.h"
-#include "cedar/object.h"
-#include "cedar/runes.h"
-#include "cedar/util.hpp"
-#include "cedar/opcode.h"
-#include "cedar/exception.hpp"
-#include "cedar/ref.hpp"
+#include <cstdio>
 
-#endif
+namespace cedar {
+	namespace vm {
+		/*
+		 * bytecode_compiler
+		 */
+		class bytecode_evaluator : public evaluator {
+			protected:
+				cedar::vm::bytecode code;
+				cedar::vm::bytecode_compiler compiler;
+
+				friend cedar::vm::bytecode_compiler;
+
+			public:
+				~bytecode_evaluator() {
+					printf("bytecode evaluator destructed\n");
+				}
+
+				/*
+				 * given some object reference,
+				 * compile it into this specific target
+				 */
+				ref eval(ref);
+		};
+	}
+}

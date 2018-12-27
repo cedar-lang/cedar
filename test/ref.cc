@@ -3,5 +3,5 @@
 
 
 TEST_CASE("ref size is 16 bytes") {
-	REQUIRE(sizeof(cedar::ref) == 15);
+	REQUIRE(sizeof(cedar::ref) == 16);
 }

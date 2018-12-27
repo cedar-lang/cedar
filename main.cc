@@ -41,6 +41,7 @@
 #include <cedar.h>
 #include <cedar/opcode.h>
 #include <cedar/vm/bytecode.h>
+#include <cedar/compiler.h>
 
 
 #include <bitset>
@@ -48,19 +49,13 @@
 static void usage(void);
 static void help(void);
 
-using ref = cedar::ref;
-ref fib(ref n) {
-    if (n < 2) {
-        return n;
-    }
-    return fib(n - 1) + fib(n - 2);
-}
-
-
 int main(int argc, char** argv) {
 
-	cedar::print(fib(35));
-	exit(0);
+
+
+	std::shared_ptr<cedar::evaluator> ev = std::make_shared<cedar::vm::bytecode_evaluator>();
+
+	cedar::print(sizeof(cedar::compiler));
 
 	srand((unsigned int)time(nullptr));
 
