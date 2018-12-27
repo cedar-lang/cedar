@@ -118,10 +118,8 @@ std::vector<instruction> cedar::vm::decode_bytecode(bytecode* bc) {
 std::string cedar::vm::instruction::to_string() {
 	std::ostringstream buf;
 
-
-
 	char hexbuf[12];
-	sprintf(hexbuf, "0x%08lx", address);
+	sprintf(hexbuf, "0x%08lx", (uint64_t)address);
 
 	buf << hexbuf << "  ";
 	buf << instruction_name(*this);
@@ -154,10 +152,6 @@ std::string cedar::vm::instruction::to_string() {
 }
 
 
-
-
-
-
 static std::string instruction_name(instruction &i) {
 	switch (i.op) {
 
@@ -169,3 +163,5 @@ static std::string instruction_name(instruction &i) {
 	}
 	return "unknown";
 }
+
+

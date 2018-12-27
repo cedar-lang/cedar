@@ -20,7 +20,7 @@ endif
 objs = $(srcs:.cc=.o)
 includes = $(wildcard include/*)
 
-exe = cedar
+exe = bin/cedar
 
 SRCDIR = src
 OBJDIR = build
@@ -74,12 +74,13 @@ build/main.o: main.cc
 
 $(exe): build/main.o $(CXXOBJFILES) $(COBJFILES)
 	@printf " LD\t$@\n"
+	@mkdir -p bin
 	@$(CXX) $(CXXLDLIBS) $(WARNINGS) -g -o $@ build/main.o $(CXXOBJFILES) $(COBJFILES)
 
 
 clean:
 	@rm -rf $(OBJDIR)
-	@rm -rf $(exe)
+	@rm -rf bin
 	@rm -rf lib/stdbind.so*
 	@rm -rf testbuild
 	@rm -rf test/test
