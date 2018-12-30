@@ -62,6 +62,7 @@ namespace cedar {
 
 
 
+
 #define FLAG_NUMBER 0
 #define FLAG_FLOAT  1
 
@@ -79,6 +80,10 @@ namespace cedar {
 
 				object *obj = nullptr;
 			};
+			[[nodiscard]] constexpr auto get(void) const noexcept {
+				return obj;
+			}
+
 
 			inline uint16_t inc() {
 				if (!is_object()) return 0;
