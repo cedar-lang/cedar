@@ -19,7 +19,7 @@ include(${CMAKE_SOURCE_DIR}/src/cedar/CMakeLists.txt)
 add_executable(cedar-bin src/main.cc)
 
 
-target_link_libraries(cedar-bin cedar-lib -lgc -lffi)
+target_link_libraries(cedar-bin cedar-lib)
 
 set_target_properties(cedar-bin PROPERTIES OUTPUT_NAME cedar)
 
