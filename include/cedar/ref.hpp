@@ -80,9 +80,6 @@ namespace cedar {
 
 				object *obj = nullptr;
 			};
-			[[nodiscard]] constexpr auto get(void) const noexcept {
-				return obj;
-			}
 
 
 			inline uint16_t inc() {
@@ -231,7 +228,7 @@ namespace cedar {
 
 
 			template<typename T>
-				inline T * const get() const {
+				inline T * get() const {
 					return reinterpret_cast<T*>(obj);
 				}
 

@@ -58,7 +58,6 @@ int main(int argc, char** argv) {
 		// contain a JIT evaluator or an AOT evaluator
 
 
-		bool interactive = false;
 		char c;
 		while ((c = getopt(argc, argv, "ihe:")) != -1) {
 			switch (c) {
@@ -66,7 +65,6 @@ int main(int argc, char** argv) {
 					help();
 					exit(0);
 				case 'i':
-					interactive = true;
 					break;
 					// TODO: implement evaluate argument
 				case 'e': {
