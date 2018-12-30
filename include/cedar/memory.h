@@ -27,7 +27,6 @@
 
 #include <memory>
 #include <cedar/exception.hpp>
-#include <boost/static_assert.hpp>
 
 
 namespace cedar {
