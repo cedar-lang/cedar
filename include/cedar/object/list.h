@@ -49,6 +49,8 @@ namespace cedar {
 
 		public:
 			list(void);
+			list(ref, ref);
+			list(std::vector<ref>);
 			~list(void);
 			ref get_first(void);
 			ref get_rest(void);
@@ -57,6 +59,8 @@ namespace cedar {
 			void set_rest(ref);
 
 			ref to_number();
+
+			inline const char *object_type_name(void) { return "list"; };
 		protected:
 			cedar::runes to_string(bool human = false);
 	};

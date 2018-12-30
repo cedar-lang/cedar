@@ -1,5 +1,5 @@
 CXX = clang++
-WARNINGS = -Wall -Wformat -Wno-unused-command-line-argument -Wno-deprecated-declarations -Wno-unused
+WARNINGS = -Wall -Wformat -Wno-unused-parameter -Wno-unused-command-line-argument -Wno-deprecated-declarations -Wno-unused
 CFLAGS = -I../include -g -O3
 CXXLDLIBS =  -std=c++17 -O3 -pthread -lffi -lc -lgc
 

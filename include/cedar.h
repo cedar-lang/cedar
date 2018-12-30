@@ -28,13 +28,11 @@
 #define CEDAR_HH
 
 #include "cedar/version.h"
-#include "cedar/compiler.h"
-#include "cedar/evaluator.h"
 #include "cedar/parser.h"
 #include "cedar/context.h"
 #include "cedar/vm/bytecode.h"
-#include "cedar/vm/bytecode_compiler.h"
-#include "cedar/vm/bytecode_evaluator.h"
+#include "cedar/vm/compiler.h"
+#include "cedar/vm/machine.h"
 #include "cedar/vm/instruction.h"
 #include "cedar/object/symbol.h"
 #include "cedar/object/nil.h"
@@ -45,7 +43,7 @@
 #include "cedar/object.h"
 #include "cedar/runes.h"
 #include "cedar/util.hpp"
-#include "cedar/opcode.h"
+#include "cedar/vm/opcode.h"
 #include "cedar/exception.hpp"
 #include "cedar/ref.hpp"
 

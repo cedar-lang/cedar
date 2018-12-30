@@ -23,24 +23,40 @@
  */
 
 #pragma once
+
 #include <cedar/ref.hpp>
+#include <cedar/vm/bytecode.h>
+#include <cedar/vm/compiler.h>
+
+#include <cstdio>
 
 namespace cedar {
+	namespace vm {
 
-	/*
-	 * evaluator
-   *
-   * an abstract class that allows a reference to be evaluated
-	 */
-	class evaluator {
 
-		public:
-			virtual ~evaluator() {}
+		class machine {
+			protected:
 
-			/*
-			 * given some object reference,
-			 * compile it into this specific target
-			 */
-			virtual ref eval(ref) = 0;
-	};
+				std::vector<ref> constants;
+				cedar::vm::compiler m_compiler;
+
+				friend cedar::vm::compiler;
+
+				// mapping from symbol names to references
+				std::map<cedar::runes, ref> global_bindings;
+
+				uint64_t stacksize = 0;
+				ref *stack = nullptr;
+
+			public:
+				machine(void);
+				~machine(void);
+
+				/*
+				 * given some object reference,
+				 * compile it into this specific target
+				 */
+				ref eval(ref);
+		};
+	}
 }

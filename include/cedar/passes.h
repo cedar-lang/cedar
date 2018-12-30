@@ -23,24 +23,26 @@
  */
 
 #pragma once
+
 #include <cedar/ref.hpp>
 
 namespace cedar {
 
-	/*
-	 * compiler
-	 *
-	 * a class that needs to be implemented in order
-	 * to compile to various targets (bytecode etc..)
-	 */
-	class compiler {
-		public:
-			virtual ~compiler() {}
 
-			/*
-			 * given some object reference,
-			 * compile it into this specific target
-			 */
-			virtual void compile(ref) = 0;
+	typedef ref (*pass_function)(ref);
+
+
+	ref wrap_top_level_with_lambdas(ref);
+
+
+	class passcontroller {
+		private:
+			ref m_val;
+			int m_pass_count = 0;
+		public:
+			passcontroller(ref);
+
+			ref get(void);
+			passcontroller& pipe(pass_function);
 	};
 }

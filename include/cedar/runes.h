@@ -36,10 +36,14 @@ namespace cedar {
 	using rune = uint32_t;
 
 	class runes {
+		public:
+
+			typedef std::u32string container;
 
 		protected:
 
-			typedef std::u32string container;
+			friend std::hash<cedar::runes>;
+
 			container buf;
 
 			void ingest_utf8(std::string);
@@ -90,7 +94,10 @@ namespace cedar {
 
 			runes& operator=(const runes&);
 
+			bool operator==(const runes &other) const;
+
 			bool operator==(const runes&);
+
 
 			operator std::string() const;
 
@@ -116,3 +123,12 @@ namespace cedar {
 };
 
 
+template <>
+struct std::hash<cedar::runes> {
+	std::size_t operator()(const cedar::runes& k) const
+	{
+		std::hash<cedar::runes::container> hash_func;
+
+		return hash_func(k.buf);
+	}
+};

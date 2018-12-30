@@ -143,6 +143,7 @@ namespace cedar {
 			// parse symbols (variable names)
 			// and keyword variants
 			ref parse_symbol(void);
+			ref parse_string(void);
 
 			ref parse_number(void);
 

@@ -39,36 +39,25 @@
 #include <string>
 
 #include <cedar.h>
-#include <cedar/opcode.h>
-#include <cedar/vm/bytecode.h>
-#include <cedar/compiler.h>
 
-
-#include <bitset>
+#include <unordered_map>
 
 static void usage(void);
 static void help(void);
 
 int main(int argc, char** argv) {
-
-
-
-	std::shared_ptr<cedar::evaluator> ev = std::make_shared<cedar::vm::bytecode_evaluator>();
-
-	cedar::print(sizeof(cedar::compiler));
-
 	srand((unsigned int)time(nullptr));
 
-	// src is the program that will be evaulated
-	// where it is loaded in is determined later
-	cedar::runes src;
-
-	if (argc > 1) {
-		src = cedar::util::read_file(argv[1]);
-	}
-
+	std::unordered_map<cedar::runes, int> vals;
 	try {
-		auto ctx = cedar::make<cedar::context>();
+		auto ctx = std::make_shared<cedar::context>();
+
+		// each context contains an evaluator that must be set
+		// externally. for now, it defaults to only a bytecode
+		// evaluator. In future, this may be extended to also
+		// contain a JIT evaluator or an AOT evaluator
+
+
 		bool interactive = false;
 		char c;
 		while ((c = getopt(argc, argv, "ihe:")) != -1) {
@@ -82,7 +71,7 @@ int main(int argc, char** argv) {
 					// TODO: implement evaluate argument
 				case 'e': {
 										cedar::runes expr = optarg;
-										ctx->eval_expr(expr);
+										ctx->eval_string(expr);
 										break;
 									};
 				default:
@@ -95,9 +84,7 @@ int main(int argc, char** argv) {
 			ctx->eval_file(argv[index]);
 		}
 
-
 	} catch (std::exception& e) {
-
 		std::cerr << "Exception name: " << typeid(e).name() << std::endl;
 		std::cerr << "Fatal Exception: " << e.what() << std::endl;
 		exit(-1);
@@ -125,5 +112,3 @@ static void help(void) {
 	printf("  -e Evaluate an expression\n");
 	printf("\n");
 }
-
-

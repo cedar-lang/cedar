@@ -29,6 +29,7 @@
 
 #include <cedar/object/list.h>
 #include <cedar/object/symbol.h>
+#include <cedar/object/string.h>
 #include <cedar/object/number.h>
 #include <cedar/object/nil.h>
 
@@ -255,6 +256,7 @@ ref reader::parse_expr(void) {
 
 	switch (tok.type) {
 		case tok_string:
+			return parse_string();
 		case tok_keyword:
 		case tok_symbol:
 			return parse_symbol();
@@ -275,8 +277,6 @@ ref reader::parse_expr(void) {
 }
 
 ref reader::parse_list(void) {
-	ref obj = new_const_obj<list>();
-
 	std::vector<ref> items;
 
 	// skip over the first paren
@@ -291,45 +291,22 @@ ref reader::parse_list(void) {
 		items.push_back(item);
 	}
 
-	unsigned len = items.size();
-	unsigned last_i = len - 1;
-	ref curr = obj;
-	for (unsigned i = 0; i < len; i++) {
-		ref lst = new_const_obj<list>();
-		curr.set_first(items[i]);
 
-		if (i+1 <= last_i && items[i+1].is<symbol>() && items[i+1].as<symbol>()->get_content() == ".") {
-			if (i+1 != last_i-1) throw make_exception("Illegal end of dotted list");
-			curr.set_rest(items[last_i]);
-			if (curr.get_rest().is<nil>()) {
-				curr.set_rest(new_const_obj<list>());
-			}
-			break;
-		}
-
-		curr.set_rest(lst);
-		curr = lst;
-	}
-
-
+	ref list_obj = cedar::new_obj<list>(items);
 	// skip over the closing paren
 	next();
 
-	return obj;
+	return list_obj;
 }
 
 
 
 
 ref reader::parse_special_syntax(cedar::runes function_name) {
-	ref obj = new_const_obj<list>();
-	obj.set_first(new_const_obj<symbol>(function_name));
+	// skip over the "special syntax token"
 	next();
-	obj.set_rest(new_const_obj<list>());
-	ref val = parse_expr();
-	// print(obj.get_rest());
-	// obj.get_rest().set_first(val);
-	// print(obj);
+	std::vector<ref> items = { new_obj<symbol>(function_name), parse_expr() };
+	ref obj = new_const_obj<list>(items);
 	return obj;
 }
 
@@ -373,3 +350,9 @@ ref reader::parse_number(void) {
 
 
 
+ref reader::parse_string(void) {
+	ref obj = new_const_obj<string>();
+	obj.as<string>()->set_content(tok.val);
+	next();
+	return obj;
+}

@@ -1,4 +1,3 @@
-
 /*
  * MIT License
  *
@@ -23,35 +22,30 @@
  * SOFTWARE.
  */
 
+#include <cedar/context.h>
+#include <cedar/memory.h>
+#include <cedar/util.hpp>
 
 
-#pragma once
+using namespace cedar;
 
-#include <cedar/object.h>
+context::context() {
+	reader = make<cedar::reader>();
+	m_evaluator = std::make_shared<cedar::vm::machine>();
+}
 
-#include <cedar/object/sequence.h>
-#include <cedar/runes.h>
-#include <cedar/ref.hpp>
+void context::eval_file(cedar::runes name) {
+	cedar::runes src = cedar::util::read_file(name);
+	return this->eval_string(src);
+}
 
-namespace cedar {
+void context::eval_string(cedar::runes expr) {
+	parse_lock.lock();
 
-	// number is a special case object. It isn't
-	// meant to be constructed. as all numbers
-	// simply live inside a reference and all
-	// arithmatic is delegated to references
-	// attempting to construct a number class
-	// will result in an exception.
-	//
-	// this class simply exists to allow type checking
-	class number : public object {
-		public:
-			number(void);
-			number(double);
-			~number(void);
+	auto top_level = reader->run(expr);
 
-			ref to_number();
-			inline const char *object_type_name(void) { return "number"; };
-		protected:
-			cedar::runes to_string(bool human = false);
-	};
+	for (auto obj : top_level) {
+		ref return_value = m_evaluator->eval(obj);
+	}
+	parse_lock.unlock();
 }

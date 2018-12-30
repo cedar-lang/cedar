@@ -22,15 +22,31 @@
  * SOFTWARE.
  */
 
-#include <cedar/vm/bytecode_compiler.h>
-#include <cedar/vm/bytecode_evaluator.h>
+
+#pragma once
+
+#include <cedar/object.h>
+#include <cedar/runes.h>
 #include <cedar/ref.hpp>
 
-using namespace cedar;
+namespace cedar {
 
-vm::bytecode_compiler::~bytecode_compiler() {}
+	class string : public object {
+		private:
+			cedar::runes m_content;
 
-void vm::bytecode_compiler::compile(ref thing) {
+		public:
+			string(void);
+			string(cedar::runes);
+			~string(void);
+
+			void set_content(cedar::runes);
+			cedar::runes get_content(void);
+
+			ref to_number();
+			inline const char *object_type_name(void) { return "string"; };
+
+		protected:
+			cedar::runes to_string(bool human = false);
+	};
 }
-
-

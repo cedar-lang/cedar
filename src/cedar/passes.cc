@@ -22,30 +22,47 @@
  * SOFTWARE.
  */
 
-#include <cedar/context.h>
-#include <cedar/memory.h>
-#include <cedar/util.hpp>
+#include <cedar/passes.h>
+#include <cedar/ref.hpp>
+#include <cedar/object/list.h>
+#include <cedar/object/symbol.h>
+#include <cedar/object/nil.h>
 
 
 using namespace cedar;
 
-context::context() {
-	reader = make<cedar::reader>();
+cedar::passcontroller::passcontroller(ref val) {
+	m_val = val;
 }
 
-void context::eval_file(cedar::runes name) {
-	cedar::runes src = cedar::util::read_file(name);
-	return this->eval_expr(src);
+
+ref passcontroller::get(void) {
+	return m_val;
 }
 
-void context::eval_expr(cedar::runes expr) {
-	parse_lock.lock();
 
-	auto top_level = reader->run(expr);
+#define PASS_DEBUG
+passcontroller& passcontroller::pipe(pass_function f) {
 
-	for (auto obj : top_level) {
-		std::cout << obj.to_string() << std::endl;
-	}
-	parse_lock.unlock();
+	ref oldval = m_val;
+	m_val = f(m_val);
+	m_pass_count++;
+#ifdef PASS_DEBUG
+	std::cout << "PASS " << m_pass_count << ": \n   from: " << oldval << "\n     to: " << m_val << std::endl;
+#endif
+	return *this;
 }
 
+
+ref cedar::wrap_top_level_with_lambdas(ref val) {
+
+
+
+	std::vector<ref> expr;
+	expr.push_back(cedar::new_obj<symbol>("lambda"));
+	expr.push_back(cedar::new_obj<list>());
+	expr.push_back(val);
+	ref lambda = cedar::new_obj<list>(expr);
+
+	return lambda;
+}

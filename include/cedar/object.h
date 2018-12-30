@@ -51,6 +51,9 @@ namespace cedar {
 			virtual cedar::runes to_string(bool human = false) = 0;
 
 
+			// virtual const char *object_type_name(void);
+
+
 
 			/*
 			 * type_name
@@ -124,5 +127,14 @@ namespace cedar {
 			bool is_pair(void);
 
 	};
+
+
+	template<const char * N>
+		class named_object : public object {
+			public:
+				const char *object_type_name(void) {
+					return N;
+				}
+		};
 
 }

@@ -44,6 +44,8 @@ namespace cedar {
 			cedar::runes get_content(void);
 
 			ref to_number();
+			inline const char *object_type_name(void) { return "symbol"; };
+
 		protected:
 			cedar::runes to_string(bool human = false);
 	};

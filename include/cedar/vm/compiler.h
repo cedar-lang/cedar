@@ -27,26 +27,33 @@
 
 
 #include <cedar/ref.hpp>
-#include <cedar/compiler.h>
+#include <cedar/vm/bytecode.h>
 #include <cstdio>
+#include <vector>
+#include <stack>
 
 namespace cedar {
 	namespace vm {
-		/*
-		 * bytecode_compiler
-		 */
-		class bytecode_compiler : public compiler {
 
+		// forwared declaration
+		class machine;
+
+
+		class compiler {
 			protected:
-
+				cedar::vm::machine *m_vm;
 			public:
-				~bytecode_compiler();
+				compiler(cedar::vm::machine *vm);
+				~compiler();
 
 				/*
 				 * given some object reference,
-				 * compile it into this specific target
+				 * compile it into bytecode and return
+				 * the address of the start of the bytecode
+				 * representation of that object
 				 */
-				void compile(ref);
+				ref compile(ref);
+
 		};
 	}
 }

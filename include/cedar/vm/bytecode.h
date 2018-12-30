@@ -56,22 +56,6 @@ namespace cedar {
 		class bytecode {
 
 			private:
-				// a mapping of unresolved references to other parts of
-				// the bytecode. This is populated with static jumps and
-				// when a lambda is defined in-language
-				//
-				// Whenever the compiler registers a label with the bytecode,
-				// it will look through the list of unresolved references for
-				// jumps and function refs that require that label's bytecode
-				// address
-				std::map<std::string, std::list<uint64_t*>> unresolved_references;
-
-
-
-				// the code pointer is where this instance's bytecode is actually
-				// stored. All calls for read interpret a type from this byte vector
-				// and calls for write append to it.
-				uint8_t *code;
 
 				// size is how many bytes are written into the code pointer
 				// it also determines *where* to write when writing new data
@@ -80,6 +64,11 @@ namespace cedar {
 				uint64_t cap = 255;
 
 			public:
+
+				// the code pointer is where this instance's bytecode is actually
+				// stored. All calls for read interpret a type from this byte vector
+				// and calls for write append to it.
+				uint8_t *code;
 
 				inline bytecode() {
 					code = new uint8_t[255];

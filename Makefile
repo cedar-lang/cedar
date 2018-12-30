@@ -1,8 +1,8 @@
 CC = clang
 CXX = clang++
-WARNINGS = -Wall -Wextra -Wno-deprecated-declarations -Wno-unused -Wno-ignored-qualifiers
-CFLAGS = -flto -I./include -O3
-CXXLDLIBS = -flto -std=c++17 -O3 -pthread -lffi -lc
+WARNINGS = -Wall -Wextra -Wno-unused-parameter -Wno-deprecated-declarations -Wno-unused -Wno-ignored-qualifiers
+CFLAGS = -flto -I./include -O3 -g
+CXXLDLIBS = -flto -std=c++17 -O3 -g -pthread -lgc -lffi -lc
 
 UNAME := $(shell uname)
 
@@ -41,7 +41,7 @@ COBJFILES := $(subst $(SRCDIR),$(OBJDIR)/c,$(CSRCFILES:%.c=%.o))
 default:
 	@$(MAKE) -j 8 all
 
-compile: $(OBJDIR) $(exe)
+compile: gen $(OBJDIR) $(exe)
 
 all: compile
 
@@ -77,6 +77,11 @@ $(exe): build/main.o $(CXXOBJFILES) $(COBJFILES)
 	@mkdir -p bin
 	@$(CXX) $(CXXLDLIBS) $(WARNINGS) -g -o $@ build/main.o $(CXXOBJFILES) $(COBJFILES)
 
+
+gen: include/cedar/vm/opcode.h
+
+include/cedar/vm/opcode.h: tools/scripts/generate_opcode_h.py
+	python3 tools/scripts/generate_opcode_h.py
 
 clean:
 	@rm -rf $(OBJDIR)

@@ -25,6 +25,7 @@
 
 #include <cedar/object/list.h>
 #include <cedar/object/nil.h>
+#include <cedar/object/symbol.h>
 #include <cedar/ref.hpp>
 
 using namespace cedar;
@@ -33,6 +34,38 @@ using namespace cedar;
 list::list(void) {
 	m_first = get_nil();
 	m_rest = get_nil();
+}
+
+list::list(ref first, ref rest) {
+	m_first = first;
+	m_rest = rest;
+}
+
+list::list(std::vector<ref> items) {
+
+	ref sac = new_obj<list>();
+	unsigned len = items.size();
+	unsigned last_i = len - 1;
+	ref curr = sac;
+	for (unsigned i = 0; i < len; i++) {
+		ref lst = new_const_obj<list>();
+		curr.set_first(items[i]);
+
+		if (i+1 <= last_i && items[i+1].is<symbol>() && items[i+1].as<symbol>()->get_content() == ".") {
+			if (i+1 != last_i-1) throw make_exception("Illegal end of dotted list");
+			curr.set_rest(items[last_i]);
+			if (curr.get_rest().is<nil>()) {
+				curr.set_rest(new_const_obj<list>());
+			}
+			break;
+		}
+
+		curr.set_rest(lst);
+		curr = lst;
+	}
+
+	set_first(sac.get_first());
+	set_rest(sac.get_rest());
 }
 
 list::~list(void) {

@@ -135,6 +135,9 @@ runes& runes::operator+=(rune c) {
 bool runes::operator==(const runes& other) {
 	return other.buf == buf;
 }
+bool runes::operator==(const runes& other) const {
+	return other.buf == buf;
+}
 
 
 runes::operator std::string() const {

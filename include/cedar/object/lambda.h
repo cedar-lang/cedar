@@ -24,33 +24,24 @@
 
 #pragma once
 
+#include <cedar/object.h>
+#include <cedar/runes.h>
 #include <cedar/ref.hpp>
-#include <cedar/evaluator.h>
 #include <cedar/vm/bytecode.h>
-#include <cedar/vm/bytecode_compiler.h>
-
-#include <cstdio>
 
 namespace cedar {
-	namespace vm {
-		/*
-		 * bytecode_compiler
-		 */
-		class bytecode_evaluator : public evaluator {
-			protected:
-				cedar::vm::bytecode code;
-				cedar::vm::bytecode_compiler compiler;
 
-				friend cedar::vm::bytecode_compiler;
+	class lambda : public object {
+		public:
+			cedar::vm::bytecode *code;
+			lambda(void);
+			lambda(cedar::vm::bytecode*);
+			~lambda(void);
 
-			public:
-				~bytecode_evaluator();
+			ref to_number();
+			inline const char *object_type_name(void) { return "lambda"; };
+		protected:
+			cedar::runes to_string(bool human = false);
+	};
 
-				/*
-				 * given some object reference,
-				 * compile it into this specific target
-				 */
-				ref eval(ref);
-		};
-	}
 }

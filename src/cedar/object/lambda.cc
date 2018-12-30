@@ -22,14 +22,39 @@
  * SOFTWARE.
  */
 
-#include <cedar/vm/bytecode_evaluator.h>
-#include <cedar/ref.hpp>
+#include <cstdio>
+#include <string>
+
+#include <cedar/object.h>
+#include <cedar/object/lambda.h>
+#include <cedar/memory.h>
+
 
 using namespace cedar;
 
-vm::bytecode_evaluator::~bytecode_evaluator() {
+cedar::lambda::lambda() {
+	code = nullptr;
+}
+cedar::lambda::lambda(cedar::vm::bytecode *n_code) {
+	code = n_code;
+}
+cedar::lambda::~lambda() {
+	delete code;
 }
 
-ref vm::bytecode_evaluator::eval(ref thing) {
-	return thing;
+cedar::runes lambda::to_string(bool) {
+
+	char buf[30];
+	std::sprintf(buf, "%p", (void*)code);
+
+	cedar::runes str;
+	str += "<lambda ";
+	str += buf;
+	str += ">";
+	return str;
+}
+
+
+ref lambda::to_number() {
+	throw cedar::make_exception("Attempt to cast lambda to number failed");
 }

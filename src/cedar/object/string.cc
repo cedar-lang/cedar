@@ -1,4 +1,3 @@
-
 /*
  * MIT License
  *
@@ -23,35 +22,47 @@
  * SOFTWARE.
  */
 
-
-
-#pragma once
+#include <cstdio>
 
 #include <cedar/object.h>
+#include <cedar/object/string.h>
+#include <cedar/memory.h>
+#include <cedar/util.hpp>
 
-#include <cedar/object/sequence.h>
-#include <cedar/runes.h>
-#include <cedar/ref.hpp>
+using namespace cedar;
 
-namespace cedar {
+static ref the_nil = nullptr;
 
-	// number is a special case object. It isn't
-	// meant to be constructed. as all numbers
-	// simply live inside a reference and all
-	// arithmatic is delegated to references
-	// attempting to construct a number class
-	// will result in an exception.
-	//
-	// this class simply exists to allow type checking
-	class number : public object {
-		public:
-			number(void);
-			number(double);
-			~number(void);
+cedar::string::string(void) {}
+cedar::string::string(cedar::runes content) {
+	m_content = content;
+}
 
-			ref to_number();
-			inline const char *object_type_name(void) { return "number"; };
-		protected:
-			cedar::runes to_string(bool human = false);
-	};
+
+cedar::string::~string() {
+}
+
+cedar::runes string::to_string(bool human) {
+	cedar::runes str;
+	if (!human) {
+		str += "\"";
+		str += m_content;
+		str += "\"";
+	} else {
+		str += m_content;
+	}
+	return str;
+}
+
+void string::set_content(cedar::runes content) {
+	m_content = content;
+}
+
+cedar::runes string::get_content(void) {
+	return m_content;
+}
+
+
+ref string::to_number() {
+	throw cedar::make_exception("Attempt to cast string to number failed");
 }

@@ -37,7 +37,9 @@ uint16_t cedar::change_refcount(object *o, int change) {
 uint16_t cedar::get_refcount(object *o) { return o->refcount; }
 
 void cedar::delete_object(object *o) {
-  if (!o->no_autofree) delete o;
+  if (!o->no_autofree) {
+		delete o;
+	}
 }
 
 ref cedar::ref::get_first() const {
@@ -73,6 +75,8 @@ cedar::runes ref::to_string(bool human) {
     }
     return std::to_string(m_int);
   }
+
+	if (obj == nullptr) return U"nil";
   return obj->to_string(human);
 }
 

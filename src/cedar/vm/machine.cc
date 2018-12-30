@@ -1,4 +1,3 @@
-
 /*
  * MIT License
  *
@@ -23,35 +22,24 @@
  * SOFTWARE.
  */
 
-
-
-#pragma once
-
-#include <cedar/object.h>
-
-#include <cedar/object/sequence.h>
-#include <cedar/runes.h>
+#include <cedar/vm/machine.h>
 #include <cedar/ref.hpp>
 
-namespace cedar {
+using namespace cedar;
 
-	// number is a special case object. It isn't
-	// meant to be constructed. as all numbers
-	// simply live inside a reference and all
-	// arithmatic is delegated to references
-	// attempting to construct a number class
-	// will result in an exception.
-	//
-	// this class simply exists to allow type checking
-	class number : public object {
-		public:
-			number(void);
-			number(double);
-			~number(void);
+vm::machine::machine(void) : m_compiler(this) {
+	stacksize = 512;
+	stack = new ref[stacksize];
+}
 
-			ref to_number();
-			inline const char *object_type_name(void) { return "number"; };
-		protected:
-			cedar::runes to_string(bool human = false);
-	};
+
+vm::machine::~machine() {
+	delete[] stack;
+}
+
+ref vm::machine::eval(ref obj) {
+
+	ref compiled_lambda = m_compiler.compile(obj);
+
+	return nullptr;
 }

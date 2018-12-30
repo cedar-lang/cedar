@@ -22,29 +22,33 @@
  * SOFTWARE.
  */
 
-#pragma once
+#include <cedar/vm/compiler.h>
+#include <cedar/vm/machine.h>
+#include <cedar/passes.h>
+#include <cedar/ref.hpp>
 
-#include <cedar/vm/instruction.h>
-
-#define OP_NOP         0x00
-#define OP_PUSH_NIL    0x01
-#define OP_PUSH_NILS   0x02
-#define OP_PUSH_TRUE   0x03
-#define OP_LOAD_CONST  0x04
+using namespace cedar;
 
 
+vm::compiler::compiler(cedar::vm::machine *vm) {
+	m_vm = vm;
+}
+vm::compiler::~compiler() {}
 
+ref vm::compiler::compile(ref obj) {
 
-#define OP_PUSH_FLOAT  0x10
+	passcontroller controller(obj);
 
-#define inst_push_float(val) cedar::vm::instruction{ .op = OP_PUSH_FLOAT, .arg_float = (val) }
-#define inst_add() cedar::vm::instruction{ .op = OP_ADD }
+	// run the value through some optimization and
+	// modification to the AST of the object before
+	// compiling to bytecode
+	ref final_value =
+		controller
+		// top level objects must be lambdas, as that's
+		// all that the evaluator knows how to evaluate
+		// by passing 0 arguments to it
+		.pipe(wrap_top_level_with_lambdas)
+		.get();
 
-// CEDAR_FOREACH_OPCODE takes some macro function V(name, opcode)
-#define CEDAR_FOREACH_OPCODE(F) \
-	F(NOP,    OP_NOP,         no_arg)  /* push a single nil to the stack */ \
-	F(NIL,    OP_PUSH_NIL,    no_arg)  /* push a single nil to the stack */ \
-	F(NILS,   OP_PUSH_NILS,   imm_int) /* push n nils to the stack */ \
-	F(T,      OP_PUSH_TRUE,   no_arg)  /* loads a nil onto the stack */  \
-	F(CONST,  OP_LOAD_CONST,  imm_int) /* loads a function's nth constant onto the stack */ \
-	F(PUSH_FLOAT, OP_PUSH_FLOAT, imm_float) /* pushes a single float to the stack */
+	return obj;
+}

@@ -26,7 +26,9 @@
 #pragma once
 
 #include <cedar/parser.h>
+#include <cedar/vm/machine.h>
 #include <cedar/memory.h>
+
 #include <vector>
 #include <mutex>
 
@@ -41,22 +43,19 @@ namespace cedar {
 	 */
 	class context {
 		private:
-			ptr<cedar::reader> reader;
+			std::shared_ptr<cedar::reader> reader;
 			// require a lock for reading
 			std::mutex parse_lock;
 
 			// the bytecode for this object
 			std::vector<uint8_t> code;
 
-		public:
 
-			/*
-			 * the only constructor for a context is blank, as you interact with it
-			 * by calling member functions to alter state.
-			 */
+			std::shared_ptr<cedar::vm::machine> m_evaluator = nullptr;
+
+		public:
 			context();
 			void eval_file(cedar::runes);
-			void eval_expr(cedar::runes);
-
+			void eval_string(cedar::runes);
 	};
 }

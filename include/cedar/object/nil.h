@@ -1,4 +1,3 @@
-
 /*
  * MIT License
  *
@@ -43,6 +42,7 @@ namespace cedar {
 			~nil(void);
 
 			ref to_number();
+			inline const char *object_type_name(void) { return "nil"; };
 		protected:
 			cedar::runes to_string(bool human = false);
 	};
