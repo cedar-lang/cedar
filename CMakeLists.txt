@@ -23,7 +23,7 @@ target_link_libraries(cedar-bin cedar-lib)
 
 set_target_properties(cedar-bin PROPERTIES OUTPUT_NAME cedar)
 
-target_compile_options(cedar-bin PRIVATE -Wall -Wextra -Werror)
+target_compile_options(cedar-bin PRIVATE -Wall -Wextra)
 
 
 install(TARGETS cedar-bin DESTINATION bin)
