@@ -54,6 +54,13 @@ namespace cedar {
 				 */
 				ref compile(ref);
 
+
+
 		};
+
+
+		// a bytecode compilation pass that takes in the compiler
+		// oboejct
+		ref bytecode_pass(ref, compiler*);
 	}
 }

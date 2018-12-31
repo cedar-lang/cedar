@@ -22,47 +22,61 @@
  * SOFTWARE.
  */
 
+#include <cedar/vm/compiler.h>
+#include <cedar/vm/machine.h>
 #include <cedar/passes.h>
 #include <cedar/ref.hpp>
-#include <cedar/object/list.h>
-#include <cedar/object/symbol.h>
-#include <cedar/object/nil.h>
 
+#include <cedar/object/list.h>
+#include <cedar/object/lambda.h>
+#include <cedar/object/symbol.h>
 
 using namespace cedar;
 
-cedar::passcontroller::passcontroller(ref val) {
-	m_val = val;
+
+vm::compiler::compiler(cedar::vm::machine *vm) {
+	m_vm = vm;
+}
+vm::compiler::~compiler() {}
+
+
+
+ref vm::compiler::compile(ref obj) {
+
+	passcontroller controller(obj, this);
+
+
+	std::cout << "Compile: " << obj << std::endl;
+	// run the value through some optimization and
+	// modification to the AST of the object before
+	// compiling to bytecode
+	ref compiled =
+		controller
+		.pipe(wrap_top_level_with_lambdas, "top level lambda wrapping")
+		.pipe(vm::bytecode_pass, "bytecode emission") // compile the object to a code lambda
+		.get();
+
+	std::cout << std::endl;
+
+	return compiled;
 }
 
 
-ref passcontroller::get(void) {
-	return m_val;
+///////////////////////////////////////////////////////
+// the entry point for the bytecode pass
+
+ref cedar::vm::bytecode_pass(ref obj, vm::compiler *) {
+
+	auto code = cedar::new_obj<cedar::lambda>();
+	// the bytecode pass requires that the object
+	// be a lambda expression at the top level
+	if (!obj.is<cedar::list>() || !obj.get_first().is<cedar::symbol>() || !(obj.get_first().as<symbol>()->get_content() == "lambda")) {
+		throw cedar::make_exception("Compiler: bytecode_pass requires a lambda expression");
+	}
+
+	return code;
 }
 
-
-#define PASS_DEBUG
-passcontroller& passcontroller::pipe(pass_function f) {
-
-	ref oldval = m_val;
-	m_val = f(m_val);
-	m_pass_count++;
-#ifdef PASS_DEBUG
-	std::cout << "PASS " << m_pass_count << ": \n   from: " << oldval << "\n     to: " << m_val << std::endl;
-#endif
-	return *this;
-}
+//////////////////////////////////////////////////////
 
 
-ref cedar::wrap_top_level_with_lambdas(ref val) {
-
-
-
-	std::vector<ref> expr;
-	expr.push_back(cedar::new_obj<symbol>("lambda"));
-	expr.push_back(cedar::new_obj<list>());
-	expr.push_back(val);
-	ref lambda = cedar::new_obj<list>(expr);
-
-	return lambda;
-}

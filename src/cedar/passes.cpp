@@ -22,33 +22,64 @@
  * SOFTWARE.
  */
 
-#include <cedar/vm/compiler.h>
-#include <cedar/vm/machine.h>
 #include <cedar/passes.h>
 #include <cedar/ref.hpp>
+#include <cedar/object/list.h>
+#include <cedar/object/symbol.h>
+#include <cedar/object/nil.h>
+#include <cedar/vm/compiler.h>
+
+
+#include <chrono>
 
 using namespace cedar;
 
+#define PASS_DEBUG
 
-vm::compiler::compiler(cedar::vm::machine *vm) {
-	m_vm = vm;
+
+cedar::passcontroller::passcontroller(ref val, vm::compiler *c) {
+	m_val = val;
+	m_compiler = c;
 }
-vm::compiler::~compiler() {}
 
-ref vm::compiler::compile(ref obj) {
 
-	passcontroller controller(obj);
+ref passcontroller::get(void) {
+	return m_val;
+}
 
-	// run the value through some optimization and
-	// modification to the AST of the object before
-	// compiling to bytecode
-	ref final_value =
-		controller
-		// top level objects must be lambdas, as that's
-		// all that the evaluator knows how to evaluate
-		// by passing 0 arguments to it
-		.pipe(wrap_top_level_with_lambdas)
-		.get();
+passcontroller& passcontroller::pipe(pass_function f, const char *name) {
 
-	return obj;
+#ifdef PASS_DEBUG
+	auto start = std::chrono::system_clock::now();
+#endif
+
+	ref oldval = m_val;
+	m_val = f(m_val, m_compiler);
+	m_pass_count++;
+
+#ifdef PASS_DEBUG
+	auto end = std::chrono::system_clock::now();
+	std::chrono::duration<double> elapsed_seconds = end - start;
+
+	printf(" %3d: %4fms - %s\n",
+			m_pass_count,
+			elapsed_seconds.count() * 1000.0,
+			name);
+	// std::cout << "  " << m_pass_count << ": " << (elapsed_seconds.count() * 1000.0) << "ms - PASS '" << name << std::endl;
+#endif
+	return *this;
+}
+
+
+ref cedar::wrap_top_level_with_lambdas(ref val, vm::compiler *) {
+
+
+
+	std::vector<ref> expr;
+	expr.push_back(cedar::new_obj<symbol>("lambda"));
+	expr.push_back(cedar::new_obj<list>());
+	expr.push_back(val);
+	ref lambda = cedar::new_obj<list>(expr);
+
+	return lambda;
 }

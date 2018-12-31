@@ -229,7 +229,7 @@ namespace cedar {
 
 			template<typename T>
 				inline T * get() const {
-					return reinterpret_cast<T*>(obj);
+					return dynamic_cast<T*>(obj);
 				}
 
 			/*
@@ -248,7 +248,7 @@ namespace cedar {
 			 * attempts to cast the object to a shared pointer of another object type
 			 */
 			template<typename T>
-				inline T *as() {
+				inline T *as() const {
 					return dynamic_cast<T*>(obj);
 				}
 
@@ -398,4 +398,11 @@ namespace cedar {
 			r.set_const(true);
 			return r;
 		}
+
+
+	template<class T>
+		constexpr inline T *ref_cast(const ref &r) {
+			return r.as<T>();
+		}
+
 } // namespace cedar

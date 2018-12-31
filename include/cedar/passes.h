@@ -29,20 +29,25 @@
 namespace cedar {
 
 
-	typedef ref (*pass_function)(ref);
 
+	namespace vm {
+		class compiler;
+	};
 
-	ref wrap_top_level_with_lambdas(ref);
+	typedef ref (*pass_function)(ref, vm::compiler*);
+
+	ref wrap_top_level_with_lambdas(ref, vm::compiler*);
 
 
 	class passcontroller {
 		private:
 			ref m_val;
+			vm::compiler *m_compiler;
 			int m_pass_count = 0;
 		public:
-			passcontroller(ref);
+			passcontroller(ref, vm::compiler*);
 
 			ref get(void);
-			passcontroller& pipe(pass_function);
+			passcontroller& pipe(pass_function, const char *);
 	};
 }

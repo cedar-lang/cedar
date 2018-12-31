@@ -37,26 +37,18 @@
 #include <chrono>
 #include <iostream>
 #include <string>
-
 #include <cedar.h>
 
-#include <unordered_map>
 
 static void usage(void);
 static void help(void);
 
+
 int main(int argc, char** argv) {
 	srand((unsigned int)time(nullptr));
 
-	std::unordered_map<cedar::runes, int> vals;
 	try {
 		auto ctx = std::make_shared<cedar::context>();
-
-		// each context contains an evaluator that must be set
-		// externally. for now, it defaults to only a bytecode
-		// evaluator. In future, this may be extended to also
-		// contain a JIT evaluator or an AOT evaluator
-
 
 		char c;
 		while ((c = getopt(argc, argv, "ihe:")) != -1) {

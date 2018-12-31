@@ -13,7 +13,7 @@ set_target_properties(cedar-lib PROPERTIES OUTPUT_NAME cedar)
 with open('src/cedar/CMakeLists.txt', 'w') as f:
     f.write(header)
     f.write('add_library(cedar-lib SHARED\n')
-    for filename in glob.iglob('src/cedar/**/*.cc', recursive=True):
+    for filename in glob.iglob('src/cedar/**/*.cpp', recursive=True):
         f.write('\t%s\n' % (filename))
     f.write(")")
     f.write(footer)

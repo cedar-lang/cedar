@@ -1,0 +1,7 @@
+(defvar π 3.1415926535)
+
+(defmacro λ (args &rest body)
+  `(lambda ,args ,@body))
+
+
+(* 2 3)

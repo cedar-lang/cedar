@@ -15,16 +15,16 @@ set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 include_directories(${CMAKE_SOURCE_DIR}/include)
 
 include(${CMAKE_SOURCE_DIR}/src/cedar/CMakeLists.txt)
+target_compile_options(cedar-lib PRIVATE -Wall -Wextra -flto)
 
-add_executable(cedar-bin src/main.cc)
-
+add_executable(cedar-bin src/main.cpp)
 
 target_link_libraries(cedar-bin cedar-lib)
-
 set_target_properties(cedar-bin PROPERTIES OUTPUT_NAME cedar)
 
-target_compile_options(cedar-bin PRIVATE -Wall -Wextra)
+target_compile_options(cedar-bin PRIVATE -Wall -Wextra -flto)
 
 
 install(TARGETS cedar-bin DESTINATION bin)
 install(TARGETS cedar-lib DESTINATION lib)
+
