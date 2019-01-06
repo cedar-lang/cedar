@@ -39,28 +39,28 @@ using namespace cedar::vm;
 
 static std::string instruction_name(instruction &i);
 
-bool instruction::encode(bytecode *bc) {
+bool instruction::encode(bytecode & bc) {
 
 	// write the opcode first,
-	bc->write<uint8_t>(op);
+	bc.write<uint8_t>(op);
 
 	// then write the arguments
 	switch (type()) {
 
 		case imm_object:
-			bc->write<object*>(arg_object);
+			bc.write<object*>(arg_object);
 			break;
 
 		case imm_float:
-			bc->write<double>(arg_float);
+			bc.write<double>(arg_float);
 			break;
 
 		case imm_int:
-			bc->write<int64_t>(arg_int);
+			bc.write<int64_t>(arg_int);
 			break;
 
 		case imm_ptr:
-			bc->write<void*>(arg_voidptr);
+			bc.write<void*>(arg_voidptr);
 			break;
 
 		case no_arg:
@@ -73,7 +73,7 @@ bool instruction::encode(bytecode *bc) {
 inst_type instruction::type(void) {
 	switch (op) {
 
-#define OP_CASE(_, code, op_type) case code: return op_type; break;
+#define OP_CASE(_, code, op_type, effect) case code: return op_type; break;
 		CEDAR_FOREACH_OPCODE(OP_CASE);
 #undef OP_CASE
 		default:
@@ -155,7 +155,7 @@ std::string cedar::vm::instruction::to_string() {
 static std::string instruction_name(instruction &i) {
 	switch (i.op) {
 
-#define OP_NAME(name, code, op_type) case code: return #name;
+#define OP_NAME(name, code, op_type, effect) case code: return #name;
 		CEDAR_FOREACH_OPCODE(OP_NAME);
 #undef OP_NAME
 		default:

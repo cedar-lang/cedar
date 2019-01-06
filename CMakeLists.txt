@@ -9,7 +9,7 @@ endif()
 set (CMAKE_CXX_STANDARD 17)
 
 set(CMAKE_CXX_FLAGS_DEBUG "-g")
-set(CMAKE_CXX_FLAGS_RELEASE "-O3")
+# set(CMAKE_CXX_FLAGS_RELEASE "-O3 -g")
 
 
 include_directories(${CMAKE_SOURCE_DIR}/include)

@@ -1,5 +1,5 @@
 #include "catch.hpp"
-#include <cedar/ref.hpp>
+#include <cedar/ref.h>
 
 
 TEST_CASE("ref size is 16 bytes") {

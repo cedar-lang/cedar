@@ -25,7 +25,7 @@
 
 #include <cedar/memory.h>
 #include <cedar/object.h>
-#include <cedar/ref.hpp>
+#include <cedar/ref.h>
 
 #include <cedar/object/list.h>
 #include <cedar/object/nil.h>

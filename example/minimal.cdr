@@ -1,2 +1,5 @@
-(set 'id
-     (lambda (x) x))
+(+ 1 2)
+
+(- 1 2)
+
+(set id (lambda (x) x))

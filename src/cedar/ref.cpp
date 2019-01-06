@@ -25,7 +25,7 @@
 #include <cedar/object.h>
 #include <cedar/object/number.h>
 #include <cedar/object/sequence.h>
-#include <cedar/ref.hpp>
+#include <cedar/ref.h>
 
 using namespace cedar;
 
@@ -38,8 +38,8 @@ uint16_t cedar::get_refcount(object *o) { return o->refcount; }
 
 void cedar::delete_object(object *o) {
   if (!o->no_autofree) {
-		delete o;
-	}
+    delete o;
+  }
 }
 
 ref cedar::ref::get_first() const {
@@ -70,16 +70,16 @@ void cedar::ref::set_const(bool c) { obj->no_autofree = c; }
 
 cedar::runes ref::to_string(bool human) {
   if (is_number()) {
-    if (is_float()) {
-      return std::to_string(m_float);
-    }
-    return std::to_string(m_int);
+  	return std::to_string(m_number);
   }
 
-	if (obj == nullptr) return U"nil";
+  if (obj == nullptr) return U"nil";
   return obj->to_string(human);
 }
 
-
-const std::type_info &cedar::get_number_typeid(void) { return typeid(cedar::number); }
-const std::type_info &cedar::get_object_typeid(object *obj) { return typeid(*obj); }
+const std::type_info &cedar::get_number_typeid(void) {
+  return typeid(cedar::number);
+}
+const std::type_info &cedar::get_object_typeid(object *obj) {
+  return typeid(*obj);
+}

@@ -30,7 +30,7 @@
 
 #include <cedar/object/sequence.h>
 #include <cedar/runes.h>
-#include <cedar/ref.hpp>
+#include <cedar/ref.h>
 
 namespace cedar {
 

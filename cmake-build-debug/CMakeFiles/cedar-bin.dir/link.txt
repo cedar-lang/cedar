@@ -1,0 +1,1 @@
+/usr/local/opt/llvm/bin/clang++  -g -Wl,-search_paths_first -Wl,-headerpad_max_install_names  CMakeFiles/cedar-bin.dir/src/main.cpp.o  -o cedar -Wl,-rpath,/Users/nick/dev/c/cedar/cmake-build-debug libcedar.dylib 

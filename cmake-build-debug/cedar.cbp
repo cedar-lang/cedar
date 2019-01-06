@@ -1,0 +1,227 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CodeBlocks_project_file>
+	<FileVersion major="1" minor="6"/>
+	<Project>
+		<Option title="cedar"/>
+		<Option makefile_is_custom="1"/>
+		<Option compiler="clang"/>
+		<Option virtualFolders="CMake Files\;CMake Files\src\;CMake Files\src\cedar\;"/>
+		<Build>
+			<Target title="all">
+				<Option working_dir="/Users/nick/dev/c/cedar/cmake-build-debug"/>
+				<Option type="4"/>
+				<MakeCommands>
+					<Build command="/usr/bin/make -j8 -f &quot;/Users/nick/dev/c/cedar/cmake-build-debug/Makefile&quot;  VERBOSE=1 all"/>
+					<CompileFile command="/usr/bin/make -j8 -f &quot;/Users/nick/dev/c/cedar/cmake-build-debug/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -j8 -f &quot;/Users/nick/dev/c/cedar/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -j8 -f &quot;/Users/nick/dev/c/cedar/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="install/local">
+				<Option working_dir="/Users/nick/dev/c/cedar/cmake-build-debug"/>
+				<Option type="4"/>
+				<MakeCommands>
+					<Build command="/usr/bin/make -j8 -f &quot;/Users/nick/dev/c/cedar/cmake-build-debug/Makefile&quot;  VERBOSE=1 install/local"/>
+					<CompileFile command="/usr/bin/make -j8 -f &quot;/Users/nick/dev/c/cedar/cmake-build-debug/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -j8 -f &quot;/Users/nick/dev/c/cedar/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -j8 -f &quot;/Users/nick/dev/c/cedar/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="install/strip">
+				<Option working_dir="/Users/nick/dev/c/cedar/cmake-build-debug"/>
+				<Option type="4"/>
+				<MakeCommands>
+					<Build command="/usr/bin/make -j8 -f &quot;/Users/nick/dev/c/cedar/cmake-build-debug/Makefile&quot;  VERBOSE=1 install/strip"/>
+					<CompileFile command="/usr/bin/make -j8 -f &quot;/Users/nick/dev/c/cedar/cmake-build-debug/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -j8 -f &quot;/Users/nick/dev/c/cedar/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -j8 -f &quot;/Users/nick/dev/c/cedar/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="install">
+				<Option working_dir="/Users/nick/dev/c/cedar/cmake-build-debug"/>
+				<Option type="4"/>
+				<MakeCommands>
+					<Build command="/usr/bin/make -j8 -f &quot;/Users/nick/dev/c/cedar/cmake-build-debug/Makefile&quot;  VERBOSE=1 install"/>
+					<CompileFile command="/usr/bin/make -j8 -f &quot;/Users/nick/dev/c/cedar/cmake-build-debug/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -j8 -f &quot;/Users/nick/dev/c/cedar/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -j8 -f &quot;/Users/nick/dev/c/cedar/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="list_install_components">
+				<Option working_dir="/Users/nick/dev/c/cedar/cmake-build-debug"/>
+				<Option type="4"/>
+				<MakeCommands>
+					<Build command="/usr/bin/make -j8 -f &quot;/Users/nick/dev/c/cedar/cmake-build-debug/Makefile&quot;  VERBOSE=1 list_install_components"/>
+					<CompileFile command="/usr/bin/make -j8 -f &quot;/Users/nick/dev/c/cedar/cmake-build-debug/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -j8 -f &quot;/Users/nick/dev/c/cedar/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -j8 -f &quot;/Users/nick/dev/c/cedar/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="cedar-bin">
+				<Option output="/Users/nick/dev/c/cedar/cmake-build-debug/cedar" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="/Users/nick/dev/c/cedar/cmake-build-debug"/>
+				<Option object_output="./"/>
+				<Option type="1"/>
+				<Option compiler="clang"/>
+				<Compiler>
+					<Add directory="/Users/nick/dev/c/cedar/include"/>
+					<Add directory="/usr/local/Cellar/llvm/7.0.1/include/c++/v1"/>
+					<Add directory="/usr/local/include"/>
+					<Add directory="/usr/local/Cellar/llvm/7.0.1/lib/clang/7.0.1/include"/>
+					<Add directory="/usr/include"/>
+					<Add directory="/System/Library/Frameworks"/>
+					<Add directory="/Library/Frameworks"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="/usr/bin/make -j8 -f &quot;/Users/nick/dev/c/cedar/cmake-build-debug/Makefile&quot;  VERBOSE=1 cedar-bin"/>
+					<CompileFile command="/usr/bin/make -j8 -f &quot;/Users/nick/dev/c/cedar/cmake-build-debug/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -j8 -f &quot;/Users/nick/dev/c/cedar/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -j8 -f &quot;/Users/nick/dev/c/cedar/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="cedar-bin/fast">
+				<Option output="/Users/nick/dev/c/cedar/cmake-build-debug/cedar" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="/Users/nick/dev/c/cedar/cmake-build-debug"/>
+				<Option object_output="./"/>
+				<Option type="1"/>
+				<Option compiler="clang"/>
+				<Compiler>
+					<Add directory="/Users/nick/dev/c/cedar/include"/>
+					<Add directory="/usr/local/Cellar/llvm/7.0.1/include/c++/v1"/>
+					<Add directory="/usr/local/include"/>
+					<Add directory="/usr/local/Cellar/llvm/7.0.1/lib/clang/7.0.1/include"/>
+					<Add directory="/usr/include"/>
+					<Add directory="/System/Library/Frameworks"/>
+					<Add directory="/Library/Frameworks"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="/usr/bin/make -j8 -f &quot;/Users/nick/dev/c/cedar/cmake-build-debug/Makefile&quot;  VERBOSE=1 cedar-bin/fast"/>
+					<CompileFile command="/usr/bin/make -j8 -f &quot;/Users/nick/dev/c/cedar/cmake-build-debug/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -j8 -f &quot;/Users/nick/dev/c/cedar/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -j8 -f &quot;/Users/nick/dev/c/cedar/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="cedar-lib">
+				<Option output="/Users/nick/dev/c/cedar/cmake-build-debug/libcedar.dylib" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="/Users/nick/dev/c/cedar/cmake-build-debug"/>
+				<Option object_output="./"/>
+				<Option type="3"/>
+				<Option compiler="clang"/>
+				<Compiler>
+					<Add directory="/Users/nick/dev/c/cedar/include"/>
+					<Add directory="/usr/local/Cellar/llvm/7.0.1/include/c++/v1"/>
+					<Add directory="/usr/local/include"/>
+					<Add directory="/usr/local/Cellar/llvm/7.0.1/lib/clang/7.0.1/include"/>
+					<Add directory="/usr/include"/>
+					<Add directory="/System/Library/Frameworks"/>
+					<Add directory="/Library/Frameworks"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="/usr/bin/make -j8 -f &quot;/Users/nick/dev/c/cedar/cmake-build-debug/Makefile&quot;  VERBOSE=1 cedar-lib"/>
+					<CompileFile command="/usr/bin/make -j8 -f &quot;/Users/nick/dev/c/cedar/cmake-build-debug/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -j8 -f &quot;/Users/nick/dev/c/cedar/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -j8 -f &quot;/Users/nick/dev/c/cedar/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="cedar-lib/fast">
+				<Option output="/Users/nick/dev/c/cedar/cmake-build-debug/libcedar.dylib" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="/Users/nick/dev/c/cedar/cmake-build-debug"/>
+				<Option object_output="./"/>
+				<Option type="3"/>
+				<Option compiler="clang"/>
+				<Compiler>
+					<Add directory="/Users/nick/dev/c/cedar/include"/>
+					<Add directory="/usr/local/Cellar/llvm/7.0.1/include/c++/v1"/>
+					<Add directory="/usr/local/include"/>
+					<Add directory="/usr/local/Cellar/llvm/7.0.1/lib/clang/7.0.1/include"/>
+					<Add directory="/usr/include"/>
+					<Add directory="/System/Library/Frameworks"/>
+					<Add directory="/Library/Frameworks"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="/usr/bin/make -j8 -f &quot;/Users/nick/dev/c/cedar/cmake-build-debug/Makefile&quot;  VERBOSE=1 cedar-lib/fast"/>
+					<CompileFile command="/usr/bin/make -j8 -f &quot;/Users/nick/dev/c/cedar/cmake-build-debug/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -j8 -f &quot;/Users/nick/dev/c/cedar/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -j8 -f &quot;/Users/nick/dev/c/cedar/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="rebuild_cache">
+				<Option working_dir="/Users/nick/dev/c/cedar/cmake-build-debug"/>
+				<Option type="4"/>
+				<MakeCommands>
+					<Build command="/usr/bin/make -j8 -f &quot;/Users/nick/dev/c/cedar/cmake-build-debug/Makefile&quot;  VERBOSE=1 rebuild_cache"/>
+					<CompileFile command="/usr/bin/make -j8 -f &quot;/Users/nick/dev/c/cedar/cmake-build-debug/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -j8 -f &quot;/Users/nick/dev/c/cedar/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -j8 -f &quot;/Users/nick/dev/c/cedar/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="edit_cache">
+				<Option working_dir="/Users/nick/dev/c/cedar/cmake-build-debug"/>
+				<Option type="4"/>
+				<MakeCommands>
+					<Build command="/usr/bin/make -j8 -f &quot;/Users/nick/dev/c/cedar/cmake-build-debug/Makefile&quot;  VERBOSE=1 edit_cache"/>
+					<CompileFile command="/usr/bin/make -j8 -f &quot;/Users/nick/dev/c/cedar/cmake-build-debug/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -j8 -f &quot;/Users/nick/dev/c/cedar/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -j8 -f &quot;/Users/nick/dev/c/cedar/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+		</Build>
+		<Unit filename="/Users/nick/dev/c/cedar/src/cedar/context.cpp">
+			<Option target="cedar-lib"/>
+		</Unit>
+		<Unit filename="/Users/nick/dev/c/cedar/src/cedar/object.cpp">
+			<Option target="cedar-lib"/>
+		</Unit>
+		<Unit filename="/Users/nick/dev/c/cedar/src/cedar/object/lambda.cpp">
+			<Option target="cedar-lib"/>
+		</Unit>
+		<Unit filename="/Users/nick/dev/c/cedar/src/cedar/object/list.cpp">
+			<Option target="cedar-lib"/>
+		</Unit>
+		<Unit filename="/Users/nick/dev/c/cedar/src/cedar/object/nil.cpp">
+			<Option target="cedar-lib"/>
+		</Unit>
+		<Unit filename="/Users/nick/dev/c/cedar/src/cedar/object/number.cpp">
+			<Option target="cedar-lib"/>
+		</Unit>
+		<Unit filename="/Users/nick/dev/c/cedar/src/cedar/object/string.cpp">
+			<Option target="cedar-lib"/>
+		</Unit>
+		<Unit filename="/Users/nick/dev/c/cedar/src/cedar/object/symbol.cpp">
+			<Option target="cedar-lib"/>
+		</Unit>
+		<Unit filename="/Users/nick/dev/c/cedar/src/cedar/parser.cpp">
+			<Option target="cedar-lib"/>
+		</Unit>
+		<Unit filename="/Users/nick/dev/c/cedar/src/cedar/passes.cpp">
+			<Option target="cedar-lib"/>
+		</Unit>
+		<Unit filename="/Users/nick/dev/c/cedar/src/cedar/ref.cpp">
+			<Option target="cedar-lib"/>
+		</Unit>
+		<Unit filename="/Users/nick/dev/c/cedar/src/cedar/runes.cpp">
+			<Option target="cedar-lib"/>
+		</Unit>
+		<Unit filename="/Users/nick/dev/c/cedar/src/cedar/vm/bytecode.cpp">
+			<Option target="cedar-lib"/>
+		</Unit>
+		<Unit filename="/Users/nick/dev/c/cedar/src/cedar/vm/compiler.cpp">
+			<Option target="cedar-lib"/>
+		</Unit>
+		<Unit filename="/Users/nick/dev/c/cedar/src/cedar/vm/instruction.cpp">
+			<Option target="cedar-lib"/>
+		</Unit>
+		<Unit filename="/Users/nick/dev/c/cedar/src/cedar/vm/machine.cpp">
+			<Option target="cedar-lib"/>
+		</Unit>
+		<Unit filename="/Users/nick/dev/c/cedar/src/main.cpp">
+			<Option target="cedar-bin"/>
+		</Unit>
+		<Unit filename="/Users/nick/dev/c/cedar/CMakeLists.txt">
+			<Option virtualFolder="CMake Files\"/>
+		</Unit>
+		<Unit filename="/Users/nick/dev/c/cedar/src/cedar/CMakeLists.txt">
+			<Option virtualFolder="CMake Files\src\cedar\"/>
+		</Unit>
+	</Project>
+</CodeBlocks_project_file>

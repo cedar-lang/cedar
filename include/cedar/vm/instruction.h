@@ -72,24 +72,9 @@ namespace cedar {
 					// basic integer argument types
 					int64_t arg_int;
 					void *arg_voidptr;
-
-					struct {
-						union {
-							object *arg_object;
-							double arg_float;
-							int64_t arg_int;
-							void *arg_voidptr;
-						} arg1;
-						union {
-							object *arg_object;
-							double arg_float;
-							int64_t arg_int;
-							void *arg_voidptr;
-						} arg2;
-					};
 				};
 
-				bool encode(bytecode*);
+				bool encode(bytecode&);
 
 				inst_type type(void);
 				std::string to_string();

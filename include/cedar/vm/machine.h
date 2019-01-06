@@ -24,7 +24,7 @@
 
 #pragma once
 
-#include <cedar/ref.hpp>
+#include <cedar/ref.h>
 #include <cedar/vm/bytecode.h>
 #include <cedar/vm/compiler.h>
 

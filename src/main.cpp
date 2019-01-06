@@ -38,18 +38,31 @@
 #include <iostream>
 #include <string>
 #include <cedar.h>
+#include <thread>
+#include <unistd.h>
+
+struct cedar_options {
+	bool interactive = false;
+};
+
+void cedar_start(cedar_options &);
 
 
 static void usage(void);
 static void help(void);
 
+void cedar_start(cedar_options &) {
+	auto eval_thread = std::thread();
+}
+
 
 int main(int argc, char** argv) {
+
 	srand((unsigned int)time(nullptr));
+
 
 	try {
 		auto ctx = std::make_shared<cedar::context>();
-
 		char c;
 		while ((c = getopt(argc, argv, "ihe:")) != -1) {
 			switch (c) {
@@ -75,7 +88,6 @@ int main(int argc, char** argv) {
 		}
 
 	} catch (std::exception& e) {
-		std::cerr << "Exception name: " << typeid(e).name() << std::endl;
 		std::cerr << "Fatal Exception: " << e.what() << std::endl;
 		exit(-1);
 	} catch (...) {
@@ -85,6 +97,7 @@ int main(int argc, char** argv) {
 
 	return 0;
 }
+
 
 // print out the usage
 static void usage(void) {
@@ -102,3 +115,7 @@ static void help(void) {
 	printf("  -e Evaluate an expression\n");
 	printf("\n");
 }
+
+
+
+

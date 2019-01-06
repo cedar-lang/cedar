@@ -27,20 +27,15 @@
 #include <cedar/exception.hpp>
 #include <cedar/memory.h>
 #include <cedar/runes.h>
-#include <cedar/ref.hpp>
+#include <cedar/ref.h>
 
 #include <cstdint>
 #include <cxxabi.h>
+#include <atomic>
 
 namespace cedar {
 
 	class object;
-	class number;
-
-	// the car and cdr functions are the go-to functions that should be used
-	// to obtain the car and cdr of any reference
-	ref car(const ref&);
-	ref cdr(const ref&);
 
 
 	class object {
@@ -116,7 +111,8 @@ namespace cedar {
 
 			// refcount is used by the `ref` class to determine how many things hold
 			// references to this particular object on the heap
-			uint32_t refcount = 0;
+			// uint32_t refcount = 0;
+			std::atomic<uint64_t> refcount = 0;
 
 			virtual ~object() {};
 
@@ -127,14 +123,5 @@ namespace cedar {
 			bool is_pair(void);
 
 	};
-
-
-	template<const char * N>
-		class named_object : public object {
-			public:
-				const char *object_type_name(void) {
-					return N;
-				}
-		};
 
 }

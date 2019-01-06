@@ -23,7 +23,7 @@
  */
 
 #include <cedar/passes.h>
-#include <cedar/ref.hpp>
+#include <cedar/ref.h>
 #include <cedar/object/list.h>
 #include <cedar/object/symbol.h>
 #include <cedar/object/nil.h>
@@ -34,7 +34,7 @@
 
 using namespace cedar;
 
-#define PASS_DEBUG
+// #define PASS_DEBUG
 
 
 cedar::passcontroller::passcontroller(ref val, vm::compiler *c) {
@@ -47,33 +47,13 @@ ref passcontroller::get(void) {
 	return m_val;
 }
 
-passcontroller& passcontroller::pipe(pass_function f, const char *name) {
-
-#ifdef PASS_DEBUG
-	auto start = std::chrono::system_clock::now();
-#endif
-
-	ref oldval = m_val;
+passcontroller& passcontroller::pipe(pass_function f, const char *) {
 	m_val = f(m_val, m_compiler);
-	m_pass_count++;
-
-#ifdef PASS_DEBUG
-	auto end = std::chrono::system_clock::now();
-	std::chrono::duration<double> elapsed_seconds = end - start;
-
-	printf(" %3d: %4fms - %s\n",
-			m_pass_count,
-			elapsed_seconds.count() * 1000.0,
-			name);
-	// std::cout << "  " << m_pass_count << ": " << (elapsed_seconds.count() * 1000.0) << "ms - PASS '" << name << std::endl;
-#endif
 	return *this;
 }
 
 
 ref cedar::wrap_top_level_with_lambdas(ref val, vm::compiler *) {
-
-
 
 	std::vector<ref> expr;
 	expr.push_back(cedar::new_obj<symbol>("lambda"));

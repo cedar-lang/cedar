@@ -64,7 +64,6 @@ namespace cedar {
 
 
 #define FLAG_NUMBER 0
-#define FLAG_FLOAT  1
 
 
 	class ref {
@@ -72,35 +71,26 @@ namespace cedar {
 
 			std::bitset<8> flags;
 			union {
-
-				union {
-					double m_float;
-					int64_t m_int;
-				};
-
+				double m_number;
 				object *obj = nullptr;
 			};
 
 
 			inline uint16_t inc() {
-				if (!is_object()) return 0;
 				return change_refcount(obj, 1);
 			}
 
 			inline uint16_t dec() {
-				if (!is_object()) return 0;
 				return change_refcount(obj, -1);
 			}
 
 			inline uint16_t rc() {
-				if (!is_object()) return 0;
 				return get_refcount(obj);
 			}
 
 			inline void release(void) {
 				if (is_object() && obj != nullptr) {
-					change_refcount(obj, -1);
-					if (get_refcount(obj) == 0) {
+					if (dec() == 0) {
 						delete_object(obj);
 					}
 					obj = nullptr;
@@ -108,29 +98,10 @@ namespace cedar {
 			}
 
 			inline void retain() {
-				if (obj != nullptr) {
+				if (is_object() && obj != nullptr) {
 					inc();
-				} else {
-					throw cedar::make_exception("ref attempted to retain access on nullptr");
 				}
 			}
-
-
-			inline double to_float(void) {
-				if (is_int()) {
-					return m_int;
-				}
-				return m_float;
-			}
-
-
-			inline int64_t to_int(void) {
-				if (is_int()) {
-					return m_int;
-				}
-				return m_float;
-			}
-
 
 		public:
 
@@ -140,57 +111,65 @@ namespace cedar {
 
 			inline ref() {
 				obj = nullptr;
-			};
+				flags[FLAG_NUMBER] = false;
+			}
 
 			inline ref(object *o) {
 				flags[FLAG_NUMBER] = false;
-				flags[FLAG_FLOAT]  = false;
 				set(o);
 			}
 
 
 			inline ref(double d) {
 				flags[FLAG_NUMBER] = true;
-				flags[FLAG_FLOAT]  = true;
-				m_float = d;
+				m_number = d;
 			}
 
 			inline ref(int64_t i) {
 				flags[FLAG_NUMBER] = true;
-				flags[FLAG_FLOAT] = false;
-				m_int = i;
+				m_number = i;
 			}
 
 			inline ref(int i) {
 				flags[FLAG_NUMBER] = true;
-				flags[FLAG_FLOAT] = false;
-				m_int = i;
+				m_number = i;
 			}
 
 
 
 			inline bool is_object(void) const {
-				return !flags[FLAG_NUMBER];
-			}
-			inline bool is_number(void) const {
-				return flags[FLAG_NUMBER];
+				return flags[FLAG_NUMBER] == false;
 			}
 
-			inline bool is_float(void) const {
-				return flags[FLAG_FLOAT];
+
+			inline bool is_number(void) const {
+				return flags[FLAG_NUMBER] == true;
 			}
-			inline bool is_int(void) const {
-				return !flags[FLAG_FLOAT];
-			}
+
 
 			inline ref(const ref& other) {
-				flags = other.flags;
-				set(other.obj);
+				operator=(other);
+			}
+			inline ref(ref&& other) {
+				operator=(other);
 			}
 
 			inline ref& operator=(const ref& other) {
+				if (other.is_number()) {
+					m_number = other.m_number;
+				} else if (other.is_object()) {
+					set(other.obj);
+				}
 				flags = other.flags;
-				set(other.obj);
+				return *this;
+			}
+			inline ref& operator=(ref&& other) {
+				if (other.is_number()) {
+					m_number = other.m_number;
+				} else if (other.is_object()) {
+					set(other.obj);
+				}
+				flags = other.flags;
 				return *this;
 			}
 
@@ -202,6 +181,7 @@ namespace cedar {
 			inline void set(object *new_ref) {
 				release();
 				obj = new_ref;
+				flags[FLAG_NUMBER] = false;
 				if (obj != nullptr)
 					retain();
 			}
@@ -215,6 +195,13 @@ namespace cedar {
 			inline object *operator->() const {
 
 				return operator*();
+			}
+
+
+			inline double to_float(void) {
+				if (!flags[FLAG_NUMBER])
+					throw cedar::make_exception("attempt to cast non-number reference to a number");
+				return m_number;
 			}
 
 
@@ -296,6 +283,7 @@ namespace cedar {
 			}
 
 
+
 			cedar::runes to_string(bool human = false);
 
 
@@ -304,40 +292,28 @@ namespace cedar {
 				if (!is_number() || !other.is_number()) {
 					throw cedar::make_exception("attempt to add non-numbers: ", to_string(), " + ", other.to_string());
 				}
-				if (is_float() || other.is_float()) {
-					return to_float() + other.to_float();
-				}
-				return to_int() + other.to_int();
+				return to_float() + other.to_float();
 			}
 
 			inline ref operator-(ref other) {
 				if (!is_number() || !other.is_number()) {
 					throw cedar::make_exception("attempt to subtract non-numbers: ", to_string(), " - ", other.to_string());
 				}
-				if (is_float() || other.is_float()) {
-					return to_float() - other.to_float();
-				}
-				return to_int() - other.to_int();
+				return to_float() - other.to_float();
 			}
 
 			inline ref operator*(ref other) {
 				if (!is_number() || !other.is_number()) {
 					throw cedar::make_exception("attempt to multiply non-numbers: ", to_string(), " * ", other.to_string());
 				}
-				if (is_float() || other.is_float()) {
-					return to_float() * other.to_float();
-				}
-				return to_int() * other.to_int();
+				return to_float() * other.to_float();
 			}
 
 			inline ref operator/(ref other) {
 				if (!is_number() || !other.is_number()) {
 					throw cedar::make_exception("attempt to divide non-numbers: ", to_string(), " / ", other.to_string());
 				}
-				if (is_float() || other.is_float()) {
-					return to_float() / other.to_float();
-				}
-				return to_int() / other.to_int();
+				return to_float() / other.to_float();
 			}
 
 
@@ -345,7 +321,7 @@ namespace cedar {
 				if (!is_number() || !other.is_number()) {
 					throw cedar::make_exception("attempt to compare non-numbers: ", to_string(), " and ", other.to_string());
 				}
-				return operator-(other).to_int();
+				return operator-(other).to_float();
 			}
 
 
@@ -362,7 +338,10 @@ namespace cedar {
 				return compare(other) >= 0;
 			}
 			inline bool operator==(ref other) {
-				if (!is_number()) return other.obj == obj;
+
+				// for now, if its not a number it checks if the types are the same, and then the
+				// string representation
+				if (!is_number()) return (typeid(obj).hash_code() == typeid(other.obj).hash_code()) && other.to_string() == to_string();
 				return compare(other) == 0;
 			}
 
@@ -398,8 +377,7 @@ namespace cedar {
 			r.set_const(true);
 			return r;
 		}
-
-
+		
 	template<class T>
 		constexpr inline T *ref_cast(const ref &r) {
 			return r.as<T>();

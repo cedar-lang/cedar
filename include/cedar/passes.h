@@ -24,7 +24,7 @@
 
 #pragma once
 
-#include <cedar/ref.hpp>
+#include <cedar/ref.h>
 
 namespace cedar {
 
@@ -43,7 +43,6 @@ namespace cedar {
 		private:
 			ref m_val;
 			vm::compiler *m_compiler;
-			int m_pass_count = 0;
 		public:
 			passcontroller(ref, vm::compiler*);
 

@@ -23,7 +23,7 @@
  */
 
 #include <cedar/vm/machine.h>
-#include <cedar/ref.hpp>
+#include <cedar/ref.h>
 
 using namespace cedar;
 
@@ -41,5 +41,5 @@ ref vm::machine::eval(ref obj) {
 
 	ref compiled_lambda = m_compiler.compile(obj);
 
-	return nullptr;
+	return compiled_lambda;
 }

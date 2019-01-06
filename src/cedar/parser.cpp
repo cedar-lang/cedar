@@ -198,6 +198,9 @@ token lexer::lex() {
 // ----------- reader -----------
 reader::reader() {}
 
+
+
+/////////////////////////////////////////////////////
 std::vector<ref> reader::run(cedar::runes source) {
 	std::vector<ref> statements;
 
@@ -226,6 +229,10 @@ std::vector<ref> reader::run(cedar::runes source) {
 	return statements;
 }
 
+
+
+
+/////////////////////////////////////////////////////
 token reader::peek(int offset) {
 	uint64_t new_i = index + offset;
 	if (new_i >= tokens.size()) {
@@ -235,6 +242,10 @@ token reader::peek(int offset) {
 	return tokens[new_i];
 }
 
+
+
+
+/////////////////////////////////////////////////////
 token reader::move(int offset) {
 	tok = peek(offset);
 	index += offset;
@@ -242,16 +253,26 @@ token reader::move(int offset) {
 	return tok;
 }
 
+
+
+
+/////////////////////////////////////////////////////
 token reader::next(void) {
 	return move(1);
 }
 
+
+
+
+
+/////////////////////////////////////////////////////
 token reader::prev(void) {
 	return move(-1);
 }
 
 
 
+/////////////////////////////////////////////////////
 ref reader::parse_expr(void) {
 
 	switch (tok.type) {
@@ -276,6 +297,9 @@ ref reader::parse_expr(void) {
 	throw cedar::make_exception("Unimplmented token: ", tok);
 }
 
+
+
+/////////////////////////////////////////////////////
 ref reader::parse_list(void) {
 	std::vector<ref> items;
 
@@ -302,6 +326,7 @@ ref reader::parse_list(void) {
 
 
 
+/////////////////////////////////////////////////////
 ref reader::parse_special_syntax(cedar::runes function_name) {
 	// skip over the "special syntax token"
 	next();
@@ -312,6 +337,9 @@ ref reader::parse_special_syntax(cedar::runes function_name) {
 
 
 
+
+
+/////////////////////////////////////////////////////
 ref reader::parse_symbol(void) {
 	ref return_obj;
 
@@ -328,6 +356,9 @@ ref reader::parse_symbol(void) {
 	return return_obj;
 }
 
+
+
+/////////////////////////////////////////////////////
 ref reader::parse_number(void) {
 	std::string str = tok.val;
 
@@ -350,6 +381,7 @@ ref reader::parse_number(void) {
 
 
 
+/////////////////////////////////////////////////////
 ref reader::parse_string(void) {
 	ref obj = new_const_obj<string>();
 	obj.as<string>()->set_content(tok.val);

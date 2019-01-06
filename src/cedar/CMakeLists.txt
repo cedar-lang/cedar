@@ -8,6 +8,7 @@ add_library(cedar-lib SHARED
 	src/cedar/passes.cpp
 	src/cedar/runes.cpp
 	src/cedar/parser.cpp
+	src/cedar/vm/bytecode.cpp
 	src/cedar/vm/compiler.cpp
 	src/cedar/vm/instruction.cpp
 	src/cedar/vm/machine.cpp

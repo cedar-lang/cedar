@@ -32,6 +32,9 @@
 #include <cstring>
 #include <map>
 #include <list>
+#include <vector>
+#include <memory.h>
+#include <cedar/ref.h>
 
 namespace cedar {
 
@@ -40,19 +43,8 @@ namespace cedar {
 
 	namespace vm {
 
-		// bytecode represents the actual bytecode that goes into
-		// encoding instructions in the VM. It is a true "byte" code
-		// where multi-byte values need to be intereted out of a
-		// stream of bytes
-		//
-		// functions for reading and writing arbitrary values to
-		// the byte stream are included behind templates
-		//
-		// typically a VM will only have one instance of bytecode
-		//
-		// bytecode also contains a map of symbol addresses inside
-		// the bytecode, and a list of addresses that need linked
-		// to these symbols for function binding
+
+		// bytecode object
 		class bytecode {
 
 			private:
@@ -65,6 +57,15 @@ namespace cedar {
 
 			public:
 
+				int stack_size = 0;
+
+				// constants stores values that the bytecode can reference with
+				// a simple index into it.
+				std::vector<ref> constants;
+				// for compilation help, allows lookup of an index in the constant
+				// list based on a name
+				std::map<cedar::runes, int> named_constant_indexes;
+
 				// the code pointer is where this instance's bytecode is actually
 				// stored. All calls for read interpret a type from this byte vector
 				// and calls for write append to it.
@@ -75,10 +76,20 @@ namespace cedar {
 				}
 
 
+				ref& get_const(int);
+				int push_const(ref);
+
+				void finalize();
+
+				template<typename T>
+					inline T operator[](int) {
+						return {};
+					}
+
+
+
 				template<typename T>
 					inline T read(uint64_t i) const {
-						if (sizeof(T) + i >= cap)
-							throw cedar::make_exception("bytecode unable to read ", sizeof(T), " bytes from index ", i, ". Out of bounds.");
 						return *(T*)(void*)(code+i);
 					}
 
@@ -111,6 +122,12 @@ namespace cedar {
 				inline uint64_t get_cap() {
 					return cap;
 				}
+
+
+				template<typename T>
+					inline T & at(int i) {
+						return *(T*)(void*)(code+i);
+					}
 		};
 
 	} // namespace vm

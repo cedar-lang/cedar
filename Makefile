@@ -9,12 +9,13 @@ CXXSRCFILES := $(filter %.cc,$(CODEFILES))
 BINDIR = bin
 
 default:
-	@# tell cmake what files to compile with by generating
-	@# the CMakeLists.txt in the src/cedar folder
-	@python3 tools/scripts/generate_src_cmakelists.py
 	@mkdir -p $(BINDIR)
-	@cd $(BINDIR); cmake ../; make -j 8
+	@cd $(BINDIR); cmake -DCMAKE_BUILD_TYPE=Debug ../; make -j 8
 
+
+gen:
+	@python3 tools/scripts/generate_src_cmakelists.py
+	@python3 tools/scripts/generate_opcode_h.py
 
 install:
 	@cd $(BINDIR); cmake ../; make install

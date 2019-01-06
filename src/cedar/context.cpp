@@ -46,6 +46,7 @@ void context::eval_string(cedar::runes expr) {
 
 	for (auto obj : top_level) {
 		ref return_value = m_evaluator->eval(obj);
+		std::cout << return_value << std::endl;
 	}
 	parse_lock.unlock();
 }

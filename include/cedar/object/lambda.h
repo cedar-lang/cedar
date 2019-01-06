@@ -26,16 +26,19 @@
 
 #include <cedar/object.h>
 #include <cedar/runes.h>
-#include <cedar/ref.hpp>
+#include <cedar/ref.h>
 #include <cedar/vm/bytecode.h>
+
+#include <memory>
 
 namespace cedar {
 
 	class lambda : public object {
 		public:
-			cedar::vm::bytecode *code;
+			cedar::vm::bytecode code;
+
+
 			lambda(void);
-			lambda(cedar::vm::bytecode*);
 			~lambda(void);
 
 			ref to_number();

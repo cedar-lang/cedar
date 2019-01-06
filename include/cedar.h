@@ -39,12 +39,13 @@
 #include "cedar/object/list.h"
 #include "cedar/object/sequence.h"
 #include "cedar/object/number.h"
+#include "cedar/object/lambda.h"
 #include "cedar/memory.h"
 #include "cedar/object.h"
 #include "cedar/runes.h"
 #include "cedar/util.hpp"
 #include "cedar/vm/opcode.h"
 #include "cedar/exception.hpp"
-#include "cedar/ref.hpp"
+#include "cedar/ref.h"
 
 #endif

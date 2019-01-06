@@ -27,7 +27,7 @@
 #pragma once
 
 #include <cedar/object.h>
-#include <cedar/ref.hpp>
+#include <cedar/ref.h>
 
 namespace cedar {
 

@@ -26,7 +26,7 @@
 #include <cedar/object/list.h>
 #include <cedar/object/nil.h>
 #include <cedar/object/symbol.h>
-#include <cedar/ref.hpp>
+#include <cedar/ref.h>
 
 using namespace cedar;
 

@@ -5,25 +5,24 @@
 
 /* Instruction opcodes for compiled code */
 #define OP_NOP                      0x00
-#define OP_NIL                      0x03
-#define OP_NILS                     0x06
-#define OP_TRUE                     0x09
-#define OP_CONST                    0x0c
-#define OP_FLOAT                    0x0f
-#define OP_INT                      0x12
-#define OP_LOAD_LOCAL               0x15
-#define OP_SET_LOCAL                0x18
+#define OP_NIL                      0x01
+#define OP_TRUE                     0x02
+#define OP_CONST                    0x03
+#define OP_FLOAT                    0x04
+#define OP_INT                      0x05
+#define OP_LOAD_LOCAL               0x06
+#define OP_SET_LOCAL                0x07
 
 /* Instruction opcode foreach macro for code generation */
+/* Arg order: (name, bytecode, type, stack effect */
 #define CEDAR_FOREACH_OPCODE(V) \
-  V(NOP, OP_NOP, no_arg) \
-  V(NIL, OP_NIL, no_arg) \
-  V(NILS, OP_NILS, imm_int) \
-  V(TRUE, OP_TRUE, no_arg) \
-  V(CONST, OP_CONST, imm_int) \
-  V(FLOAT, OP_FLOAT, imm_float) \
-  V(INT, OP_INT, imm_int) \
-  V(LOAD_LOCAL, OP_LOAD_LOCAL, imm_int) \
-  V(SET_LOCAL, OP_SET_LOCAL, imm_int)
+  V(NOP, OP_NOP, no_arg, 0) \
+  V(NIL, OP_NIL, no_arg, 1) \
+  V(TRUE, OP_TRUE, no_arg, 1) \
+  V(CONST, OP_CONST, imm_int, 1) \
+  V(FLOAT, OP_FLOAT, imm_float, 1) \
+  V(INT, OP_INT, imm_int, 1) \
+  V(LOAD_LOCAL, OP_LOAD_LOCAL, imm_int, 1) \
+  V(SET_LOCAL, OP_SET_LOCAL, imm_int, -1)
 
 #endif

@@ -26,7 +26,7 @@
 #pragma once
 
 
-#include <cedar/ref.hpp>
+#include <cedar/ref.h>
 #include <cedar/vm/bytecode.h>
 #include <cstdio>
 #include <vector>
@@ -46,6 +46,9 @@ namespace cedar {
 				compiler(cedar::vm::machine *vm);
 				~compiler();
 
+
+				class context {};
+
 				/*
 				 * given some object reference,
 				 * compile it into bytecode and return
@@ -54,8 +57,14 @@ namespace cedar {
 				 */
 				ref compile(ref);
 
+				void compile_lambda_expression(ref);
 
 
+				void compile_number(double, bytecode &);
+
+				void compile_object(ref, bytecode &);
+
+				void compile_list(ref, bytecode &);
 		};
 
 

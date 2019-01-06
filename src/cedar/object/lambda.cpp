@@ -28,29 +28,32 @@
 #include <cedar/object.h>
 #include <cedar/object/lambda.h>
 #include <cedar/memory.h>
+#include <cedar/vm/instruction.h>
 
 
 using namespace cedar;
 
 cedar::lambda::lambda() {
-	code = nullptr;
-}
-cedar::lambda::lambda(cedar::vm::bytecode *n_code) {
-	code = n_code;
 }
 cedar::lambda::~lambda() {
-	delete code;
 }
 
 cedar::runes lambda::to_string(bool) {
 
 	char buf[30];
-	std::sprintf(buf, "%p", (void*)code);
+	std::sprintf(buf, "%p", (void*)code.code);
 
 	cedar::runes str;
 	str += "<lambda ";
 	str += buf;
 	str += ">";
+
+
+	auto insts = vm::decode_bytecode(&code);
+
+	for (auto & i : insts) {
+		std::cout << i.to_string() << std::endl;
+	}
 	return str;
 }
 
