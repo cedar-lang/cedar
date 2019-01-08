@@ -34,25 +34,38 @@
 using namespace cedar;
 
 cedar::lambda::lambda() {
+	code = std::make_shared<cedar::vm::bytecode>();
 }
+
+
+cedar::lambda::lambda(std::shared_ptr<vm::bytecode> bc) {
+	code = bc;
+}
+
+
 cedar::lambda::~lambda() {
 }
 
-cedar::runes lambda::to_string(bool) {
+cedar::runes lambda::to_string(bool human) {
 
-	char buf[30];
-	std::sprintf(buf, "%p", (void*)code.code);
+	char addr_buf[30];
+	std::sprintf(addr_buf, "%p", (void*)code.get());
 
 	cedar::runes str;
 	str += "<lambda ";
-	str += buf;
+	str += addr_buf;
 	str += ">";
 
 
-	auto insts = vm::decode_bytecode(&code);
-
-	for (auto & i : insts) {
-		std::cout << i.to_string() << std::endl;
+	if (!human) {
+		std::cout << "Constants:\n";
+		for (int i = 0; i < code->constants.size(); i++) {
+			std::cout << i << "\t" << code->constants[i].type_name() << "\t" << code->constants[i].to_string(true) << std::endl;
+		}
+		auto insts = vm::decode_bytecode(code.get());
+		for (auto & i : insts) {
+			std::cout << i.to_string((uint64_t)(void*)code->code) << std::endl;
+		}
 	}
 	return str;
 }

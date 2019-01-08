@@ -24,6 +24,9 @@
 
 #include <cstdio>
 
+#include <string>
+#include <functional>
+
 #include <cedar/object.h>
 #include <cedar/object/symbol.h>
 #include <cedar/memory.h>
@@ -58,3 +61,15 @@ cedar::runes symbol::get_content(void) {
 ref symbol::to_number() {
 	throw cedar::make_exception("Attempt to cast symbol to number failed");
 }
+
+
+
+uint64_t symbol::hash(void) {
+	if (!m_hash_calculated) {
+		m_hash = std::hash<cedar::runes>()(m_content);
+		m_hash_calculated = true;
+	}
+	return m_hash;
+}
+
+

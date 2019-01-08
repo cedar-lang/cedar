@@ -64,6 +64,7 @@ namespace cedar {
 
 
 #define FLAG_NUMBER 0
+#define FLAG_DISABLE_REFCOUNT 1
 
 
 	class ref {
@@ -77,18 +78,25 @@ namespace cedar {
 
 
 			inline uint16_t inc() {
-				return change_refcount(obj, 1);
+				if (!flags[FLAG_DISABLE_REFCOUNT])
+					return change_refcount(obj, 1);
+				return 0;
 			}
 
 			inline uint16_t dec() {
-				return change_refcount(obj, -1);
+				if (!flags[FLAG_DISABLE_REFCOUNT])
+					return change_refcount(obj, -1);
+				return 0;
 			}
 
 			inline uint16_t rc() {
-				return get_refcount(obj);
+				if (!flags[FLAG_DISABLE_REFCOUNT])
+					return get_refcount(obj);
+				return 0;
 			}
 
 			inline void release(void) {
+				if (flags[FLAG_DISABLE_REFCOUNT]) return;
 				if (is_object() && obj != nullptr) {
 					if (dec() == 0) {
 						delete_object(obj);
@@ -98,6 +106,7 @@ namespace cedar {
 			}
 
 			inline void retain() {
+				if (flags[FLAG_DISABLE_REFCOUNT]) return;
 				if (is_object() && obj != nullptr) {
 					inc();
 				}
@@ -154,7 +163,16 @@ namespace cedar {
 				operator=(other);
 			}
 
+			// for storing arbitrary pointers. This behavior is for low-level
+			// VM operations and should ignore all refcounting after assigning this
+			inline ref & store_ptr(void * ptr) {
+				flags[FLAG_DISABLE_REFCOUNT] = true;
+				obj = (object*)ptr;
+				return *this;
+			}
+
 			inline ref& operator=(const ref& other) {
+				flags[FLAG_DISABLE_REFCOUNT] = other.flags[FLAG_DISABLE_REFCOUNT];
 				if (other.is_number()) {
 					m_number = other.m_number;
 				} else if (other.is_object()) {
@@ -164,6 +182,7 @@ namespace cedar {
 				return *this;
 			}
 			inline ref& operator=(ref&& other) {
+				flags[FLAG_DISABLE_REFCOUNT] = other.flags[FLAG_DISABLE_REFCOUNT];
 				if (other.is_number()) {
 					m_number = other.m_number;
 				} else if (other.is_object()) {
@@ -213,10 +232,17 @@ namespace cedar {
 
 			void set_const(bool);
 
+			uint64_t symbol_hash(void);
+
 
 			template<typename T>
 				inline T * get() const {
 					return dynamic_cast<T*>(obj);
+				}
+
+			template<typename T>
+				inline T reinterpret(void) const {
+					return reinterpret_cast<T>(obj);
 				}
 
 			/*
@@ -236,7 +262,7 @@ namespace cedar {
 			 */
 			template<typename T>
 				inline T *as() const {
-					return dynamic_cast<T*>(obj);
+					return is_object() ? dynamic_cast<T*>(obj) : nullptr;
 				}
 
 			/*

@@ -27,7 +27,6 @@ def new_op(name, inst_type='no_arg', effect=0):
 
 new_op('NOP', effect=0)
 new_op('NIL', effect=1)
-new_op('TRUE', effect=1)
 
 # load the constant at the index
 new_op('CONST', 'imm_int', effect=1)
@@ -40,7 +39,26 @@ new_op('INT',   'imm_int', effect=1)
 new_op('LOAD_LOCAL', 'imm_int', effect=1) # load a local from the start of the stack frame
 new_op('SET_LOCAL', 'imm_int', effect=-1) # set a local from the start of the stack frame
 
+# pop the name off the stack, look it up, then push the value found,
+# otherwise throw because it wasn't found
+#
+# These instructions are used only to access global bindings not found in local scope or
+# freevars
+new_op('LOAD_GLOBAL', 'imm_int', effect=0)
+# SET_GLOBAL pops the name off the stack, then the value off the stack
+#  GLOBALS[POP()] = POP(); PUSH(GLOBALS[...]);
+new_op('SET_GLOBAL', 'imm_int', effect=-1)
 
+new_op('CONS', effect=-1);
+
+new_op('CALL', effect=-1);
+new_op('MAKE_FUNC', 'imm_int', effect=1);
+
+# arg_pop pops one value from the argument list and updates the list
+# at the argument index in the stack call frame
+new_op('ARG_POP', 'imm_int', effect=1);
+
+new_op('RETURN', effect=0);
 
 def main(outfile):
     with open(outfile, 'w') as f:

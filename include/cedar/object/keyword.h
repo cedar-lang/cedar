@@ -22,29 +22,34 @@
  * SOFTWARE.
  */
 
+
 #pragma once
 
 #include <cedar/object.h>
 #include <cedar/runes.h>
 #include <cedar/ref.h>
-#include <cedar/vm/bytecode.h>
-
-#include <memory>
 
 namespace cedar {
 
-	class lambda : public object {
-		public:
-			std::shared_ptr<cedar::vm::bytecode> code;
-			int closure_size = -1;
-			std::shared_ptr<ref[]> closure = nullptr;
+	class keyword : public object {
+		private:
+			cedar::runes m_content;
+			uint64_t m_hash = 0;
+			bool m_hash_calculated = false;
 
-			lambda(void);
-			lambda(std::shared_ptr<cedar::vm::bytecode>);
-			~lambda(void);
+		public:
+			keyword(void);
+			keyword(cedar::runes);
+			~keyword(void);
+
+			void set_content(cedar::runes);
+			cedar::runes get_content(void);
 
 			ref to_number();
-			inline const char *object_type_name(void) { return "lambda"; };
+			inline const char *object_type_name(void) { return "keyword"; };
+
+			uint64_t hash(void);
+
 		protected:
 			cedar::runes to_string(bool human = false);
 	};

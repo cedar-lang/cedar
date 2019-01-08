@@ -27,13 +27,47 @@
 #include <cedar/vm/opcode.h>
 #include <cedar/passes.h>
 #include <cedar/ref.h>
-
+#include <cedar/object/nil.h>
 #include <cedar/object/list.h>
 #include <cedar/object/lambda.h>
 #include <cedar/object/symbol.h>
+#include <cedar/object/keyword.h>
 #include <cedar/object/number.h>
+#include <cedar/object/string.h>
+#include <memory>
 
 using namespace cedar;
+
+
+
+////////////////////////////////////////////////////////////
+// scope::
+vm::scope::scope(std::shared_ptr<scope> parent) {
+	m_parent = parent;
+}
+
+int vm::scope::find(uint64_t symbol) {
+	if (m_bindings.count(symbol) == 1) {
+		return m_bindings.at(symbol);
+	}
+	// if there is no parent, return -1
+	if (m_parent == nullptr)
+		return -1;
+	// defer to the parent recursively
+	return m_parent->find(symbol);
+}
+
+int vm::scope::find(ref & symbol) {
+	return find(symbol.symbol_hash());
+}
+
+void vm::scope::set(uint64_t symbol, int ind) {
+	m_bindings[symbol] = ind;
+}
+
+void vm::scope::set(ref & symbol, int ind) {
+	m_bindings[symbol.symbol_hash()] = ind;
+}
 
 
 vm::compiler::compiler(cedar::vm::machine *vm) {
@@ -78,9 +112,23 @@ static bool list_is_call_to(cedar::runes func_name, ref & obj) {
 
 ref cedar::vm::bytecode_pass(ref obj, vm::compiler *c) {
 
-	ref lambda = cedar::new_obj<cedar::lambda>();
 
-	c->compile_object(obj, ref_cast<cedar::lambda>(lambda)->code);
+	// make a top level bytecode object
+	auto code = std::make_shared<cedar::vm::bytecode>();
+	// make the top level scope for this expression
+	auto sc = std::make_shared<scope>(nullptr);
+
+	compiler_ctx context;
+
+	c->compile_object(obj, *code, sc, &context);
+
+	code->write((uint8_t)OP_RETURN);
+	// finalize the code (sum up stack effect)
+	code->finalize();
+	// build a lambda around the code
+	auto lambda = cedar::new_obj<cedar::lambda>(code);
+
+	ref_cast<cedar::lambda>(lambda)->closure_size = context.closure_size;
 	return lambda;
 }
 
@@ -90,28 +138,159 @@ ref cedar::vm::bytecode_pass(ref obj, vm::compiler *c) {
 //////////////////////////////////////////////////////
 
 
-void vm::compiler::compile_object(ref obj, vm::bytecode & code) {
+void vm::compiler::compile_object(ref obj, vm::bytecode & code, scope_ptr sc, compiler_ctx* ctx) {
 
 	if (obj.is<cedar::list>()) {
-		return compile_list(obj, code);
+		return compile_list(obj, code, sc, ctx);
 	}
 
 	if (obj.is<cedar::number>()) {
-		return compile_number(obj.to_float(), code);
+		return compile_number(obj.to_float(), code, sc, ctx);
 	}
 
-	std::cout << obj << ": UNKNOWN TYPE IN COMPILER\n";
+	if (obj.is<cedar::symbol>()) {
+		return compile_symbol(obj, code, sc, ctx);
+	}
+
+	if (obj.is<cedar::string>() || obj.is<cedar::keyword>()) {
+		return compile_constant(obj, code, sc, ctx);
+	}
+
+	if (obj.is<cedar::nil>()) {
+		code.write((uint8_t)OP_NIL);
+		return;
+	}
+
+
+	std::cerr << "Unhandled object (type: " << obj.type_name() << ") " << obj << std::endl;
 }
 
-void vm::compiler::compile_list(ref obj, vm::bytecode &) {
+
+void cedar::vm::compiler::compile_call_arguments(ref args, bytecode & code, scope_ptr sc, compiler_ctx *ctx) {
+	if (auto rest = args.get_rest(); rest.is<cedar::nil>()) {
+		code.write((uint8_t)OP_NIL);
+		return;
+	} else {
+		compile_call_arguments(rest, code, sc, ctx);
+	}
+
+	compile_object(args.get_first(), code, sc, ctx);
+	code.write((uint8_t)OP_CONS);
+}
+
+
+void vm::compiler::compile_list(ref obj, vm::bytecode & code, scope_ptr sc, compiler_ctx* ctx) {
+	// set is a special form that attempts to change a local closure binding
+	// and if it can't, will set in the global scope
 	if (list_is_call_to("set", obj)) {
-		printf("is set call\n");
+
+		auto name_obj = obj.get_rest().get_first();
+		if (!name_obj.is<symbol>()) {
+			throw cedar::make_exception("Invalid syntax in set special form: ", obj);
+		}
+
+		auto val_obj = obj.get_rest().get_rest().get_first();
+
+		// compile the value onto the stack
+		compile_object(val_obj, code, sc, ctx);
+
+		if (const int ind = sc->find(name_obj); ind != -1) {
+			// is a local assignment
+			code.write((uint8_t)OP_SET_LOCAL);
+			code.write((uint64_t)ind);
+		} else {
+			// is a global assignment
+			const int const_ind = code.push_const(name_obj);
+			code.write((uint8_t)OP_SET_GLOBAL);
+			code.write((uint64_t)const_ind);
+		}
+
+		return;
 	}
+
+	if (list_is_call_to("quote", obj)) {
+		compile_constant(obj.get_rest().get_first(), code, sc, ctx);
+		return;
+	}
+
+	if (list_is_call_to("lambda", obj)) {
+		compile_lambda_expression(obj, code, sc, ctx);
+		return;
+	}
+
+
+	// otherwise it must be a method call, so compile using the calling convention
+	compile_call_arguments(obj.get_rest(), code, sc, ctx);
+	compile_object(obj.get_first(), code, sc, ctx);
+	code.write((uint8_t)OP_CALL);
 }
 
-
-void vm::compiler::compile_number(double number, vm::bytecode & code) {
+void vm::compiler::compile_number(double number, vm::bytecode & code, scope_ptr, compiler_ctx*) {
 	code.write((uint8_t)OP_FLOAT);
 	code.write(number);
 }
 
+void vm::compiler::compile_constant(ref obj, bytecode & code, scope_ptr, compiler_ctx*) {
+	auto const_index = code.push_const(obj);
+	code.write((uint8_t)OP_CONST);
+	code.write((uint64_t)const_index);
+}
+
+
+// symbol compilation can follow 1 of two paths. If the scope contains the symbol
+// in it's map, it will be a local closure index and will be a fast O(1) lookup.
+// If it isn't found in the map, the symbol lookup will defer to the global lookup
+// system and be slightly slower
+void vm::compiler::compile_symbol(ref sym, bytecode & code, scope_ptr sc, compiler_ctx*) {
+
+	// if the symbol is found in the enclosing closure/freevars, just push the
+	// constant time 'lookup' instruction
+	if (const int ind = sc->find(sym); ind != -1) {
+		code.write((uint8_t)OP_LOAD_LOCAL);
+		code.write((uint64_t)ind);
+		return;
+	}
+
+	const int const_index = code.push_const(sym);
+	// lookup the symbol globally
+	code.write((uint8_t)OP_LOAD_GLOBAL);
+	code.write((uint64_t)const_index);
+
+}
+
+
+void vm::compiler::compile_lambda_expression(ref expr, bytecode & code, scope_ptr sc, compiler_ctx *ctx) {
+	auto new_scope = std::make_shared<scope>(sc);
+	auto new_code = std::make_shared<bytecode>();
+
+	auto args = expr.get_rest().get_first();
+
+	while (true) {
+		auto arg = args.get_first();
+
+		if (auto *sym = ref_cast<cedar::symbol>(arg); sym != nullptr) {
+			new_code->write((uint8_t)OP_ARG_POP);
+			new_code->write((uint64_t)ctx->closure_size);
+			new_scope->set(arg, ctx->closure_size);
+			ctx->closure_size++;
+		} else {
+			if (ref_cast<cedar::nil>(arg) == nullptr)
+				throw cedar::make_exception("lambda arguments must be symbols: ", expr);
+		}
+
+		args = args.get_rest();
+		if (args.is<cedar::nil>()) break;
+	}
+
+	auto body = expr.get_rest().get_rest().get_first();
+
+	compile_object(body, *new_code, new_scope, ctx);
+	new_code->write((uint8_t)OP_RETURN);
+
+	new_code->finalize();
+	ref new_lambda = new_obj<cedar::lambda>(new_code);
+	const int const_ind = code.push_const(new_lambda);
+	code.write((uint8_t)OP_MAKE_FUNC);
+	code.write((uint64_t)const_ind);
+
+}

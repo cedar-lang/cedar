@@ -62,9 +62,6 @@ namespace cedar {
 				// constants stores values that the bytecode can reference with
 				// a simple index into it.
 				std::vector<ref> constants;
-				// for compilation help, allows lookup of an index in the constant
-				// list based on a name
-				std::map<cedar::runes, int> named_constant_indexes;
 
 				// the code pointer is where this instance's bytecode is actually
 				// stored. All calls for read interpret a type from this byte vector

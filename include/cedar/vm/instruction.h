@@ -77,7 +77,7 @@ namespace cedar {
 				bool encode(bytecode&);
 
 				inst_type type(void);
-				std::string to_string();
+				std::string to_string(uint64_t offset = 0);
 		};
 
 

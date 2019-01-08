@@ -34,6 +34,8 @@ namespace cedar {
 	class symbol : public object {
 		private:
 			cedar::runes m_content;
+			uint64_t m_hash = 0;
+			bool m_hash_calculated = false;
 
 		public:
 			symbol(void);
@@ -45,6 +47,8 @@ namespace cedar {
 
 			ref to_number();
 			inline const char *object_type_name(void) { return "symbol"; };
+
+			uint64_t hash(void);
 
 		protected:
 			cedar::runes to_string(bool human = false);

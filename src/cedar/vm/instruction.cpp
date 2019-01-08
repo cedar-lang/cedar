@@ -115,11 +115,11 @@ std::vector<instruction> cedar::vm::decode_bytecode(bytecode* bc) {
 
 
 
-std::string cedar::vm::instruction::to_string() {
+std::string cedar::vm::instruction::to_string(uint64_t offset) {
 	std::ostringstream buf;
 
-	char hexbuf[12];
-	sprintf(hexbuf, "%p", (void*)address);
+	char hexbuf[22];
+	sprintf(hexbuf, "0x%016lx", (uint64_t)((char*)(address) + offset));
 
 	buf << hexbuf << "  ";
 	buf << instruction_name(*this);

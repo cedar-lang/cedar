@@ -31,6 +31,8 @@
 #include <cstdio>
 #include <vector>
 #include <stack>
+#include <memory>
+#include <map>
 
 namespace cedar {
 	namespace vm {
@@ -38,6 +40,34 @@ namespace cedar {
 		// forwared declaration
 		class machine;
 
+		struct compiler_ctx {
+			uint64_t closure_size = 0;
+		};
+
+		class scope {
+			/**
+			 * m_bindings
+			 * a mapping from the hashes of symbols to their index
+			 * in the closure
+			 * Looking up a binding's index is an O(n) task as it needs to
+			 * walk up the scope tree until it finds the mapping or has no
+			 * parent to continue searching. If no value was found, -1 will
+			 * be returned as -1 is not a valid closure index
+			 */
+			std::map<uint64_t, int> m_bindings;
+			public:
+				std::shared_ptr<scope> m_parent = nullptr;
+				scope(std::shared_ptr<scope>);
+
+				int find(uint64_t);
+				int find(ref &);
+
+				void set(ref &, int);
+				void set(uint64_t, int);
+
+		};
+
+		using scope_ptr = std::shared_ptr<scope>;
 
 		class compiler {
 			protected:
@@ -57,16 +87,14 @@ namespace cedar {
 				 */
 				ref compile(ref);
 
-				void compile_lambda_expression(ref);
-
-
-				void compile_number(double, bytecode &);
-
-				void compile_object(ref, bytecode &);
-
-				void compile_list(ref, bytecode &);
+				void compile_lambda_expression(ref, bytecode &, scope_ptr sc, compiler_ctx*);
+				void compile_number(double, bytecode &, scope_ptr, compiler_ctx*);
+				void compile_object(ref, bytecode &, scope_ptr, compiler_ctx*);
+				void compile_constant(ref, bytecode &, scope_ptr, compiler_ctx*);
+				void compile_symbol(ref, bytecode &, scope_ptr, compiler_ctx*);
+				void compile_list(ref, bytecode &, scope_ptr, compiler_ctx*);
+				void compile_call_arguments(ref, bytecode &, scope_ptr sc, compiler_ctx*);
 		};
-
 
 		// a bytecode compilation pass that takes in the compiler
 		// oboejct

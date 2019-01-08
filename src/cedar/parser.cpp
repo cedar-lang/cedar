@@ -29,6 +29,7 @@
 
 #include <cedar/object/list.h>
 #include <cedar/object/symbol.h>
+#include <cedar/object/keyword.h>
 #include <cedar/object/string.h>
 #include <cedar/object/number.h>
 #include <cedar/object/nil.h>
@@ -346,7 +347,7 @@ ref reader::parse_symbol(void) {
 	// since parse_symbol also parses keywords, the parser
 	// needs to special case symbols that start with ':'
 	if (tok.val[0] == ':') {
-		throw cedar::make_exception("Keyword generation unimplemented, plz fix");
+		return_obj = new_obj<cedar::keyword>(tok.val);
 	} else if (tok.val == "nil") {
 		return_obj = get_nil();
 	} else {

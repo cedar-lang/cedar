@@ -22,30 +22,54 @@
  * SOFTWARE.
  */
 
-#pragma once
+#include <cstdio>
+
+#include <string>
+#include <functional>
 
 #include <cedar/object.h>
-#include <cedar/runes.h>
-#include <cedar/ref.h>
-#include <cedar/vm/bytecode.h>
+#include <cedar/object/keyword.h>
+#include <cedar/memory.h>
+#include <cedar/util.hpp>
 
-#include <memory>
+using namespace cedar;
 
-namespace cedar {
+static ref the_nil = nullptr;
 
-	class lambda : public object {
-		public:
-			std::shared_ptr<cedar::vm::bytecode> code;
-			int closure_size = -1;
-			std::shared_ptr<ref[]> closure = nullptr;
-
-			lambda(void);
-			lambda(std::shared_ptr<cedar::vm::bytecode>);
-			~lambda(void);
-
-			ref to_number();
-			inline const char *object_type_name(void) { return "lambda"; };
-		protected:
-			cedar::runes to_string(bool human = false);
-	};
+cedar::keyword::keyword(void) {}
+cedar::keyword::keyword(cedar::runes content) {
+	m_content = content;
 }
+
+
+cedar::keyword::~keyword() {
+}
+
+cedar::runes keyword::to_string(bool) {
+	return m_content;
+}
+
+void keyword::set_content(cedar::runes content) {
+	m_content = content;
+}
+
+cedar::runes keyword::get_content(void) {
+	return m_content;
+}
+
+
+ref keyword::to_number() {
+	throw cedar::make_exception("Attempt to cast keyword to number failed");
+}
+
+
+
+uint64_t keyword::hash(void) {
+	if (!m_hash_calculated) {
+		m_hash = std::hash<cedar::runes>()(m_content);
+		m_hash_calculated = true;
+	}
+	return m_hash;
+}
+
+

@@ -27,7 +27,10 @@
 #include <cedar/ref.h>
 #include <cedar/vm/bytecode.h>
 #include <cedar/vm/compiler.h>
+#include <cedar/runes.h>
 
+#include <tuple>
+#include <map>
 #include <cstdio>
 
 namespace cedar {
@@ -37,13 +40,10 @@ namespace cedar {
 		class machine {
 			protected:
 
-				std::vector<ref> constants;
+				std::map<uint64_t, std::tuple<runes, ref>> global_bindings;
 				cedar::vm::compiler m_compiler;
 
 				friend cedar::vm::compiler;
-
-				// mapping from symbol names to references
-				std::map<cedar::runes, ref> global_bindings;
 
 				uint64_t stacksize = 0;
 				ref *stack = nullptr;

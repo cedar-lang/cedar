@@ -25,6 +25,7 @@
 #include <cedar/object.h>
 #include <cedar/object/number.h>
 #include <cedar/object/sequence.h>
+#include <cedar/object/symbol.h>
 #include <cedar/ref.h>
 
 using namespace cedar;
@@ -83,3 +84,16 @@ const std::type_info &cedar::get_number_typeid(void) {
 const std::type_info &cedar::get_object_typeid(object *obj) {
   return typeid(*obj);
 }
+
+
+// returns the hash of the symbol, otherwise returns 0
+uint64_t cedar::ref::symbol_hash(void) {
+	if (is_object())
+		if (auto sym = ref_cast<cedar::symbol>(*this); sym != nullptr) {
+			return sym->hash();
+		}
+	return 0ull;
+}
+
+
+
