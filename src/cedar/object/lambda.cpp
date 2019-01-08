@@ -39,23 +39,25 @@ cedar::lambda::lambda() {
 
 
 cedar::lambda::lambda(std::shared_ptr<vm::bytecode> bc) {
+	type = bytecode_type;
 	code = bc;
 }
 
+cedar::lambda::lambda(bound_function func) {
+	type = function_binding_type;
+	function_binding = func;
+}
 
 cedar::lambda::~lambda() {
 }
 
 cedar::runes lambda::to_string(bool human) {
-
 	char addr_buf[30];
 	std::sprintf(addr_buf, "%p", (void*)code.get());
-
 	cedar::runes str;
 	str += "<lambda ";
 	str += addr_buf;
 	str += ">";
-
 
 	if (!human) {
 		std::cout << "Constants:\n";

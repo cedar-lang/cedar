@@ -28,6 +28,7 @@
 #include <cedar/vm/bytecode.h>
 #include <cedar/vm/compiler.h>
 #include <cedar/runes.h>
+#include <cedar/vm/binding.h>
 
 #include <tuple>
 #include <map>
@@ -51,6 +52,10 @@ namespace cedar {
 			public:
 				machine(void);
 				~machine(void);
+
+				void bind(ref &, ref);
+				void bind(cedar::runes, bound_function);
+				ref find(ref &);
 
 				/*
 				 * given some object reference,

@@ -9,22 +9,26 @@ endif()
 set (CMAKE_CXX_STANDARD 17)
 
 set(CMAKE_CXX_FLAGS_DEBUG "-g")
-# set(CMAKE_CXX_FLAGS_RELEASE "-O3 -g")
+set(CMAKE_CXX_FLAGS_RELEASE "-O3 -g")
 
 
 include_directories(${CMAKE_SOURCE_DIR}/include)
 
 include(${CMAKE_SOURCE_DIR}/src/cedar/CMakeLists.txt)
-target_compile_options(cedar-lib PRIVATE -Wall -Wextra -flto)
+target_compile_options(cedar-lib PRIVATE -Wall -Wno-unused-parameter -Wextra -flto)
 
 add_executable(cedar-bin src/main.cpp)
 
-target_link_libraries(cedar-bin cedar-lib)
+target_link_libraries(cedar-bin cedar-lib ${CMAKE_DL_LIBS})
 set_target_properties(cedar-bin PROPERTIES OUTPUT_NAME cedar)
 
-target_compile_options(cedar-bin PRIVATE -Wall -Wextra -flto)
+target_compile_options(cedar-bin PRIVATE -Wall -Wno-unused-parameter -Wextra -flto)
 
 
 install(TARGETS cedar-bin DESTINATION bin)
 install(TARGETS cedar-lib DESTINATION lib)
+
+
+
+
 

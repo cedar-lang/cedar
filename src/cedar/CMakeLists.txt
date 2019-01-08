@@ -10,6 +10,7 @@ add_library(cedar-lib SHARED
 	src/cedar/parser.cpp
 	src/cedar/vm/compiler.cpp
 	src/cedar/vm/bytecode.cpp
+	src/cedar/vm/bindings.cpp
 	src/cedar/vm/machine.cpp
 	src/cedar/vm/instruction.cpp
 	src/cedar/object/number.cpp
@@ -21,4 +22,5 @@ add_library(cedar-lib SHARED
 	src/cedar/object/lambda.cpp
 )
 
+target_link_libraries(cedar-lib ${CMAKE_DL_LIBS})
 set_target_properties(cedar-lib PROPERTIES OUTPUT_NAME cedar)

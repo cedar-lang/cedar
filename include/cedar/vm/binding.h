@@ -24,41 +24,18 @@
 
 #pragma once
 
-#include <cedar/object.h>
-#include <cedar/runes.h>
 #include <cedar/ref.h>
-#include <cedar/vm/bytecode.h>
-#include <cedar/vm/machine.h>
-
-#include <cedar/vm/binding.h>
 #include <functional>
-#include <memory>
+
+
+// just forward declare machine
+namespace cedar {namespace vm { class machine; }}
 
 namespace cedar {
-
-	class lambda : public object {
-		public:
-
-			enum lambda_type {
-				bytecode_type,
-				function_binding_type,
-			};
-
-			lambda_type type = bytecode_type;
-			std::shared_ptr<cedar::vm::bytecode> code;
-			int closure_size = -1;
-			std::shared_ptr<ref[]> closure = nullptr;
-
-			bound_function function_binding;
-
-			lambda(void);
-			lambda(std::shared_ptr<cedar::vm::bytecode>);
-			lambda(cedar::bound_function);
-			~lambda(void);
-
-			ref to_number();
-			inline const char *object_type_name(void) { return "lambda"; };
-		protected:
-			cedar::runes to_string(bool human = false);
-	};
+	using bound_function = std::function<cedar::ref(cedar::ref, cedar::vm::machine*)>;
 }
+
+#define cedar_binding_sig(name) cedar::ref name(cedar::ref args, cedar::vm::machine * machine)
+#define cedar_binding(name) \
+	cedar_binding_sig(name) asm ("_" #name); \
+	cedar_binding_sig(name)

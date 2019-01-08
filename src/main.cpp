@@ -40,6 +40,49 @@
 #include <cedar.h>
 #include <thread>
 #include <unistd.h>
+#include <dlfcn.h>
+
+using ref = cedar::ref;
+class dynamic_library : public cedar::object {
+	void *m_handle = nullptr;
+
+	public:
+		dynamic_library(void * handle) : m_handle(handle) {};
+
+		cedar::bound_function find_func(const char *name) {
+			return nullptr;
+		}
+		ref to_number() {
+			throw cedar::make_exception("Attempt to cast dynamic_library to number failed");
+		}
+
+		inline const char *object_type_name(void) { return "dynamic-library"; };
+	protected:
+		cedar::runes to_string(bool human = false) {
+			char addr_buf[30];
+			std::sprintf(addr_buf, "%p", (void*)m_handle);
+			cedar::runes str;
+			str += "<dynamic-library ";
+			str += addr_buf;
+			str += ">";
+			return str;
+		};
+};
+
+cedar_binding(cedar_dlopen) {
+
+	cedar::string *name = cedar::ref_cast<cedar::string>(args.get_first());
+
+	if (name == nullptr) {
+		throw cedar::make_exception("dlopen requires a string as the first argument");
+	}
+
+	std::string filename = name->get_content();
+
+	void *binding = dlopen(filename.c_str(), RTLD_LAZY);
+	return cedar::new_obj<dynamic_library>(binding);
+};
+
 
 struct cedar_options {
 	bool interactive = false;
@@ -63,6 +106,9 @@ int main(int argc, char** argv) {
 
 	try {
 		auto ctx = std::make_shared<cedar::context>();
+
+		ctx->m_evaluator->bind("dlopen", *cedar_dlopen);
+
 		char c;
 		while ((c = getopt(argc, argv, "ihe:")) != -1) {
 			switch (c) {

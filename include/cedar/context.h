@@ -51,9 +51,9 @@ namespace cedar {
 			std::vector<uint8_t> code;
 
 
-			std::shared_ptr<cedar::vm::machine> m_evaluator = nullptr;
 
 		public:
+			std::shared_ptr<cedar::vm::machine> m_evaluator = nullptr;
 			context();
 			void eval_file(cedar::runes);
 			void eval_string(cedar::runes);

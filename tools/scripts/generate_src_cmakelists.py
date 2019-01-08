@@ -7,6 +7,7 @@ header = """
 
 footer = """
 
+target_link_libraries(cedar-lib ${CMAKE_DL_LIBS})
 set_target_properties(cedar-lib PROPERTIES OUTPUT_NAME cedar)
 """
 

@@ -28,6 +28,7 @@
 #include <cedar/ref.h>
 #include <cedar/object.h>
 #include <cedar/object/list.h>
+#include <cedar/object/symbol.h>
 
 using namespace cedar;
 
@@ -40,6 +41,29 @@ vm::machine::machine(void) : m_compiler(this) {
 vm::machine::~machine() {
 	delete[] stack;
 }
+
+
+
+
+void vm::machine::bind(ref & symbol, ref value) {
+	global_bindings[symbol.symbol_hash()] = {symbol.to_string(), value};
+}
+
+
+void vm::machine::bind(runes name, bound_function f) {
+	ref symbol = new_obj<cedar::symbol>(name);
+	ref lambda = new_obj<cedar::lambda>(f);
+	global_bindings[symbol.symbol_hash()] = {name, lambda};
+}
+
+ref vm::machine::find(ref & symbol) {
+	try {
+		return std::get<ref>(global_bindings.at(symbol.symbol_hash()));
+	}catch(...) {
+		return nullptr;
+	}
+}
+
 
 ref vm::machine::eval(ref obj) {
 
@@ -263,13 +287,18 @@ loop:
 	}
 
 	TARGET(OP_CALL) {
-
-		printf("cc: %lu\n", call_count++);
 		PUSH_PTR(ip);
 		PUSH_PTR(fp);
 		fp = sp - 4;
 		program = stack[fp+1].reinterpret<cedar::lambda*>();
-		ip = program->code->code;
+
+		if (program->type == lambda::bytecode_type) {
+			ip = program->code->code;
+		} else if (program->type == lambda::function_binding_type) {
+			ref val = program->function_binding(stack[fp], this);
+			PUSH(val);
+			goto LABEL(OP_RETURN);
+		}
 		goto loop;
 	}
 

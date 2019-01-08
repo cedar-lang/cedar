@@ -49,5 +49,6 @@
 #include "cedar/vm/opcode.h"
 #include "cedar/exception.hpp"
 #include "cedar/ref.h"
+#include "cedar/vm/binding.h"
 
 #endif
