@@ -1,4 +1,3 @@
-
 /*
  * MIT License
  *
@@ -85,9 +84,10 @@ namespace cedar {
 				 * the address of the start of the bytecode
 				 * representation of that object
 				 */
-				ref compile(ref);
+				ref compile(ref, machine*);
 
 				void compile_lambda_expression(ref, bytecode &, scope_ptr sc, compiler_ctx*);
+				void compile_progn(ref, bytecode &, scope_ptr, compiler_ctx*);
 				void compile_number(double, bytecode &, scope_ptr, compiler_ctx*);
 				void compile_object(ref, bytecode &, scope_ptr, compiler_ctx*);
 				void compile_constant(ref, bytecode &, scope_ptr, compiler_ctx*);

@@ -78,4 +78,8 @@ void vm::bytecode::finalize(void) {
 
 
 	stack_size = stack_effect;
+
+	for (int i = 0; i < 6; i++) {
+		write((uint8_t)OP_RETURN);
+	}
 }

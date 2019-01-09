@@ -29,6 +29,8 @@
 #include <cedar/object.h>
 #include <cedar/object/list.h>
 #include <cedar/object/symbol.h>
+#include <chrono>
+#include <ratio>
 
 using namespace cedar;
 
@@ -79,7 +81,7 @@ static const char *instruction_name(uint8_t op) {
 
 ref vm::machine::eval(ref obj) {
 
-	ref compiled_lambda = m_compiler.compile(obj);
+	ref compiled_lambda = m_compiler.compile(obj, this);
 
 	auto *raw_program = ref_cast<cedar::lambda>(compiled_lambda);
 
@@ -90,6 +92,7 @@ ref vm::machine::eval(ref obj) {
 
 
 // #define VM_TRACE
+#define USE_PREDICT
 
 
 	// declare and initialize the frame and stack pointers to 0
@@ -112,16 +115,48 @@ ref vm::machine::eval(ref obj) {
 
 
 #ifdef VM_TRACE
-#define PRELUDE printf("sp: %3lu, fp: %3lu, ip %p, op: %s\n", sp, fp, ip, instruction_name(op));
+
+std::chrono::high_resolution_clock::time_point last_time = std::chrono::high_resolution_clock::now();
+
+#define PRELUDE \
+	std::chrono::high_resolution_clock::time_point now = std::chrono::high_resolution_clock::now();  \
+	std::chrono::duration<long long, std::nano> dt = now - last_time; \
+	double dtns = dt.count();                                         \
+	printf("sp: %3lu, fp: %3lu, ip %p, preds: %4ld, prev_dt: %8.5fms, op: %s\n", sp, fp, ip, correct_predictions, dtns / 1000.0 / 1000.0, instruction_name(op)); \
+	last_time = now;
 #else
 #define PRELUDE
 #endif
 #define DISPATCH goto loop;
 
 
+
+
+
 	void *threaded_labels[255];
 	for (int i = 0; i < 255; i++)
 		threaded_labels[i] = &&LABEL(OP_NOP);
+
+// some opcodes come in very common pairs, making it very possible to do speculative exec
+// on what the next opcode could be... This macro allows high speed assumptions to be made
+// at the end of an opcode that is typically followed by another opcode
+// The performance loss by this check is minimal on modern CPUs because of the l1 cache typically
+// caching 8 bytes, so the best case scenario is a cache miss 1/8 opcodes that predict
+// the next instruction
+int64_t correct_predictions = 0;
+#ifdef USE_PREDICT
+#define PREDICT(pred, label) \
+	do {              \
+		if (*ip == pred) { \
+			ip++;              \
+			op = *ip;          \
+			correct_predictions++; \
+			goto label; \
+		} else correct_predictions--; } while (0);
+
+#else
+#define PREDICT(pred, label)
+#endif
 
 #define SET_LABEL(op) threaded_labels[op] = &&DO_##op;
 
@@ -196,6 +231,7 @@ ref vm::machine::eval(ref obj) {
 	uint8_t op;
 loop:
 
+	// printf("preds: %ld\n", correct_predictions);
 	// TODO: every n instructions, clean up the stack
 	//       by setting all references above the sp to null
 	//       also tweak this value intelligently
@@ -210,14 +246,15 @@ loop:
 		for (uint64_t i = 0; i < sp-1; i++) {
 			new_stack[i] = stack[i];
 		}
-		delete[] stack;
+		// delete[] stack;
 		stack = new_stack;
 		stacksize = new_size;
 	}
 
-	for (int i = sp; i < stacksize; i++) {
+	for (unsigned int i = sp; i < stacksize; i++) {
 		stack[i] = nullptr;
 	}
+
 
 	ip++;
 	goto *threaded_labels[op];
@@ -269,6 +306,12 @@ loop:
 		auto val = program->closure[ind];
 		PUSH(val);
 		CODE_SKIP(uint64_t);
+		// load locals are typically packed into an argument
+		// list, so it's reasonable to predict a possible
+		// CONS operation immediately afterwards. If the prediction
+		// was invalid, then it's not a problem, performace wise
+		// thanks to the CPU cache
+		PREDICT(OP_CONS, DO_OP_CONS);
 		DISPATCH;
 	}
 
@@ -334,11 +377,14 @@ loop:
 		program = stack[fp+1].reinterpret<cedar::lambda*>();
 
 		if (program->type == lambda::bytecode_type) {
+			auto new_closure = std::shared_ptr<ref[]>(new ref[program->closure_size]);
+			for (int i = 0; i < program->closure_size; i++) {
+				new_closure[i] = program->closure[i];
+			}
+			program->closure = new_closure;
 			ip = program->code->code;
 		} else if (program->type == lambda::function_binding_type) {
-
 			ref val = program->function_binding(stack[fp], this);
-
 			PUSH(val);
 			goto LABEL(OP_RETURN);
 		}
@@ -346,6 +392,7 @@ loop:
 	}
 
 	TARGET(OP_MAKE_FUNC) {
+		printf("MAKE FUNC\n");
 		PRELUDE;
 		auto ind = CODE_READ(uint64_t);
 		ref function_template = program->code->constants[ind];
@@ -353,6 +400,10 @@ loop:
 
 		ref function = new_obj<cedar::lambda>();
 		auto *fptr = ref_cast<cedar::lambda>(function);
+
+		if (fptr->closure_size != -1) {
+			printf("needs closure\n");
+		}
 
 		// inherit closures from parent
 		fptr->closure = program->closure;

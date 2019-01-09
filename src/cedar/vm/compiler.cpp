@@ -77,14 +77,16 @@ vm::compiler::~compiler() {}
 
 
 
-ref vm::compiler::compile(ref obj) {
+ref vm::compiler::compile(ref obj, vm::machine *machine) {
 
 	// run the value through some optimization and
 	// modification to the AST of the object before
 	// compiling to bytecode
-	ref compiled = passcontroller(obj, this)
-			.pipe(vm::bytecode_pass, "bytecode emission") // compile the object to a code lambda
-			.get();
+	auto controller = passcontroller(obj, this);
+
+	controller.pipe(vm::bytecode_pass, "bytecode emission");
+
+	ref compiled = controller.get();
 
 	return compiled;
 }
@@ -182,6 +184,17 @@ void cedar::vm::compiler::compile_call_arguments(ref args, bytecode & code, scop
 }
 
 
+
+void vm::compiler::compile_progn(ref obj, vm::bytecode & code, scope_ptr sc, compiler_ctx *ctx) {
+	while (true) {
+		compile_object(obj.get_first(), code, sc, ctx);
+		if (obj.get_rest().is_nil()) break;
+		code.write((uint8_t)OP_SKIP);
+		obj = obj.get_rest();
+	}
+
+}
+
 void vm::compiler::compile_list(ref obj, vm::bytecode & code, scope_ptr sc, compiler_ctx* ctx) {
 	// set is a special form that attempts to change a local closure binding
 	// and if it can't, will set in the global scope
@@ -218,6 +231,11 @@ void vm::compiler::compile_list(ref obj, vm::bytecode & code, scope_ptr sc, comp
 
 	if (list_is_call_to("lambda", obj)) {
 		compile_lambda_expression(obj, code, sc, ctx);
+		return;
+	}
+
+	if (list_is_call_to("progn", obj)) {
+		compile_progn(obj.get_rest(), code, sc, ctx);
 		return;
 	}
 

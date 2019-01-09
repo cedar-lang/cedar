@@ -22,3 +22,20 @@
 (print (- 10 3))
 (print (* 10 3))
 (print (/ 10 3))
+
+(set curry (lambda (x)
+             (lambda (y)
+               (+ x y))))
+
+(set add-one (curry 1))
+(set add-two (curry 2))
+
+(print (add-one 1))
+(print (add-one 2))
+(print (add-two 2))
+
+(set inf (lambda (x)
+           (progn
+             (print "hello" x)
+             (inf (+ x 1)))))
+(inf 1)
