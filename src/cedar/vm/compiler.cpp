@@ -167,9 +167,12 @@ void vm::compiler::compile_object(ref obj, vm::bytecode & code, scope_ptr sc, co
 
 
 void cedar::vm::compiler::compile_call_arguments(ref args, bytecode & code, scope_ptr sc, compiler_ctx *ctx) {
-	if (auto rest = args.get_rest(); rest.is<cedar::nil>()) {
+
+
+	if (args.is_nil()) {
+	}
+	if (auto rest = args.get_rest(); rest.is_nil()) {
 		code.write((uint8_t)OP_NIL);
-		return;
 	} else {
 		compile_call_arguments(rest, code, sc, ctx);
 	}
@@ -266,6 +269,8 @@ void vm::compiler::compile_lambda_expression(ref expr, bytecode & code, scope_pt
 	auto args = expr.get_rest().get_first();
 
 	while (true) {
+
+		if (args.is_nil()) break;
 		auto arg = args.get_first();
 
 		if (auto *sym = ref_cast<cedar::symbol>(arg); sym != nullptr) {
@@ -274,12 +279,12 @@ void vm::compiler::compile_lambda_expression(ref expr, bytecode & code, scope_pt
 			new_scope->set(arg, ctx->closure_size);
 			ctx->closure_size++;
 		} else {
-			if (ref_cast<cedar::nil>(arg) == nullptr)
+			if (arg.is_nil()) {
 				throw cedar::make_exception("lambda arguments must be symbols: ", expr);
+			}
 		}
 
 		args = args.get_rest();
-		if (args.is<cedar::nil>()) break;
 	}
 
 	auto body = expr.get_rest().get_rest().get_first();

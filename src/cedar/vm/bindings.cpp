@@ -35,34 +35,81 @@ using namespace cedar;
 cedar_binding(cedar_add) {
 
 	ref accumulator = 0;
+	while (true) {
+		accumulator = accumulator + args.get_first();
+		if (args.get_rest().is_nil()) break;
+		args = args.get_rest();
+	}
+	return accumulator;
+}
+
+cedar_binding(cedar_sub) {
+	ref acc = args.get_first();
+	args = args.get_rest();
+	int i = 0;
+	while (true) {
+		i++;
+		acc = acc - args.get_first();
+
+		if (args.get_rest().is_nil()) break;
+		args = args.get_rest();
+	}
+	if (i == 0) {
+		acc = acc * -1;
+	}
+	return acc;
+}
+
+cedar_binding(cedar_mul) {
+
+	ref accumulator = 1;
 
 	while (true) {
-		if (args.get_first().is_nil()) break;
-		accumulator = accumulator + args.get_first();
+		accumulator = accumulator * args.get_first();
+		if (args.get_rest().is_nil()) break;
 		args = args.get_rest();
 	}
 
 	return accumulator;
 }
 
-cedar_binding(cedar_sub) {
-
-	ref accumulator = 0;
-
+cedar_binding(cedar_div) {
+	ref acc = args.get_first();
+	args = args.get_rest();
+	int i = 0;
 	while (true) {
-		if (args.get_first().is_nil()) break;
-		accumulator = accumulator - args.get_first();
+		i++;
+		acc = acc / args.get_first();
+
+		if (args.get_rest().is_nil()) break;
+		args = args.get_rest();
+	}
+	if (i == 0) {
+		acc = ref{1} / acc;
+	}
+	return acc;
+}
+
+
+
+cedar_binding(cedar_equal) {
+	ref first = args.get_first();
+	args = args.get_rest();
+	while (true) {
+		if (args.get_first() != first) return nullptr;
+
+		if (args.get_rest().is_nil()) break;
 		args = args.get_rest();
 	}
 
-	return accumulator;
+	return true;
 }
 
 
 cedar_binding(cedar_print) {
 	while (true) {
-		if (args.is_nil()) break;
 		std::cout << args.get_first().to_string(true) << " ";
+		if (args.get_rest().is_nil()) break;
 		args = args.get_rest();
 	}
 	std::cout << std::endl;
@@ -75,4 +122,14 @@ cedar_binding(cedar_typeof) {
 
 	return new_obj<cedar::keyword>(kw_str);
 }
+
+cedar_binding(cedar_first) {
+	ref arg = args.get_first();
+	return arg.get_first();
+}
+
+cedar_binding(cedar_rest) {
+	return args.get_first().get_rest();
+}
+
 

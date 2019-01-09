@@ -75,6 +75,8 @@ class dynamic_library : public cedar::object {
 
 cedar_binding(cedar_dlopen) {
 
+	std::cout << args << std::endl;
+
 	cedar::string *name = cedar::ref_cast<cedar::string>(args.get_first());
 
 	if (name == nullptr) {

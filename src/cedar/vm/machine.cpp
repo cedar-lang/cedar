@@ -215,6 +215,10 @@ loop:
 		stacksize = new_size;
 	}
 
+	for (int i = sp; i < stacksize; i++) {
+		stack[i] = nullptr;
+	}
+
 	ip++;
 	goto *threaded_labels[op];
 

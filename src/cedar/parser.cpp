@@ -317,7 +317,10 @@ ref reader::parse_list(void) {
 	}
 
 
-	ref list_obj = cedar::new_obj<list>(items);
+	ref list_obj = nullptr;
+	if (items.size() > 0) {
+		list_obj = cedar::new_obj<list>(items);
+	}
 	// skip over the closing paren
 	next();
 
@@ -332,7 +335,7 @@ ref reader::parse_special_syntax(cedar::runes function_name) {
 	// skip over the "special syntax token"
 	next();
 	std::vector<ref> items = { new_obj<symbol>(function_name), parse_expr() };
-	ref obj = new_const_obj<list>(items);
+	ref obj = new_obj<list>(items);
 	return obj;
 }
 
@@ -349,9 +352,9 @@ ref reader::parse_symbol(void) {
 	if (tok.val[0] == ':') {
 		return_obj = new_obj<cedar::keyword>(tok.val);
 	} else if (tok.val == "nil") {
-		return_obj = get_nil();
+		return_obj = nullptr;
 	} else {
-		return_obj = new_const_obj<cedar::symbol>(tok.val);
+		return_obj = new_obj<cedar::symbol>(tok.val);
 	}
 	next();
 	return return_obj;
@@ -384,7 +387,7 @@ ref reader::parse_number(void) {
 
 /////////////////////////////////////////////////////
 ref reader::parse_string(void) {
-	ref obj = new_const_obj<string>();
+	ref obj = new_obj<string>();
 	obj.as<string>()->set_content(tok.val);
 	next();
 	return obj;

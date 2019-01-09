@@ -23,9 +23,9 @@
  */
 
 #include <cedar/object.h>
+#include <cedar/object/list.h>
 #include <cedar/object/number.h>
 #include <cedar/object/sequence.h>
-#include <cedar/object/list.h>
 #include <cedar/object/symbol.h>
 #include <cedar/ref.h>
 
@@ -39,45 +39,54 @@ uint16_t cedar::change_refcount(object *o, int change) {
 uint16_t cedar::get_refcount(object *o) { return o->refcount; }
 
 void cedar::delete_object(object *o) {
-  if (!o->no_autofree) {
-    delete o;
-  }
+	// TODO: fix the leak, somewhere it breaks and attempts
+	// to free when it shouldnt
+	delete o;
 }
 
 ref cedar::ref::get_first() const {
   if (!is_object())
     throw cedar::make_exception("unable to get first of non-object reference");
-	if (obj == nullptr) return nullptr;
+  if (obj == nullptr) return nullptr;
   return reinterpret_cast<sequence *>(obj)->get_first();
 }
 
 ref cedar::ref::get_rest() const {
   if (!is_object())
     throw cedar::make_exception("unable to get rest of non-object reference");
-	if (obj == nullptr) return nullptr;
+  if (obj == nullptr) return nullptr;
   return reinterpret_cast<sequence *>(obj)->get_rest();
 }
 
 void cedar::ref::set_first(ref val) {
   if (!is_object())
     throw cedar::make_exception("unable to set first of non-object reference");
-	if (obj == nullptr) return;
+  if (obj == nullptr) return;
   return reinterpret_cast<sequence *>(obj)->set_first(val);
 }
 
 void cedar::ref::set_rest(ref val) {
   if (!is_object())
     throw cedar::make_exception("unable to set rest of non-object reference");
-	if (obj == nullptr) return;
+  if (obj == nullptr) return;
   return reinterpret_cast<sequence *>(obj)->set_rest(val);
 }
 
-void cedar::ref::set_const(bool c) { obj->no_autofree = c; }
-
 cedar::runes ref::to_string(bool human) {
-	if (is_number()) {
-		auto str = std::to_string(m_number);
-  	return str;
+  if (is_number()) {
+    auto str = std::to_string(m_number);
+    long len = str.length();
+    for (int i = len - 1; i > 0; i--) {
+      if (str[i] == '0') {
+				str.pop_back();
+      } else if (str[i] == '.') {
+				str.pop_back();
+				break;
+      } else {
+				break;
+      }
+    }
+    return str;
   }
   if (obj == nullptr) return U"nil";
   return obj->to_string(human);
@@ -90,34 +99,31 @@ const std::type_info &cedar::get_object_typeid(object *obj) {
   return typeid(*obj);
 }
 
-
 // returns the hash of the symbol, otherwise returns 0
 uint64_t cedar::ref::symbol_hash(void) {
-	if (is_object())
-		if (auto sym = ref_cast<cedar::symbol>(*this); sym != nullptr) {
-			return sym->hash();
-		}
-	return 0ull;
+  if (is_object())
+    if (auto sym = ref_cast<cedar::symbol>(*this); sym != nullptr) {
+      return sym->hash();
+    }
+  return 0ull;
 }
-
 
 bool cedar::ref::is_nil(void) const {
-
-	if (is_object()) {
-		if (obj == nullptr) return true;
-		if (operator*() == get_nil_object()) {
-			return true;
-		}
-		if (auto *list = ref_cast<cedar::list>(*this); list != nullptr) {
-			if (list->get_first().is_nil() && list->get_rest().is_nil())
-				return true;
-		}
-	}
-	return false;
+  if (is_object()) {
+    if (obj == nullptr) return true;
+    if (operator*() == get_nil_object()) {
+      return true;
+    }
+		/*
+    if (auto *list = ref_cast<cedar::list>(*this); list != nullptr) {
+    	if (list->get_first().is_nil() && list->get_rest().is_nil()) return true;
+    }
+		*/
+  }
+  return false;
 }
 
-const char *cedar::get_object_type_name(object *obj){
-	return obj->object_type_name();
+const char *cedar::get_object_type_name(object *obj) {
+  return obj->object_type_name();
 }
-
 

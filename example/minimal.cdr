@@ -3,8 +3,22 @@
 ;;; grab bindings to library functions
 (set + (dlsym lib-so "cedar_add"))
 (set - (dlsym lib-so "cedar_sub"))
+(set * (dlsym lib-so "cedar_mul"))
+(set / (dlsym lib-so "cedar_div"))
+(set = (dlsym lib-so "cedar_equal"))
+(set eq (dlsym lib-so "cedar_equal"))
+
 (set print (dlsym lib-so "cedar_print"))
 (set type-of (dlsym lib-so "cedar_typeof"))
 
-(print (+ 1 2))
-(print '(1 2 3))
+(set first (dlsym lib-so "cedar_first"))
+(set rest (dlsym lib-so "cedar_rest"))
+
+(set double (lambda (x) (+ x x)))
+(set square (lambda (x) (* x x)))
+
+(print "//////////////// MATHS /////////////////")
+(print (+ 10 3))
+(print (- 10 3))
+(print (* 10 3))
+(print (/ 10 3))

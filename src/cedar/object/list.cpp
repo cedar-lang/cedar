@@ -44,28 +44,36 @@ list::list(ref first, ref rest) {
 list::list(std::vector<ref> items) {
 
 	ref sac = new_obj<list>();
-	unsigned len = items.size();
-	unsigned last_i = len - 1;
-	ref curr = sac;
-	for (unsigned i = 0; i < len; i++) {
-		ref lst = new_const_obj<list>();
-		curr.set_first(items[i]);
+	int len = items.size();
+	ref curr = nullptr;
+	for (int i = len-1; i >= 0; i--) {
+		ref lst = new_obj<list>();
+		ref item = items[i];
+		lst.set_first(item);
 
-		if (i+1 <= last_i && items[i+1].is<symbol>() && items[i+1].as<symbol>()->get_content() == ".") {
-			if (i+1 != last_i-1) throw make_exception("Illegal end of dotted list");
-			curr.set_rest(items[last_i]);
-			if (curr.get_rest().is_nil()) {
-				curr.set_rest(new_const_obj<list>());
+		if (i-1 >= 0) {
+			if (auto *sym = ref_cast<symbol>(items[i-1]); sym != nullptr) {
+				if (sym->get_content() == ".") {
+					if (i == len - 1 && len >= 3) {
+						lst.set_rest(item);
+						i--;
+						lst.set_first(items[i-1]);
+						i--;
+						curr = lst;
+						continue;
+					} else {
+						throw cedar::make_exception("illegal end of dotted list");
+					}
+				}
 			}
-			break;
 		}
 
-		curr.set_rest(lst);
+		lst.set_rest(curr);
 		curr = lst;
 	}
 
-	set_first(sac.get_first());
-	set_rest(sac.get_rest());
+	set_first(curr.get_first());
+	set_rest(curr.get_rest());
 }
 
 list::~list(void) {
@@ -93,18 +101,13 @@ void list::set_rest(ref n_rest) {
 cedar::runes list::to_string(bool) {
 	cedar::runes s;
 
-
-
 	if (m_rest.is_nil()) {
-		if (m_first.is_nil()) return "()";
+		if (m_first.is_nil()) return "(nil)";
 		s += "(";
 		s += m_first.to_string();
 		s += ")";
 		return s;
 	}
-
-
-	std::cout << new_obj<cedar::list>().is_nil() << std::endl;
 
 	if (is_pair()) {
 		s += "(";
@@ -121,9 +124,6 @@ cedar::runes list::to_string(bool) {
 	while (true) {
 		s += curr.get_first().to_string();
 
-		std::cout << '"' << s << '"' << std::endl;
-
-		std::cout << curr.get_rest().is_nil() << std::endl;
 		if (curr.get_rest().is_nil()) {
 			break;
 		} else {
@@ -131,8 +131,7 @@ cedar::runes list::to_string(bool) {
 		}
 
 		if (!curr.get_rest().is_nil()) {
-			if (false && curr.get_rest()->is_pair()) {
-				s += " ";
+			if (curr.get_rest()->is_pair()) {
 				s += curr.get_rest().get_first().to_string();
 				s += " . ";
 				s += curr.get_rest().get_rest().to_string();

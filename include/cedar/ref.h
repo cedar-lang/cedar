@@ -381,6 +381,10 @@ namespace cedar {
 				return compare(other) == 0;
 			}
 
+			inline bool operator!=(ref other) {
+				return !operator==(other);
+			}
+
 #define LITERAL_BINARY_OP_TYPE(op, type) \
 			inline ref operator op(const type& val) { \
 				if (is_float()) return to_float() + val;  \
@@ -407,13 +411,6 @@ namespace cedar {
 			return r;
 		}
 
-	template<typename T, typename ...Args>
-		ref new_const_obj(Args...args) {
-			ref r = new_obj<T>(args...);
-			r.set_const(true);
-			return r;
-		}
-		
 	template<class T>
 		constexpr inline T *ref_cast(const ref &r) {
 			return r.as<T>();
