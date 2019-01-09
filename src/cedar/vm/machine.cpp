@@ -59,10 +59,22 @@ void vm::machine::bind(runes name, bound_function f) {
 ref vm::machine::find(ref & symbol) {
 	try {
 		return std::get<ref>(global_bindings.at(symbol.symbol_hash()));
-	}catch(...) {
+	} catch(...) {
 		return nullptr;
 	}
 }
+
+
+static const char *instruction_name(uint8_t op) {
+	switch (op) {
+#define OP_NAME(name, code, op_type, effect) case code: return #name;
+		CEDAR_FOREACH_OPCODE(OP_NAME);
+#undef OP_NAME
+	}
+	return "unknown";
+}
+
+
 
 
 ref vm::machine::eval(ref obj) {
@@ -77,7 +89,7 @@ ref vm::machine::eval(ref obj) {
 
 
 
-#define VM_TRACE
+// #define VM_TRACE
 
 
 	// declare and initialize the frame and stack pointers to 0
@@ -98,6 +110,13 @@ ref vm::machine::eval(ref obj) {
 #define LABEL(op) DO_##op
 #define TARGET(op) DO_##op:
 
+
+#ifdef VM_TRACE
+#define PRELUDE printf("sp: %3lu, fp: %3lu, ip %p, op: %s\n", sp, fp, ip, instruction_name(op));
+#else
+#define PRELUDE
+#endif
+#define DISPATCH goto loop;
 
 
 	void *threaded_labels[255];
@@ -121,6 +140,8 @@ ref vm::machine::eval(ref obj) {
 	SET_LABEL(OP_MAKE_FUNC);
 	SET_LABEL(OP_ARG_POP);
 	SET_LABEL(OP_RETURN);
+	SET_LABEL(OP_EXIT);
+	SET_LABEL(OP_SKIP);
 
 
 	ref progref = cedar::new_obj<cedar::lambda>(raw_program->code);
@@ -170,7 +191,6 @@ ref vm::machine::eval(ref obj) {
 	PUSH(nullptr);
 
 
-	uint64_t call_count = 0;
 
 	// the currently evaluating opcode
 	uint8_t op;
@@ -195,9 +215,6 @@ loop:
 		stacksize = new_size;
 	}
 
-#ifdef VM_TRACE
-	printf("%p: %02x %lu\n", ip, op, sp);
-#endif
 	ip++;
 	goto *threaded_labels[op];
 
@@ -205,55 +222,65 @@ loop:
 	// encountered, an error is printed and the program just exits...
 	// TODO: make it not do this and actually just ignore it.
 	TARGET(OP_NOP) {
+		PRELUDE;
 		fprintf(stderr, "UNHANDLED INSTRUCTION: %02x\n", op);
 		exit(-1);
-		goto loop;
+		DISPATCH;
 	}
 
 
 	TARGET(OP_NIL) {
+		PRELUDE;
 		PUSH(nullptr);
-		goto loop;
+		DISPATCH;
 	}
 
 	TARGET(OP_CONST) {
+		PRELUDE;
 		const auto ind = CODE_READ(uint64_t);
 		PUSH(program->code->constants[ind]);
 		CODE_SKIP(uint64_t);
-		goto loop;
+		DISPATCH;
 	}
 
 	TARGET(OP_FLOAT) {
+		PRELUDE;
 		const auto flt = CODE_READ(double);
 		PUSH(flt);
 		CODE_SKIP(double);
-		goto loop;
+		DISPATCH;
 	}
 
 	TARGET(OP_INT) {
+		PRELUDE;
 		const auto integer = CODE_READ(int64_t);
 		PUSH(integer);
 		CODE_SKIP(int64_t);
-		goto loop;
+		DISPATCH;
 	}
 
 	TARGET(OP_LOAD_LOCAL) {
+		PRELUDE;
 		auto ind = CODE_READ(uint64_t);
 		auto val = program->closure[ind];
 		PUSH(val);
 		CODE_SKIP(uint64_t);
-		goto loop;
+		DISPATCH;
 	}
 
 
 	TARGET(OP_SET_LOCAL) {
+		PRELUDE;
 		auto ind = CODE_READ(uint64_t);
-		program->closure[ind] = POP();
+		ref val = POP();
+		program->closure[ind] = val;
+		PUSH(val);
 		CODE_SKIP(uint64_t);
-		goto loop;
+		DISPATCH;
 	}
 
 	TARGET(OP_LOAD_GLOBAL) {
+		PRELUDE;
 		auto ind = CODE_READ(uint64_t);
 		ref symbol = program->code->constants[ind];
 
@@ -265,28 +292,38 @@ loop:
 		}
 
 		CODE_SKIP(uint64_t);
-		goto loop;
+		DISPATCH;
 	}
 
 
 	TARGET(OP_SET_GLOBAL) {
+		PRELUDE;
 		auto ind = CODE_READ(uint64_t);
-		ref symbol = program->code->constants[ind];
 
-		global_bindings[symbol.symbol_hash()] = {symbol.to_string(), POP()};
+		ref symbol = program->code->constants[ind];
+		ref val = POP();
+
+		bind(symbol, val);
+
+		PUSH(val);
 		CODE_SKIP(uint64_t);
-		goto loop;
+		DISPATCH;
 	}
 
 	TARGET(OP_CONS) {
-		ref list = new_obj<cedar::list>();
-		list.set_first(POP());
-		list.set_rest(POP());
+		PRELUDE;
+		auto list_obj = new cedar::list();
+
+		list_obj->set_first(POP());
+		list_obj->set_rest(POP());
+
+		ref list = list_obj;
 		PUSH(list);
-		goto loop;
+		DISPATCH;
 	}
 
 	TARGET(OP_CALL) {
+		PRELUDE;
 		PUSH_PTR(ip);
 		PUSH_PTR(fp);
 		fp = sp - 4;
@@ -295,15 +332,17 @@ loop:
 		if (program->type == lambda::bytecode_type) {
 			ip = program->code->code;
 		} else if (program->type == lambda::function_binding_type) {
+
 			ref val = program->function_binding(stack[fp], this);
+
 			PUSH(val);
 			goto LABEL(OP_RETURN);
 		}
-		goto loop;
+		DISPATCH;
 	}
 
 	TARGET(OP_MAKE_FUNC) {
-
+		PRELUDE;
 		auto ind = CODE_READ(uint64_t);
 		ref function_template = program->code->constants[ind];
 		auto *template_ptr = ref_cast<cedar::lambda>(function_template);
@@ -317,28 +356,47 @@ loop:
 		fptr->code = template_ptr->code;
 		PUSH(fptr);
 		CODE_SKIP(uint64_t);
-		goto loop;
+		DISPATCH;
 	}
 
 	TARGET(OP_ARG_POP) {
+		PRELUDE;
 		int ind = CODE_READ(uint64_t);
 		ref arg = stack[fp].get_first();
 		program->closure[ind] = arg;
 		stack[fp] = stack[fp].get_rest();
 		CODE_SKIP(uint64_t);
-		goto loop;
+		DISPATCH;
 	}
 
 	TARGET(OP_RETURN) {
+		PRELUDE;
+		ref val = POP();
+		auto prevfp = fp;
+		fp = (uint64_t)POP_PTR();
+		ip = (uint8_t*)POP_PTR();
+		sp = prevfp;
+		program = ref_cast<cedar::lambda>(stack[fp+1]);
+		PUSH(val);
+		DISPATCH;
+	}
 
-		std::cout << POP() << std::endl;
-		return POP();
-		goto loop;
+	TARGET(OP_EXIT) {
+		PRELUDE;
+		goto end;
+		DISPATCH;
+	}
+
+
+	TARGET(OP_SKIP) {
+		PRELUDE;
+		ref a = POP();
+		DISPATCH;
 	}
 
 
 	goto loop;
+end:
 
-
-	return nullptr;
+	return POP();
 }

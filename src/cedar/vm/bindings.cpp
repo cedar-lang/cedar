@@ -22,3 +22,57 @@
  * SOFTWARE.
  */
 
+
+// this file includes most of the standard bindings and runtime functions required
+// by the cedar standard library. They will be linked at runtime via a dlopen and dlsym
+// binding defined in src/main.cpp
+
+#include <cedar/vm/binding.h>
+#include <cedar.h>
+
+using namespace cedar;
+
+cedar_binding(cedar_add) {
+
+	ref accumulator = 0;
+
+	while (true) {
+		if (args.get_first().is_nil()) break;
+		accumulator = accumulator + args.get_first();
+		args = args.get_rest();
+	}
+
+	return accumulator;
+}
+
+cedar_binding(cedar_sub) {
+
+	ref accumulator = 0;
+
+	while (true) {
+		if (args.get_first().is_nil()) break;
+		accumulator = accumulator - args.get_first();
+		args = args.get_rest();
+	}
+
+	return accumulator;
+}
+
+
+cedar_binding(cedar_print) {
+	while (true) {
+		if (args.is_nil()) break;
+		std::cout << args.get_first().to_string(true) << " ";
+		args = args.get_rest();
+	}
+	std::cout << std::endl;
+	return 0;
+}
+
+cedar_binding(cedar_typeof) {
+	cedar::runes kw_str = ":";
+	kw_str += args.get_first().object_type_name();
+
+	return new_obj<cedar::keyword>(kw_str);
+}
+

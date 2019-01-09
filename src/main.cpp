@@ -50,7 +50,11 @@ class dynamic_library : public cedar::object {
 		dynamic_library(void * handle) : m_handle(handle) {};
 
 		cedar::bound_function find_func(const char *name) {
-			return nullptr;
+			void * loc = dlsym(m_handle, name);
+			if (loc == nullptr) {
+				throw cedar::make_exception("Unable to find function with name ", name);
+			}
+			return (cedar::bound_function)loc;
 		}
 		ref to_number() {
 			throw cedar::make_exception("Attempt to cast dynamic_library to number failed");
@@ -84,6 +88,19 @@ cedar_binding(cedar_dlopen) {
 };
 
 
+cedar_binding(cedar_dlsym) {
+	dynamic_library *dynlib = cedar::ref_cast<dynamic_library>(args.get_first());
+	cedar::string *name = cedar::ref_cast<cedar::string>(args.get_rest().get_first());
+	if (dynlib == nullptr || name == nullptr) {
+		throw cedar::make_exception("invalid types passed to dlsym, requires :dynamic_library and :string");
+	}
+	auto stdname = std::string("_") + std::string(name->get_content());
+	auto func_binding = dynlib->find_func(stdname.c_str());
+	ref func = cedar::new_obj<cedar::lambda>(func_binding);
+	return func;
+}
+
+
 struct cedar_options {
 	bool interactive = false;
 };
@@ -108,6 +125,7 @@ int main(int argc, char** argv) {
 		auto ctx = std::make_shared<cedar::context>();
 
 		ctx->m_evaluator->bind("dlopen", *cedar_dlopen);
+		ctx->m_evaluator->bind("dlsym", *cedar_dlsym);
 
 		char c;
 		while ((c = getopt(argc, argv, "ihe:")) != -1) {

@@ -46,9 +46,6 @@ namespace cedar {
 			virtual cedar::runes to_string(bool human = false) = 0;
 
 
-			// virtual const char *object_type_name(void);
-
-
 
 			/*
 			 * type_name
@@ -118,6 +115,9 @@ namespace cedar {
 
 			virtual ref to_number() = 0;
 
+
+
+			virtual const char *object_type_name(void) = 0;
 
 
 			bool is_pair(void);

@@ -53,22 +53,16 @@ cedar::lambda::~lambda() {
 
 cedar::runes lambda::to_string(bool human) {
 	char addr_buf[30];
-	std::sprintf(addr_buf, "%p", (void*)code.get());
+	if (type == bytecode_type) {
+		std::sprintf(addr_buf, "%p", (void*)code.get());
+	} else if (type == function_binding_type) {
+		std::sprintf(addr_buf, "binding %p", (void*)function_binding);
+	}
+
 	cedar::runes str;
 	str += "<lambda ";
 	str += addr_buf;
 	str += ">";
-
-	if (!human) {
-		std::cout << "Constants:\n";
-		for (int i = 0; i < code->constants.size(); i++) {
-			std::cout << i << "\t" << code->constants[i].type_name() << "\t" << code->constants[i].to_string(true) << std::endl;
-		}
-		auto insts = vm::decode_bytecode(code.get());
-		for (auto & i : insts) {
-			std::cout << i.to_string((uint64_t)(void*)code->code) << std::endl;
-		}
-	}
 	return str;
 }
 

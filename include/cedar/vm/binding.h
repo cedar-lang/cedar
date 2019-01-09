@@ -32,7 +32,8 @@
 namespace cedar {namespace vm { class machine; }}
 
 namespace cedar {
-	using bound_function = std::function<cedar::ref(cedar::ref, cedar::vm::machine*)>;
+	typedef ref (*bound_function)(cedar::ref, cedar::vm::machine*);
+	// using bound_function = std::function<cedar::ref(cedar::ref, cedar::vm::machine*)>;
 }
 
 #define cedar_binding_sig(name) cedar::ref name(cedar::ref args, cedar::vm::machine * machine)

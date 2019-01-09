@@ -44,8 +44,8 @@ namespace cedar {
 		private:
 			// a list stores two references, the car/cdr in old lisp
 			// they will default to the `nil` singleton object
-			ref m_first;
-			ref m_rest;
+			ref m_first = nullptr;
+			ref m_rest = nullptr;
 
 		public:
 			list(void);
@@ -60,7 +60,11 @@ namespace cedar {
 
 			ref to_number();
 
-			inline const char *object_type_name(void) { return "list"; };
+			inline const char *object_type_name(void) {
+				if (m_rest.is_nil() && m_first.is_nil())
+					return "nil";
+				return "list";
+			};
 		protected:
 			cedar::runes to_string(bool human = false);
 	};

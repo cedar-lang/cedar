@@ -55,6 +55,7 @@ namespace cedar {
 
 
 	size_t get_hash_code(object *);
+	const char *get_object_type_name(object *);
 
 
 	object *get_nil_object(void);
@@ -154,6 +155,9 @@ namespace cedar {
 			inline bool is_number(void) const {
 				return flags[FLAG_NUMBER] == true;
 			}
+
+
+			bool is_nil(void) const;
 
 
 			inline ref(const ref& other) {
@@ -274,9 +278,15 @@ namespace cedar {
 				if (is_number()) {
 					return get_number_typeid().hash_code();
 				}
-				return get_object_typeid(obj).hash_code();
+				return get_object_typeid(operator*()).hash_code();
 			}
 
+
+			inline const char *object_type_name(void) {
+				if (is_number()) return "number";
+				if (is_nil()) return "nil";
+				return get_object_type_name(obj);
+			}
 
 
 			/*

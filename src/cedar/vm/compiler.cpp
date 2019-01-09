@@ -122,7 +122,7 @@ ref cedar::vm::bytecode_pass(ref obj, vm::compiler *c) {
 
 	c->compile_object(obj, *code, sc, &context);
 
-	code->write((uint8_t)OP_RETURN);
+	code->write((uint8_t)OP_EXIT);
 	// finalize the code (sum up stack effect)
 	code->finalize();
 	// build a lambda around the code

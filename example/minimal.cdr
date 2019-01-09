@@ -1,1 +1,10 @@
-(set lib (dlopen "libcedar.so"))
+;;; grab a binding to the cedar shared object
+(set lib-so (dlopen "cedar"))
+;;; grab bindings to library functions
+(set + (dlsym lib-so "cedar_add"))
+(set - (dlsym lib-so "cedar_sub"))
+(set print (dlsym lib-so "cedar_print"))
+(set type-of (dlsym lib-so "cedar_typeof"))
+
+(print (+ 1 2))
+(print '(1 2 3))

@@ -32,8 +32,8 @@ using namespace cedar;
 
 
 list::list(void) {
-	m_first = get_nil();
-	m_rest = get_nil();
+	m_first = nullptr;
+	m_rest = nullptr;
 }
 
 list::list(ref first, ref rest) {
@@ -54,7 +54,7 @@ list::list(std::vector<ref> items) {
 		if (i+1 <= last_i && items[i+1].is<symbol>() && items[i+1].as<symbol>()->get_content() == ".") {
 			if (i+1 != last_i-1) throw make_exception("Illegal end of dotted list");
 			curr.set_rest(items[last_i]);
-			if (curr.get_rest().is<nil>()) {
+			if (curr.get_rest().is_nil()) {
 				curr.set_rest(new_const_obj<list>());
 			}
 			break;
@@ -94,9 +94,17 @@ cedar::runes list::to_string(bool) {
 	cedar::runes s;
 
 
-	if (m_first.is<nil>()) {
-		return "()";
+
+	if (m_rest.is_nil()) {
+		if (m_first.is_nil()) return "()";
+		s += "(";
+		s += m_first.to_string();
+		s += ")";
+		return s;
 	}
+
+
+	std::cout << new_obj<cedar::list>().is_nil() << std::endl;
 
 	if (is_pair()) {
 		s += "(";
@@ -107,26 +115,34 @@ cedar::runes list::to_string(bool) {
 		return s;
 	}
 
-
 	s += "(";
 	ref curr = this;
 
-	while (!curr.get_first().is<nil>()) {
+	while (true) {
 		s += curr.get_first().to_string();
-		if (!curr.get_rest().is<nil>()) {
-			if (curr.get_rest()->is_pair()) {
+
+		std::cout << '"' << s << '"' << std::endl;
+
+		std::cout << curr.get_rest().is_nil() << std::endl;
+		if (curr.get_rest().is_nil()) {
+			break;
+		} else {
+			s += " ";
+		}
+
+		if (!curr.get_rest().is_nil()) {
+			if (false && curr.get_rest()->is_pair()) {
 				s += " ";
 				s += curr.get_rest().get_first().to_string();
 				s += " . ";
 				s += curr.get_rest().get_rest().to_string();
 				break;
 			}
-			if (!curr.get_rest().get_first().is<nil>()) {
-				s += " ";
-			}
-			curr = curr.get_rest();
 		}
+
+		curr = curr.get_rest();
 	}
+
 	s += ")";
 
 	return s;
@@ -135,3 +151,7 @@ cedar::runes list::to_string(bool) {
 ref list::to_number() {
 	throw cedar::make_exception("Attempt to cast list to number failed");
 }
+
+
+
+
