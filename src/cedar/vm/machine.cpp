@@ -72,7 +72,10 @@ ref vm::machine::find(ref & symbol) {
 	}
 }
 
+// #define VM_TRACE
+#define USE_PREDICT
 
+#ifdef VM_TRACE
 static const char *instruction_name(uint8_t op) {
 	switch (op) {
 #define OP_NAME(name, code, op_type, effect) case code: return #name;
@@ -81,7 +84,7 @@ static const char *instruction_name(uint8_t op) {
 	}
 	return "unknown";
 }
-
+#endif
 
 
 
@@ -99,7 +102,7 @@ ref vm::machine::eval(ref obj) {
 		return compiled_lambda;
 	}
 
-	u64 stacksize = 2048;
+	u64 stacksize = 128;
 	ref *stack = new ref[stacksize];
 
 	i32 stack_size_required = 0;
@@ -120,8 +123,6 @@ ref vm::machine::eval(ref obj) {
 
 	cedar::lambda * program = nullptr;
 
-// #define VM_TRACE
-#define USE_PREDICT
 
 
 #define PUSH(val) (stack[sp++] = (val))
@@ -166,7 +167,7 @@ auto trace_current_state = [&](void) {
 	printf("op: %02x %-20.15s ", op, instruction_name(op));
 	printf("Δt: %5.5fms  ", dtns / 1000.0 / 1000.0);
 	printf("sp: %6lu  ", sp);
-	printf("ch: %6lu  ", callheight);
+	printf("depth: %6lu  ", callheight);
 	printf("\n");
 
 	last_time = now;
