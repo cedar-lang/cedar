@@ -3,5 +3,14 @@
 (def user (dict 'first "john"
                 'last "doe"
                 'dog (dict 'name "sparky")))
-(print user.first user.last "has the dog" user.dog.name)
+
+(set user.dog 'name "Sir Barks")
+
+(print user)
+(print user.first
+       user.last
+       "is the owner of the dog"
+       user.dog.name)
+
+(print "hello\nworld")
 

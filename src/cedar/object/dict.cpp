@@ -30,6 +30,7 @@
 #include <cedar/object.h>
 #include <cedar/object/dict.h>
 #include <cedar/object/list.h>
+#include <cedar/object/symbol.h>
 #include <cedar/memory.h>
 #include <cedar/util.hpp>
 
@@ -49,7 +50,9 @@ cedar::runes dict::to_string(bool human) {
 	cedar::runes str = "(dict";
 	for (auto it : table) {
 		str += " ";
-		str += const_cast<cedar::ref&>(it.first).to_string();
+		ref key = const_cast<cedar::ref&>(it.first);
+		if (key.is<list>() || key.is<symbol>()) str += "'";
+		str += key.to_string();
 		str += " ";
 		str += const_cast<cedar::ref&>(it.second).to_string();
 	}
