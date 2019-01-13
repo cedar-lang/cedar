@@ -20,6 +20,7 @@
 #define OP_RETURN                   0x0d
 #define OP_EXIT                     0x0e
 #define OP_SKIP                     0x0f
+#define OP_MAKE_CLOSURE             0x10
 
 /* Instruction opcode foreach macro for code generation */
 /* Arg order: (name, bytecode, type, stack effect */
@@ -39,6 +40,7 @@
   V(ARG_POP, OP_ARG_POP, imm_int, 1) \
   V(RETURN, OP_RETURN, no_arg, 0) \
   V(EXIT, OP_EXIT, no_arg, 0) \
-  V(SKIP, OP_SKIP, no_arg, -1)
+  V(SKIP, OP_SKIP, no_arg, -1) \
+  V(MAKE_CLOSURE, OP_MAKE_CLOSURE, no_arg, 0)
 
 #endif

@@ -280,9 +280,23 @@ void vm::compiler::compile_symbol(ref sym, bytecode & code, scope_ptr sc, compil
 }
 
 
+
+// lambda compilation is complicated becuase of the closure system behind the scenes.
+// Closures need to be known at compile time, so top level lambda expressions need to
+// construct the closure on their call, not construction
 void vm::compiler::compile_lambda_expression(ref expr, bytecode & code, scope_ptr sc, compiler_ctx *ctx) {
+
+	ctx->lambda_depth++;
+
+	bool is_top_level_lambda = ctx->lambda_depth == 1;
+
 	auto new_scope = std::make_shared<scope>(sc);
 	auto new_code = std::make_shared<bytecode>();
+
+
+	if (is_top_level_lambda) {
+		new_code->write((u8)OP_MAKE_CLOSURE);
+	}
 
 	auto args = expr.get_rest().get_first();
 
@@ -309,6 +323,8 @@ void vm::compiler::compile_lambda_expression(ref expr, bytecode & code, scope_pt
 
 	compile_object(body, *new_code, new_scope, ctx);
 	new_code->write((uint8_t)OP_RETURN);
+
+	ctx->lambda_depth--;
 
 	new_code->finalize();
 	ref new_lambda = new_obj<cedar::lambda>(new_code);

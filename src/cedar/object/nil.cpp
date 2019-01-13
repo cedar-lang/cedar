@@ -62,3 +62,8 @@ cedar::runes nil::to_string(bool) {
 ref nil::to_number() {
 	throw cedar::make_exception("Attempt to cast nil to number failed");
 }
+
+
+u64 nil::hash(void) {
+	return 0lu;
+}

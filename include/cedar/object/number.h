@@ -51,7 +51,9 @@ namespace cedar {
 
 			ref to_number();
 			inline const char *object_type_name(void) { return "number"; };
+			u64 hash(void);
 		protected:
 			cedar::runes to_string(bool human = false);
 	};
+
 }

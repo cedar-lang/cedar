@@ -29,6 +29,7 @@
 #include <cedar/object.h>
 #include <cedar/runes.h>
 #include <cedar/ref.h>
+#include <cedar/types.h>
 
 namespace cedar {
 
@@ -43,6 +44,7 @@ namespace cedar {
 
 			ref to_number();
 			inline const char *object_type_name(void) { return "nil"; };
+			u64 hash(void);
 		protected:
 			cedar::runes to_string(bool human = false);
 	};

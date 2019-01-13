@@ -65,6 +65,8 @@ namespace cedar {
 					return "nil";
 				return "list";
 			};
+
+			u64 hash(void);
 		protected:
 			cedar::runes to_string(bool human = false);
 	};

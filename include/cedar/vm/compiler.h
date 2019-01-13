@@ -32,6 +32,8 @@
 #include <stack>
 #include <memory>
 #include <map>
+#include <cedar/types.h>
+
 
 namespace cedar {
 	namespace vm {
@@ -40,7 +42,8 @@ namespace cedar {
 		class machine;
 
 		struct compiler_ctx {
-			uint64_t closure_size = 0;
+			u64 closure_size = 0;
+			u16 lambda_depth = 0;
 		};
 
 		class scope {

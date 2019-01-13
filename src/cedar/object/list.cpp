@@ -151,6 +151,55 @@ ref list::to_number() {
 	throw cedar::make_exception("Attempt to cast list to number failed");
 }
 
+/*
+static Py_hash_t
+tuplehash(PyTupleObject *v)
+{
+    Py_uhash_t x;
+    Py_hash_t y;
+    Py_ssize_t len = Py_SIZE(v);
+    PyObject **p;
+    Py_uhash_t mult = _PyHASH_MULTIPLIER;
+    x = 0x345678UL;
+    p = v->ob_item;
+    while (--len >= 0) {
+        y = PyObject_Hash(*p++);
+        if (y == -1)
+            return -1;
+        x = (x ^ y) * mult;
+        mult += (Py_hash_t)(82520UL + len + len);
+    }
+    x += 97531UL;
+    if (x == (Py_uhash_t)-1)
+        x = -2;
+    return x;
+}
+*/
+
+u64 list::hash(void) {
+
+	u64 x = 0;
+	u64 y = 0;
+
+	i64 mult = 1000003UL; // prime multiplier
+
+	x = 0x345678UL;
 
 
+	y = m_first.hash();
+	x = (x ^ y) * mult;
+	mult += (u64)(852520UL + 2);
 
+	y = m_rest.hash();
+	x = (x ^ y) * mult;
+	mult += (u64)(852520UL);
+	x += 97531UL;
+	return x;
+	/*
+	u64 first_hash = m_first.hash();
+	u64 rest_hash = m_rest.hash();
+	first_hash = ((first_hash & TOP_MASK) ^ ((first_hash & BOTTOM_MASK) << 32));
+	rest_hash = ((rest_hash & BOTTOM_MASK) ^ ((rest_hash & TOP_MASK) >> 32));
+	return first_hash ^ rest_hash;
+	*/
+}

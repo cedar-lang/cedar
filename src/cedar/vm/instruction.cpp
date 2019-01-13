@@ -29,6 +29,7 @@
 #include <cedar/vm/bytecode.h>
 #include <cedar/vm/opcode.h>
 #include <vector>
+#include <cedar/types.h>
 
 #include <cstdio>
 #include <cstdlib>
@@ -119,7 +120,7 @@ std::string cedar::vm::instruction::to_string(uint64_t offset) {
 	std::ostringstream buf;
 
 	char hexbuf[22];
-	sprintf(hexbuf, "0x%016lx", (uint64_t)((char*)(address) + offset));
+	sprintf(hexbuf, "0x%016lx", (u64)((char*)(address) + offset));
 
 	buf << hexbuf << "  ";
 	buf << instruction_name(*this);

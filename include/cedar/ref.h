@@ -36,6 +36,7 @@
 #include <cedar/exception.hpp>
 #include <bitset>
 #include <cxxabi.h>
+#include <cedar/types.h>
 
 namespace cedar {
 	class object;
@@ -59,20 +60,26 @@ namespace cedar {
 
 
 	object *get_nil_object(void);
-
-
-
+	u64 get_object_hash(object*);
 
 
 #define FLAG_NUMBER 0
 #define FLAG_DISABLE_REFCOUNT 1
 
 
+	enum ref_type {
+		ref_obj,
+		ref_int,
+		ref_flt,
+	};
+
 	class ref {
 		protected:
 
 			std::bitset<8> flags;
 			union {
+				i64 m_int;
+				f64 m_flt;
 				double m_number;
 				object *obj = nullptr;
 			};
@@ -140,10 +147,19 @@ namespace cedar {
 				m_number = i;
 			}
 
+			inline ref(long int i) {
+				flags[FLAG_NUMBER] = true;
+				m_number = i;
+			}
+
 			inline ref(int i) {
 				flags[FLAG_NUMBER] = true;
 				m_number = i;
 			}
+
+			inline ref_type rtype(void) {
+				return ref_obj;
+			};
 
 
 
@@ -156,6 +172,10 @@ namespace cedar {
 				return flags[FLAG_NUMBER] == true;
 			}
 
+
+			inline bool is_flt(void) const {
+				return false; // flags[FLAG_FLT];
+			}
 
 			bool is_nil(void) const;
 
@@ -257,6 +277,7 @@ namespace cedar {
 			template<typename T>
 				inline bool is() const {
 					return typeid(T).hash_code() == type_id();
+
 				}
 
 			/*
@@ -307,6 +328,8 @@ namespace cedar {
 					given_name = get_object_typeid(obj).name();
 				}
 
+				printf(":: %s\n", given_name);
+
 				// use the c++ abi to demangle the name that typeid gives back;
 				char *realname = abi::__cxa_demangle(given_name, 0, 0, &status);
 				if (status) {
@@ -321,6 +344,16 @@ namespace cedar {
 
 
 			cedar::runes to_string(bool human = false);
+
+
+			inline u64 hash(void) {
+				if (is_number()) {
+					return *reinterpret_cast<u64*>(&m_number);
+				}
+				if (is_nil()) return 0lu;
+				auto h = get_object_hash(obj);
+				return h;
+			}
 
 
 			////////////////////////////////////////////////////////////////////////
@@ -374,10 +407,8 @@ namespace cedar {
 				return compare(other) >= 0;
 			}
 			inline bool operator==(ref other) {
-
-				// for now, if its not a number it checks if the types are the same, and then the
-				// string representation
-				if (!is_number()) return (typeid(obj).hash_code() == typeid(other.obj).hash_code()) && other.to_string() == to_string();
+				if (!is_number())
+					return (typeid(obj).hash_code() == typeid(other.obj).hash_code()) && other.hash() == hash();
 				return compare(other) == 0;
 			}
 

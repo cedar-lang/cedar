@@ -22,51 +22,47 @@
  * SOFTWARE.
  */
 
-#include <cstdio>
+
+
+#pragma once
 
 #include <cedar/object.h>
-#include <cedar/object/string.h>
-#include <cedar/memory.h>
-#include <cedar/util.hpp>
 
-using namespace cedar;
+#include <cedar/object/sequence.h>
+#include <cedar/runes.h>
+#include <cedar/ref.h>
+#include <map>
 
-static ref the_nil = nullptr;
+namespace cedar {
 
-cedar::string::string(void) {}
-cedar::string::string(cedar::runes content) {
-	m_content = content;
-}
+	class dict : public object{
+		private:
+			std::map<ref, ref> table;
 
+		public:
+			dict(void);
+			~dict(void);
+			ref get_first(void);
+			ref get_rest(void);
 
-cedar::string::~string() {
-}
+			void set_first(ref);
+			void set_rest(ref);
 
-cedar::runes string::to_string(bool human) {
-	cedar::runes str;
-	if (!human) {
-		str += "\"";
-		str += m_content;
-		str += "\"";
-	} else {
-		str += m_content;
-	}
-	return str;
-}
+			ref to_number();
 
-void string::set_content(cedar::runes content) {
-	m_content = content;
-}
+			inline const char *object_type_name(void) {
+				return "dict";
+			};
 
-cedar::runes string::get_content(void) {
-	return m_content;
-}
+		protected:
+			cedar::runes to_string(bool human = false);
+	};
 
 
-ref string::to_number() {
-	throw cedar::make_exception("Attempt to cast string to number failed");
-}
-
-u64 string::hash(void) {
-	return (std::hash<cedar::runes>()(m_content) & ~0x3) | 1;
+	// set item on some ref, checking the type correctly
+	void dict_set(ref &, ref, ref);
+	// unsafe just does no type checking and just reinterpret casts the dict object
+	void dict_set_unsafe(ref &, ref, ref);
+	ref dict_get(ref &, ref);
+	ref dict_get_unsafe(ref &, ref);
 }

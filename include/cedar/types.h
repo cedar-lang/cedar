@@ -22,51 +22,25 @@
  * SOFTWARE.
  */
 
-#include <cstdio>
+#pragma once
 
-#include <cedar/object.h>
-#include <cedar/object/string.h>
-#include <cedar/memory.h>
-#include <cedar/util.hpp>
+// this is a list of literal numeric typedefs for easier use than declaring
+// things "unsigned long long". Why not use the <stdint.h> provided types?
+// Because for some reason uint64_t is defined as `unsigned long long int`
+// on my mac, but `unsigned long int` on my linux box. This causes all kinds
+// of problems with printf and other things
 
-using namespace cedar;
+typedef unsigned long int u64;
+typedef long int i64;
 
-static ref the_nil = nullptr;
+typedef unsigned int u32;
+typedef int i32;
 
-cedar::string::string(void) {}
-cedar::string::string(cedar::runes content) {
-	m_content = content;
-}
+typedef unsigned short u16;
+typedef short i16;
 
+typedef char i8;
+typedef unsigned char u8;
 
-cedar::string::~string() {
-}
-
-cedar::runes string::to_string(bool human) {
-	cedar::runes str;
-	if (!human) {
-		str += "\"";
-		str += m_content;
-		str += "\"";
-	} else {
-		str += m_content;
-	}
-	return str;
-}
-
-void string::set_content(cedar::runes content) {
-	m_content = content;
-}
-
-cedar::runes string::get_content(void) {
-	return m_content;
-}
-
-
-ref string::to_number() {
-	throw cedar::make_exception("Attempt to cast string to number failed");
-}
-
-u64 string::hash(void) {
-	return (std::hash<cedar::runes>()(m_content) & ~0x3) | 1;
-}
+typedef float f32;
+typedef double f64;

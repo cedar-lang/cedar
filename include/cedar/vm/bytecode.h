@@ -35,6 +35,7 @@
 #include <vector>
 #include <memory.h>
 #include <cedar/ref.h>
+#include <cedar/types.h>
 
 namespace cedar {
 
@@ -51,13 +52,13 @@ namespace cedar {
 
 				// size is how many bytes are written into the code pointer
 				// it also determines *where* to write when writing new data
-				uint64_t size = 0;
+				u64 size = 0;
 				// cap is the number of bytes allocated for the code pointer
-				uint64_t cap = 255;
+				u64 cap = 255;
 
 			public:
 
-				int stack_size = 0;
+				i32 stack_size = 0;
 
 				// constants stores values that the bytecode can reference with
 				// a simple index into it.

@@ -46,8 +46,8 @@ namespace cedar {
 
 				friend cedar::vm::compiler;
 
-				uint64_t stacksize = 0;
-				ref *stack = nullptr;
+				// uint64_t stacksize = 0;
+				// ref *stack = nullptr;
 
 			public:
 				machine(void);

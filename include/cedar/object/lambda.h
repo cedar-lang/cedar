@@ -34,7 +34,32 @@
 #include <functional>
 #include <memory>
 
+
+// define the number of references to store in the
+// closure itself, instead of in the vector
+#define CLOSURE_INTERNAL_SIZE 4
+
 namespace cedar {
+
+
+
+	// closure represents a wraper around closed values
+	// in functions, also known as "freevars" in LC
+	// It will attempt to store things in a fixed sized
+	// array if it can, but will also allocate a vector
+	// if needed
+	class closure {
+
+		bool use_vec = false;
+		std::vector<ref> vars;
+		ref var_a[CLOSURE_INTERNAL_SIZE];
+		public:
+			// constructor to allocate n vars of closure space
+			closure(int);
+			~closure(void);
+
+			ref & at(int);
+	};
 
 	class lambda : public object {
 		public:
@@ -47,7 +72,7 @@ namespace cedar {
 			lambda_type type = bytecode_type;
 			std::shared_ptr<cedar::vm::bytecode> code;
 			int closure_size = -1;
-			std::shared_ptr<ref[]> closure = nullptr;
+			std::shared_ptr<closure> closure = nullptr;
 
 			bound_function function_binding;
 
@@ -58,6 +83,8 @@ namespace cedar {
 
 			ref to_number();
 			inline const char *object_type_name(void) { return "lambda"; };
+			u64 hash(void);
+
 		protected:
 			cedar::runes to_string(bool human = false);
 	};

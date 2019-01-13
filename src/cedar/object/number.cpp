@@ -49,4 +49,6 @@ cedar::ref number::to_number() {
 	return this;
 }
 
-
+u64 number::hash(void) {
+	return 0lu;
+}

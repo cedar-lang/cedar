@@ -34,8 +34,6 @@
 
 using namespace cedar;
 
-static ref the_nil = nullptr;
-
 cedar::symbol::symbol(void) {}
 cedar::symbol::symbol(cedar::runes content) {
 	m_content = content;
@@ -64,7 +62,7 @@ ref symbol::to_number() {
 
 
 
-uint64_t symbol::hash(void) {
+u64 symbol::hash(void) {
 	if (!m_hash_calculated) {
 		m_hash = std::hash<cedar::runes>()(m_content);
 		m_hash_calculated = true;

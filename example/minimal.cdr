@@ -1,5 +1,6 @@
 ;;; grab a binding to the cedar shared object
 (set lib-so (dlopen "cedar"))
+
 ;;; grab bindings to library functions
 (set + (dlsym lib-so "cedar_add"))
 (set - (dlsym lib-so "cedar_sub"))
@@ -11,31 +12,43 @@
 (set print (dlsym lib-so "cedar_print"))
 (set type-of (dlsym lib-so "cedar_typeof"))
 
+(set hash (dlsym lib-so "cedar_hash"))
+
+
 (set first (dlsym lib-so "cedar_first"))
 (set rest (dlsym lib-so "cedar_rest"))
 
-(set double (lambda (x) (+ x x)))
-(set square (lambda (x) (* x x)))
 
-(print "//////////////// MATHS /////////////////")
-(print (+ 10 3))
-(print (- 10 3))
-(print (* 10 3))
-(print (/ 10 3))
+(set t 't)
 
-(set curry (lambda (x)
-             (lambda (y)
-               (+ x y))))
 
-(set add-one (curry 1))
-(set add-two (curry 2))
 
-(print (add-one 1))
-(print (add-one 2))
-(print (add-two 2))
 
-(set inf (lambda (x)
-           (progn
-             (print "hello" x)
-             (inf (+ x 1)))))
-(inf 1)
+; (print "//////////////// MATHS /////////////////")
+; (print (+ 10 3))
+; (print (- 10 3))
+; (print (* 10 3))
+; (print (/ 10 3))
+
+
+; (set curry1 (lambda (fn arg) (lambda (val2) (fn arg val2))))
+
+
+; (set add1 (curry1 + 1))
+
+; (print (add1 2))
+
+; (print (= nil nil))
+
+
+(print (hash "hello"))
+(print (hash '(1 2 3)))
+(print (hash '(1 2 3 4)))
+(print (hash 't))
+
+
+; (set fib (lambda (n)
+;             (if (< n 2)
+;               n
+;               (+ (fib (- n 2)) (fib (- n 1))))))
+; (print "fib(20): " (fib 20))

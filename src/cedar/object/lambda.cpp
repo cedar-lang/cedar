@@ -33,6 +33,25 @@
 
 using namespace cedar;
 
+/////////////////////////////////////////////////////
+
+cedar::closure::closure(int n) {
+	if (n > CLOSURE_INTERNAL_SIZE) {
+		printf("MUST USE EXTERNAL CLOSURE\n");
+		use_vec = true;
+		vars = std::vector<ref>(n);
+	}
+}
+
+cedar::closure::~closure(void) {
+}
+
+ref & cedar::closure::at(int i) {
+	return use_vec ? vars[i] : var_a[i];
+}
+
+/////////////////////////////////////////////////////
+
 cedar::lambda::lambda() {
 	code = std::make_shared<cedar::vm::bytecode>();
 }
@@ -69,4 +88,8 @@ cedar::runes lambda::to_string(bool human) {
 
 ref lambda::to_number() {
 	throw cedar::make_exception("Attempt to cast lambda to number failed");
+}
+
+u64 lambda::hash(void) {
+	return reinterpret_cast<u64>(type == bytecode_type ? (void*)code.get() : (void*)function_binding);
 }

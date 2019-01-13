@@ -63,6 +63,7 @@ new_op('EXIT', effect=0);
 
 new_op('SKIP', effect=-1);
 
+new_op('MAKE_CLOSURE', effect=0)
 
 def main(outfile):
     with open(outfile, 'w') as f:

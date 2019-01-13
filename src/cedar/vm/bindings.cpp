@@ -32,6 +32,19 @@
 
 using namespace cedar;
 
+
+union hash_union {
+	u64 i;
+	double d;
+};
+
+cedar_binding(cedar_hash) {
+	// TODO: add longs in the lang
+	assert(sizeof(double) == sizeof(u64));
+	u64 h = args.get_first().hash();
+	return (double)(h & 0x00FFFFFFFFFFFFFF);
+}
+
 cedar_binding(cedar_add) {
 
 	ref accumulator = 0;
@@ -102,7 +115,7 @@ cedar_binding(cedar_equal) {
 		args = args.get_rest();
 	}
 
-	return true;
+	return cedar::new_obj<cedar::symbol>("t");
 }
 
 

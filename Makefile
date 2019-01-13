@@ -10,7 +10,7 @@ BINDIR = bin
 
 default:
 	@mkdir -p $(BINDIR)
-	@cd $(BINDIR); cmake -DCMAKE_BUILD_TYPE=Debug ../; make -j 4 --no-print-directory
+	@cd $(BINDIR); cmake -DCMAKE_BUILD_TYPE=Release ../; make --no-print-directory
 
 
 gen:

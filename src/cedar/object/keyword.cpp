@@ -64,7 +64,7 @@ ref keyword::to_number() {
 
 
 
-uint64_t keyword::hash(void) {
+u64 keyword::hash(void) {
 	if (!m_hash_calculated) {
 		m_hash = std::hash<cedar::runes>()(m_content);
 		m_hash_calculated = true;

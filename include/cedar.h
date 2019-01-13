@@ -50,5 +50,6 @@
 #include "cedar/exception.hpp"
 #include "cedar/ref.h"
 #include "cedar/vm/binding.h"
+#include "cedar/types.h"
 
 #endif

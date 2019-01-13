@@ -27,6 +27,7 @@
 #include <cedar/object/number.h>
 #include <cedar/object/sequence.h>
 #include <cedar/object/symbol.h>
+#include <cedar/object/nil.h>
 #include <cedar/ref.h>
 
 using namespace cedar;
@@ -111,9 +112,7 @@ uint64_t cedar::ref::symbol_hash(void) {
 bool cedar::ref::is_nil(void) const {
   if (is_object()) {
     if (obj == nullptr) return true;
-    if (operator*() == get_nil_object()) {
-      return true;
-    }
+		if (is<cedar::nil>()) return true;
 		/*
     if (auto *list = ref_cast<cedar::list>(*this); list != nullptr) {
     	if (list->get_first().is_nil() && list->get_rest().is_nil()) return true;
@@ -125,5 +124,9 @@ bool cedar::ref::is_nil(void) const {
 
 const char *cedar::get_object_type_name(object *obj) {
   return obj->object_type_name();
+}
+
+u64 cedar::get_object_hash(object *obj) {
+	return obj->hash();
 }
 

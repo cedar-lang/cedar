@@ -22,6 +22,10 @@
  * SOFTWARE.
  */
 
+#include <chrono>
+#include <ratio>
+#include <array>
+
 #include <cedar/object/lambda.h>
 #include <cedar/vm/machine.h>
 #include <cedar/vm/opcode.h>
@@ -29,19 +33,16 @@
 #include <cedar/object.h>
 #include <cedar/object/list.h>
 #include <cedar/object/symbol.h>
-#include <chrono>
-#include <ratio>
+#include <cedar/types.h>
 
 using namespace cedar;
 
 vm::machine::machine(void) : m_compiler(this) {
-	stacksize = 512;
-	stack = new ref[stacksize];
 }
 
 
 vm::machine::~machine() {
-	delete[] stack;
+	// delete[] stack;
 }
 
 
@@ -79,6 +80,10 @@ static const char *instruction_name(uint8_t op) {
 
 
 
+static void *threaded_labels[255];
+bool created_thread_labels = false;
+
+
 ref vm::machine::eval(ref obj) {
 
 	ref compiled_lambda = m_compiler.compile(obj, this);
@@ -89,23 +94,35 @@ ref vm::machine::eval(ref obj) {
 		return compiled_lambda;
 	}
 
+	u64 stacksize = 2048;
+	ref *stack = new ref[stacksize];
 
+	i32 stack_size_required = 0;
+
+
+	u64 fp, sp;
+	fp = sp = 0;
+
+	// ip is the "instruction pointer" and dereferencing
+	// it will select the opcode to run
+	uint8_t *ip = nullptr;
+
+	// how high the "call stack" is
+	u64 callheight = 0;
+
+	// the currently evaluating opcode
+	uint8_t op = OP_NOP;
+
+	cedar::lambda * program = nullptr;
 
 // #define VM_TRACE
 #define USE_PREDICT
 
 
-	// declare and initialize the frame and stack pointers to 0
-	uint64_t fp, sp;
-	fp = sp = 0;
-
-#define PUSH(val) stack[sp++] = val
-#define PUSH_PTR(ptr) stack[sp++].store_ptr((void*)(ptr))
-#define POP() stack[--sp]
-#define POP_PTR() stack[--sp].reinterpret<void*>()
-	// ip is the "instruction pointer" and dereferencing
-	// it will select the opcode to run
-	uint8_t *ip = nullptr;
+#define PUSH(val) (stack[sp++] = (val))
+#define PUSH_PTR(ptr) (stack[sp++].store_ptr((void*)(ptr)))
+#define POP() (stack[--sp])
+#define POP_PTR() (stack[--sp].reinterpret<void*>())
 
 #define CODE_READ(type) (*(type*)(void*)ip)
 #define CODE_SKIP(type) (ip += sizeof(type))
@@ -114,18 +131,53 @@ ref vm::machine::eval(ref obj) {
 #define TARGET(op) DO_##op:
 
 
+
+auto check_stack_size_and_resize = [&] (void) {
+	if (sp >= stacksize - 64) {
+		auto new_size = stacksize + 512;
+		auto *new_stack = new ref[new_size];
+		for (i64 i = 0; i < (i64)sp; i++) {
+			new_stack[i] = stack[i];
+		}
+		delete[] stack;
+		stack = new_stack;
+		stacksize = new_size;
+	}
+};
+
+
+#define DEFAULT_PRELUDE check_stack_size_and_resize();
+
 #ifdef VM_TRACE
 
 std::chrono::high_resolution_clock::time_point last_time = std::chrono::high_resolution_clock::now();
 
+auto trace_current_state = [&](void) {
+
+	std::chrono::high_resolution_clock::time_point now = std::chrono::high_resolution_clock::now();
+	std::chrono::duration<long long, std::nano> dt = now - last_time;
+	double dtns = dt.count();
+
+	printf("op: %02x %-20.15s ", op, instruction_name(op));
+	printf("Δt: %5.5fms  ", dtns / 1000.0 / 1000.0);
+	printf("sp: %6lu  ", sp);
+	printf("ch: %6lu  ", callheight);
+	printf("\n");
+
+	last_time = now;
+};
+
+#define PRELUDE DEFAULT_PRELUDE; trace_current_state();
+/*
 #define PRELUDE \
 	std::chrono::high_resolution_clock::time_point now = std::chrono::high_resolution_clock::now();  \
 	std::chrono::duration<long long, std::nano> dt = now - last_time; \
 	double dtns = dt.count();                                         \
-	printf("sp: %3lu, fp: %3lu, ip %p, preds: %4ld, prev_dt: %8.5fms, op: %s\n", sp, fp, ip, correct_predictions, dtns / 1000.0 / 1000.0, instruction_name(op)); \
+	printf("sp: %3zu, fp: %3zu, ip %p, preds: %4ld, prev_dt: %8.5fms, op: %s\n", (size_t)sp, (size_t)fp, ip, correct_predictions, dtns / 1000.0 / 1000.0, instruction_name(op)); \
 	last_time = now;
+	*/
 #else
-#define PRELUDE
+#define PRELUDE DEFAULT_PRELUDE
 #endif
 #define DISPATCH goto loop;
 
@@ -133,9 +185,6 @@ std::chrono::high_resolution_clock::time_point last_time = std::chrono::high_res
 
 
 
-	void *threaded_labels[255];
-	for (int i = 0; i < 255; i++)
-		threaded_labels[i] = &&LABEL(OP_NOP);
 
 // some opcodes come in very common pairs, making it very possible to do speculative exec
 // on what the next opcode could be... This macro allows high speed assumptions to be made
@@ -143,7 +192,7 @@ std::chrono::high_resolution_clock::time_point last_time = std::chrono::high_res
 // The performance loss by this check is minimal on modern CPUs because of the l1 cache typically
 // caching 8 bytes, so the best case scenario is a cache miss 1/8 opcodes that predict
 // the next instruction
-int64_t correct_predictions = 0;
+long correct_predictions = 0;
 #ifdef USE_PREDICT
 #define PREDICT(pred, label) \
 	do {              \
@@ -160,35 +209,41 @@ int64_t correct_predictions = 0;
 
 #define SET_LABEL(op) threaded_labels[op] = &&DO_##op;
 
-	SET_LABEL(OP_NIL);
-	SET_LABEL(OP_CONST);
-	SET_LABEL(OP_FLOAT);
-	SET_LABEL(OP_INT);
-	SET_LABEL(OP_LOAD_LOCAL);
-	SET_LABEL(OP_SET_LOCAL);
 
-	SET_LABEL(OP_LOAD_GLOBAL);
-	SET_LABEL(OP_SET_GLOBAL);
+	// if the global thread label vector isn't initialized, we need to do that first
+	if (!created_thread_labels) {
+		for (int i = 0; i < 255; i++) threaded_labels[i] = &&LABEL(OP_NOP);
+		SET_LABEL(OP_NIL);
+		SET_LABEL(OP_CONST);
+		SET_LABEL(OP_FLOAT);
+		SET_LABEL(OP_INT);
+		SET_LABEL(OP_LOAD_LOCAL);
+		SET_LABEL(OP_SET_LOCAL);
 
-	SET_LABEL(OP_CONS);
-	SET_LABEL(OP_CALL);
-	SET_LABEL(OP_MAKE_FUNC);
-	SET_LABEL(OP_ARG_POP);
-	SET_LABEL(OP_RETURN);
-	SET_LABEL(OP_EXIT);
-	SET_LABEL(OP_SKIP);
+		SET_LABEL(OP_LOAD_GLOBAL);
+		SET_LABEL(OP_SET_GLOBAL);
+
+		SET_LABEL(OP_CONS);
+		SET_LABEL(OP_CALL);
+		SET_LABEL(OP_MAKE_FUNC);
+		SET_LABEL(OP_ARG_POP);
+		SET_LABEL(OP_RETURN);
+		SET_LABEL(OP_EXIT);
+		SET_LABEL(OP_SKIP);
+
+		SET_LABEL(OP_MAKE_CLOSURE);
+		created_thread_labels = true;
+	}
 
 
 	ref progref = cedar::new_obj<cedar::lambda>(raw_program->code);
-
-
 
 
 	// program is a pointer to the currently evaluating lambda expression.
 	// In the background this is still managed by a managed refcount, but this
 	// pointer is strictly a performance improvement in order to cut down on
 	// dynamic_casts in a reference
-	auto * program = ref_cast<cedar::lambda>(progref);
+	program = ref_cast<cedar::lambda>(progref);
 
 	// staring out, we need to copy all the useful information from the raw lambda
 	// so we don't destroy the raw lambda's information such as closures or other
@@ -198,8 +253,7 @@ int64_t correct_predictions = 0;
 	// if the program has no closure usage, there should be no allocation. This is strictly
 	// an optimization to speed up (only slightly) the initial "warm-up" of the VM
 	if (program->closure_size != 0) {
-		auto * c = new ref[program->closure_size];
-		program->closure = std::shared_ptr<ref[]>(c);
+		program->closure = std::make_shared<closure>(program->closure_size);
 	}
 	// obtain a reference to the code
 	program->code = raw_program->code;
@@ -226,9 +280,6 @@ int64_t correct_predictions = 0;
 	PUSH(nullptr);
 
 
-
-	// the currently evaluating opcode
-	uint8_t op;
 loop:
 
 	// printf("preds: %ld\n", correct_predictions);
@@ -240,20 +291,22 @@ loop:
 	op = *ip;
 
 	// check if stack size must be reallocated
-	if (sp >= stacksize) {
+	/*
+	if (sp >= stacksize-128) {
 		auto new_size = stacksize + 512;
 		auto *new_stack = new ref[new_size];
 		for (uint64_t i = 0; i < sp-1; i++) {
 			new_stack[i] = stack[i];
 		}
-		// delete[] stack;
+		delete[] stack;
 		stack = new_stack;
 		stacksize = new_size;
 	}
+	*/
 
-	for (unsigned int i = sp; i < stacksize; i++) {
-		stack[i] = nullptr;
-	}
+	// for (unsigned int i = sp; i < stacksize; i++) {
+	// 	stack[i] = nullptr;
+	// }
 
 
 	ip++;
@@ -294,18 +347,18 @@ loop:
 
 	TARGET(OP_INT) {
 		PRELUDE;
-		const auto integer = CODE_READ(int64_t);
+		const auto integer = CODE_READ(i64);
 		PUSH(integer);
-		CODE_SKIP(int64_t);
+		CODE_SKIP(i64);
 		DISPATCH;
 	}
 
 	TARGET(OP_LOAD_LOCAL) {
 		PRELUDE;
-		auto ind = CODE_READ(uint64_t);
-		auto val = program->closure[ind];
+		auto ind = CODE_READ(u64);
+		auto val = program->closure->at(ind);
 		PUSH(val);
-		CODE_SKIP(uint64_t);
+		CODE_SKIP(u64);
 		// load locals are typically packed into an argument
 		// list, so it's reasonable to predict a possible
 		// CONS operation immediately afterwards. If the prediction
@@ -318,18 +371,27 @@ loop:
 
 	TARGET(OP_SET_LOCAL) {
 		PRELUDE;
-		auto ind = CODE_READ(uint64_t);
+		auto ind = CODE_READ(u64);
 		ref val = POP();
-		program->closure[ind] = val;
+		program->closure->at(ind) = val;
 		PUSH(val);
-		CODE_SKIP(uint64_t);
+		CODE_SKIP(u64);
 		DISPATCH;
 	}
 
 	TARGET(OP_LOAD_GLOBAL) {
 		PRELUDE;
-		auto ind = CODE_READ(uint64_t);
+		auto ind = CODE_READ(u64);
 		ref symbol = program->code->constants[ind];
+
+		if (!symbol.is<cedar::symbol>()) {
+
+			std::cout << ref{program} << std::endl;
+			for (auto i : program->code->constants) {
+				std::cout << i << std::endl;
+			}
+			printf("Not a symbol %lu\n", ind);
+		}
 
 		try {
 			auto binding = global_bindings.at(symbol.symbol_hash());
@@ -338,14 +400,14 @@ loop:
 			throw cedar::make_exception("Symbol '", symbol, "' not bound");
 		}
 
-		CODE_SKIP(uint64_t);
+		CODE_SKIP(u64);
 		DISPATCH;
 	}
 
 
 	TARGET(OP_SET_GLOBAL) {
 		PRELUDE;
-		auto ind = CODE_READ(uint64_t);
+		auto ind = CODE_READ(u64);
 
 		ref symbol = program->code->constants[ind];
 		ref val = POP();
@@ -353,7 +415,7 @@ loop:
 		bind(symbol, val);
 
 		PUSH(val);
-		CODE_SKIP(uint64_t);
+		CODE_SKIP(u64);
 		DISPATCH;
 	}
 
@@ -375,13 +437,9 @@ loop:
 		PUSH_PTR(fp);
 		fp = sp - 4;
 		program = stack[fp+1].reinterpret<cedar::lambda*>();
-
+		callheight++;
 		if (program->type == lambda::bytecode_type) {
-			auto new_closure = std::shared_ptr<ref[]>(new ref[program->closure_size]);
-			for (int i = 0; i < program->closure_size; i++) {
-				new_closure[i] = program->closure[i];
-			}
-			program->closure = new_closure;
+			stack_size_required = program->code->stack_size;
 			ip = program->code->code;
 		} else if (program->type == lambda::function_binding_type) {
 			ref val = program->function_binding(stack[fp], this);
@@ -392,35 +450,30 @@ loop:
 	}
 
 	TARGET(OP_MAKE_FUNC) {
-		printf("MAKE FUNC\n");
 		PRELUDE;
-		auto ind = CODE_READ(uint64_t);
+		auto ind = CODE_READ(u64);
 		ref function_template = program->code->constants[ind];
 		auto *template_ptr = ref_cast<cedar::lambda>(function_template);
 
 		ref function = new_obj<cedar::lambda>();
 		auto *fptr = ref_cast<cedar::lambda>(function);
 
-		if (fptr->closure_size != -1) {
-			printf("needs closure\n");
-		}
-
 		// inherit closures from parent
 		fptr->closure = program->closure;
 		fptr->closure_size = program->closure_size;
 		fptr->code = template_ptr->code;
 		PUSH(fptr);
-		CODE_SKIP(uint64_t);
+		CODE_SKIP(u64);
 		DISPATCH;
 	}
 
 	TARGET(OP_ARG_POP) {
 		PRELUDE;
-		int ind = CODE_READ(uint64_t);
+		i32 ind = CODE_READ(u64);
 		ref arg = stack[fp].get_first();
-		program->closure[ind] = arg;
+		program->closure->at(ind) = arg;
 		stack[fp] = stack[fp].get_rest();
-		CODE_SKIP(uint64_t);
+		CODE_SKIP(u64);
 		DISPATCH;
 	}
 
@@ -428,10 +481,12 @@ loop:
 		PRELUDE;
 		ref val = POP();
 		auto prevfp = fp;
-		fp = (uint64_t)POP_PTR();
-		ip = (uint8_t*)POP_PTR();
+		fp = (u64)POP_PTR();
+		ip = (u8*)POP_PTR();
 		sp = prevfp;
 		program = ref_cast<cedar::lambda>(stack[fp+1]);
+		stack_size_required = program->code->stack_size;
+		callheight--;
 		PUSH(val);
 		DISPATCH;
 	}
@@ -450,8 +505,18 @@ loop:
 	}
 
 
+	TARGET(OP_MAKE_CLOSURE) {
+		PRELUDE;
+		program->closure = std::make_shared<closure>(program->closure_size);
+		DISPATCH;
+	}
+
+
 	goto loop;
 end:
+
+
+	delete[] stack;
 
 	return POP();
 }

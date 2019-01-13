@@ -33,6 +33,8 @@
 #include <cxxabi.h>
 #include <atomic>
 
+#include <cedar/types.h>
+
 namespace cedar {
 
 	class object;
@@ -44,8 +46,6 @@ namespace cedar {
 
 			friend ref;
 			virtual cedar::runes to_string(bool human = false) = 0;
-
-
 
 			/*
 			 * type_name
@@ -68,6 +68,8 @@ namespace cedar {
 				delete realname;
 				return r;
 			}
+
+
 			/*
 			 * is<T>
 			 *
@@ -99,6 +101,7 @@ namespace cedar {
 
 		public:
 
+			virtual u64 hash(void) = 0;
 			// const char *name = "object";
 
 
@@ -109,7 +112,7 @@ namespace cedar {
 			// refcount is used by the `ref` class to determine how many things hold
 			// references to this particular object on the heap
 			// uint32_t refcount = 0;
-			std::atomic<uint64_t> refcount = 0;
+			u64 refcount = 0;
 
 			virtual ~object() {};
 

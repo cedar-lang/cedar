@@ -60,6 +60,10 @@ class dynamic_library : public cedar::object {
 			throw cedar::make_exception("Attempt to cast dynamic_library to number failed");
 		}
 
+		u64 hash(void) {
+			return reinterpret_cast<u64>(m_handle);
+		}
+
 		inline const char *object_type_name(void) { return "dynamic-library"; };
 	protected:
 		cedar::runes to_string(bool human = false) {
@@ -75,8 +79,6 @@ class dynamic_library : public cedar::object {
 
 cedar_binding(cedar_dlopen) {
 
-	std::cout << args << std::endl;
-
 	cedar::string *name = cedar::ref_cast<cedar::string>(args.get_first());
 
 	if (name == nullptr) {
@@ -86,6 +88,8 @@ cedar_binding(cedar_dlopen) {
 	std::string filename = name->get_content();
 
 	void *binding = dlopen(filename.c_str(), RTLD_LAZY);
+	if (binding == nullptr)
+		throw cedar::make_exception("Dynamic Library not found: ", name);
 	return cedar::new_obj<dynamic_library>(binding);
 };
 
@@ -96,7 +100,7 @@ cedar_binding(cedar_dlsym) {
 	if (dynlib == nullptr || name == nullptr) {
 		throw cedar::make_exception("invalid types passed to dlsym, requires :dynamic_library and :string");
 	}
-	auto stdname = std::string("_") + std::string(name->get_content());
+	auto stdname = std::string(name->get_content());
 	auto func_binding = dynlib->find_func(stdname.c_str());
 	ref func = cedar::new_obj<cedar::lambda>(func_binding);
 	return func;
@@ -119,7 +123,6 @@ void cedar_start(cedar_options &) {
 
 
 int main(int argc, char** argv) {
-
 	srand((unsigned int)time(nullptr));
 
 
