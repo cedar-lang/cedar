@@ -70,4 +70,16 @@ namespace cedar {
 		protected:
 			cedar::runes to_string(bool human = false);
 	};
+
+
+	inline ref newlist() {
+		return nullptr;
+	};
+
+	template<typename F, typename... R>
+		inline ref newlist(F first, R... rest) {
+			ref l = new_obj<list>(nullptr, newlist(rest...));
+			l.set_first(first);
+			return l;
+		}
 }

@@ -42,6 +42,7 @@
 #include "cedar/object/number.h"
 #include "cedar/object/lambda.h"
 #include "cedar/object/string.h"
+#include "cedar/object/dict.h"
 #include "cedar/memory.h"
 #include "cedar/object.h"
 #include "cedar/runes.h"

@@ -32,12 +32,17 @@
 #include <cedar/ref.h>
 #include <cedar/object.h>
 #include <cedar/object/list.h>
+#include <cedar/object/dict.h>
 #include <cedar/object/symbol.h>
 #include <cedar/types.h>
 
 using namespace cedar;
 
+void init_binding(cedar::vm::machine *m);
+
 vm::machine::machine(void) : m_compiler(this) {
+	globals = new_obj<dict>();
+	init_binding(this);
 }
 
 
@@ -49,19 +54,19 @@ vm::machine::~machine() {
 
 
 void vm::machine::bind(ref & symbol, ref value) {
-	global_bindings[symbol.symbol_hash()] = {symbol.to_string(), value};
+	dict_set(globals, symbol, value);
 }
 
 
 void vm::machine::bind(runes name, bound_function f) {
 	ref symbol = new_obj<cedar::symbol>(name);
 	ref lambda = new_obj<cedar::lambda>(f);
-	global_bindings[symbol.symbol_hash()] = {name, lambda};
+	dict_set(globals, symbol, lambda);
 }
 
 ref vm::machine::find(ref & symbol) {
 	try {
-		return std::get<ref>(global_bindings.at(symbol.symbol_hash()));
+		return dict_get(globals, symbol);
 	} catch(...) {
 		return nullptr;
 	}
@@ -290,24 +295,6 @@ loop:
 	// read the opcode from the instruction pointer
 	op = *ip;
 
-	// check if stack size must be reallocated
-	/*
-	if (sp >= stacksize-128) {
-		auto new_size = stacksize + 512;
-		auto *new_stack = new ref[new_size];
-		for (uint64_t i = 0; i < sp-1; i++) {
-			new_stack[i] = stack[i];
-		}
-		delete[] stack;
-		stack = new_stack;
-		stacksize = new_size;
-	}
-	*/
-
-	// for (unsigned int i = sp; i < stacksize; i++) {
-	// 	stack[i] = nullptr;
-	// }
-
 
 	ip++;
 	goto *threaded_labels[op];
@@ -382,22 +369,12 @@ loop:
 	TARGET(OP_LOAD_GLOBAL) {
 		PRELUDE;
 		auto ind = CODE_READ(u64);
-		ref symbol = program->code->constants[ind];
-
-		if (!symbol.is<cedar::symbol>()) {
-
-			std::cout << ref{program} << std::endl;
-			for (auto i : program->code->constants) {
-				std::cout << i << std::endl;
-			}
-			printf("Not a symbol %lu\n", ind);
-		}
+		ref key = program->code->constants[ind];
 
 		try {
-			auto binding = global_bindings.at(symbol.symbol_hash());
-			PUSH(std::get<ref>(binding));
+			PUSH(dict_get(globals, key));
 		} catch (std::exception &) {
-			throw cedar::make_exception("Symbol '", symbol, "' not bound");
+			throw cedar::make_exception("global '", key, "' not bound");
 		}
 
 		CODE_SKIP(u64);
@@ -412,7 +389,7 @@ loop:
 		ref symbol = program->code->constants[ind];
 		ref val = POP();
 
-		bind(symbol, val);
+		dict_set(globals, symbol, val);
 
 		PUSH(val);
 		CODE_SKIP(u64);

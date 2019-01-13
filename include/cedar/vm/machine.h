@@ -41,7 +41,7 @@ namespace cedar {
 		class machine {
 			protected:
 
-				std::map<uint64_t, std::tuple<runes, ref>> global_bindings;
+				ref globals;
 				cedar::vm::compiler m_compiler;
 
 				friend cedar::vm::compiler;

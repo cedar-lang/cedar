@@ -14,6 +14,7 @@ add_library(cedar-lib SHARED
 	src/cedar/vm/machine.cpp
 	src/cedar/vm/bindings.cpp
 	src/cedar/object/symbol.cpp
+	src/cedar/object/dict.cpp
 	src/cedar/object/string.cpp
 	src/cedar/object/lambda.cpp
 	src/cedar/object/nil.cpp

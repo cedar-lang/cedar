@@ -375,11 +375,14 @@ ref reader::parse_number(void) {
 			break;
 		}
 	}
+
 	next();
+
 	if (is_float) {
-		return atof(str.c_str());
+		return ref(atof(str.c_str()));
 	} else {
-		return (int64_t)atoll(str.c_str());
+		i64 i = atoll(str.c_str());
+		return ref(i);
 	}
 }
 

@@ -1,54 +1,7 @@
-;;; grab a binding to the cedar shared object
-(set lib-so (dlopen "cedar"))
+(def t 't)
 
-;;; grab bindings to library functions
-(set + (dlsym lib-so "cedar_add"))
-(set - (dlsym lib-so "cedar_sub"))
-(set * (dlsym lib-so "cedar_mul"))
-(set / (dlsym lib-so "cedar_div"))
-(set = (dlsym lib-so "cedar_equal"))
-(set eq (dlsym lib-so "cedar_equal"))
+(def user (dict 'first "john"
+                'last "doe"
+                'dog (dict 'name "sparky")))
+(print user.first user.last "has the dog" user.dog.name)
 
-(set print (dlsym lib-so "cedar_print"))
-(set type-of (dlsym lib-so "cedar_typeof"))
-
-(set hash (dlsym lib-so "cedar_hash"))
-
-
-(set first (dlsym lib-so "cedar_first"))
-(set rest (dlsym lib-so "cedar_rest"))
-
-
-(set t 't)
-
-
-
-
-; (print "//////////////// MATHS /////////////////")
-; (print (+ 10 3))
-; (print (- 10 3))
-; (print (* 10 3))
-; (print (/ 10 3))
-
-
-; (set curry1 (lambda (fn arg) (lambda (val2) (fn arg val2))))
-
-
-; (set add1 (curry1 + 1))
-
-; (print (add1 2))
-
-; (print (= nil nil))
-
-
-(print (hash "hello"))
-(print (hash '(1 2 3)))
-(print (hash '(1 2 3 4)))
-(print (hash 't))
-
-
-; (set fib (lambda (n)
-;             (if (< n 2)
-;               n
-;               (+ (fib (- n 2)) (fib (- n 1))))))
-; (print "fib(20): " (fib 20))
