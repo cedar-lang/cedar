@@ -15,7 +15,7 @@ set (CMAKE_CXX_STANDARD 17)
 include_directories(${CMAKE_SOURCE_DIR}/include)
 
 include(${CMAKE_SOURCE_DIR}/src/cedar/CMakeLists.txt)
-target_compile_options(cedar-lib PRIVATE -Wall -Wextra -Wno-unused-parameter -flto)
+target_compile_options(cedar-lib PRIVATE -g -Wall -Wextra -Wno-unused-parameter -flto)
 
 add_executable(cedar-bin src/main.cpp)
 

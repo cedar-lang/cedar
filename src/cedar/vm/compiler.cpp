@@ -146,8 +146,8 @@ void vm::compiler::compile_object(ref obj, vm::bytecode & code, scope_ptr sc, co
 		return compile_list(obj, code, sc, ctx);
 	}
 
-	if (obj.is<cedar::number>()) {
-		return compile_number(obj.to_float(), code, sc, ctx);
+	if (obj.is_number()) {
+		return compile_number(obj, code, sc, ctx);
 	}
 
 	if (obj.is<cedar::symbol>()) {
@@ -196,13 +196,13 @@ void vm::compiler::compile_progn(ref obj, vm::bytecode & code, scope_ptr sc, com
 }
 
 void vm::compiler::compile_list(ref obj, vm::bytecode & code, scope_ptr sc, compiler_ctx* ctx) {
-	// set is a special form that attempts to change a local closure binding
+	// def is a special form that attempts to change a local closure binding
 	// and if it can't, will set in the global scope
-	if (list_is_call_to("set", obj)) {
+	if (list_is_call_to("def", obj)) {
 
 		auto name_obj = obj.get_rest().get_first();
 		if (!name_obj.is<symbol>()) {
-			throw cedar::make_exception("Invalid syntax in set special form: ", obj);
+			throw cedar::make_exception("Invalid syntax in def special form: ", obj);
 		}
 
 		auto val_obj = obj.get_rest().get_rest().get_first();
@@ -246,9 +246,19 @@ void vm::compiler::compile_list(ref obj, vm::bytecode & code, scope_ptr sc, comp
 	code.write((uint8_t)OP_CALL);
 }
 
-void vm::compiler::compile_number(double number, vm::bytecode & code, scope_ptr, compiler_ctx*) {
-	code.write((uint8_t)OP_FLOAT);
-	code.write(number);
+void vm::compiler::compile_number(ref obj, vm::bytecode & code, scope_ptr, compiler_ctx*) {
+
+	if (obj.is_flt()) {
+		code.write((uint8_t)OP_FLOAT);
+		code.write(obj.to_float());
+		return;
+	}
+
+	if (obj.is_int()) {
+		code.write((uint8_t)OP_INT);
+		code.write(obj.to_int());
+		return;
+	}
 }
 
 void vm::compiler::compile_constant(ref obj, bytecode & code, scope_ptr, compiler_ctx*) {
@@ -258,11 +268,60 @@ void vm::compiler::compile_constant(ref obj, bytecode & code, scope_ptr, compile
 }
 
 
+
 // symbol compilation can follow 1 of two paths. If the scope contains the symbol
 // in it's map, it will be a local closure index and will be a fast O(1) lookup.
 // If it isn't found in the map, the symbol lookup will defer to the global lookup
 // system and be slightly slower
-void vm::compiler::compile_symbol(ref sym, bytecode & code, scope_ptr sc, compiler_ctx*) {
+void vm::compiler::compile_symbol(ref sym, bytecode & code, scope_ptr sc, compiler_ctx *ctx) {
+
+	auto nsym = [&](cedar::runes s) {
+		return new_obj<symbol>(s);
+	};
+
+	cedar::runes str = sym.to_string();
+
+
+	bool is_dot = false;
+	for (auto it : str) {
+		if (it == '.') {
+			is_dot = true;
+			break;
+		}
+	}
+
+	if (is_dot) {
+		cedar::runes obj;
+		cedar::runes rest;
+
+		bool encountered_dot = false;
+		for (auto it : str) {
+			if (it == '.') {
+				if (encountered_dot) {
+					obj += ".";
+					obj += rest;
+					rest = "";
+				}
+				encountered_dot = true;
+				continue;
+			}
+			if (!encountered_dot) {
+				obj += it;
+			} else rest += it;
+		}
+
+		if (rest.size() == 0) throw cedar::make_exception("invalid dot notation on dict: ", sym);
+
+		ref d = nsym(obj);
+		ref key = nsym(rest);
+		ref get = nsym("get");
+
+
+		ref expr = newlist(get, d, newlist(nsym("quote"), key));
+
+		return compile_object(expr, code, sc, ctx);
+
+	}
 
 	// if the symbol is found in the enclosing closure/freevars, just push the
 	// constant time 'lookup' instruction

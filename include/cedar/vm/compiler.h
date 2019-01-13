@@ -91,7 +91,7 @@ namespace cedar {
 
 				void compile_lambda_expression(ref, bytecode &, scope_ptr sc, compiler_ctx*);
 				void compile_progn(ref, bytecode &, scope_ptr, compiler_ctx*);
-				void compile_number(double, bytecode &, scope_ptr, compiler_ctx*);
+				void compile_number(ref, bytecode &, scope_ptr, compiler_ctx*);
 				void compile_object(ref, bytecode &, scope_ptr, compiler_ctx*);
 				void compile_constant(ref, bytecode &, scope_ptr, compiler_ctx*);
 				void compile_symbol(ref, bytecode &, scope_ptr, compiler_ctx*);

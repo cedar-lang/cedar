@@ -42,17 +42,18 @@ namespace cedar {
 		public:
 			dict(void);
 			~dict(void);
-			ref get_first(void);
-			ref get_rest(void);
-
-			void set_first(ref);
-			void set_rest(ref);
 
 			ref to_number();
 
 			inline const char *object_type_name(void) {
 				return "dict";
 			};
+
+			u64 hash(void);
+
+			ref get(ref);
+			void set(ref, ref);
+			ref keys(void);
 
 		protected:
 			cedar::runes to_string(bool human = false);
@@ -62,7 +63,5 @@ namespace cedar {
 	// set item on some ref, checking the type correctly
 	void dict_set(ref &, ref, ref);
 	// unsafe just does no type checking and just reinterpret casts the dict object
-	void dict_set_unsafe(ref &, ref, ref);
 	ref dict_get(ref &, ref);
-	ref dict_get_unsafe(ref &, ref);
 }

@@ -32,17 +32,11 @@
 
 using namespace cedar;
 
-
-union hash_union {
-	u64 i;
-	double d;
-};
-
 cedar_binding(cedar_hash) {
 	// TODO: add longs in the lang
 	assert(sizeof(double) == sizeof(u64));
 	u64 h = args.get_first().hash();
-	return (double)(h & 0x00FFFFFFFFFFFFFF);
+	return ref((i64)h);
 }
 
 cedar_binding(cedar_add) {
@@ -91,10 +85,9 @@ cedar_binding(cedar_div) {
 	args = args.get_rest();
 	int i = 0;
 	while (true) {
+		if (args.is_nil()) break;
 		i++;
 		acc = acc / args.get_first();
-
-		if (args.get_rest().is_nil()) break;
 		args = args.get_rest();
 	}
 	if (i == 0) {
@@ -146,3 +139,82 @@ cedar_binding(cedar_rest) {
 }
 
 
+cedar_binding(cedar_pair) {
+	ref l = new_obj<cedar::list>();
+	l.set_first(args.get_first());
+	l.set_rest(args.get_rest().get_first());
+	return l;
+}
+
+
+
+cedar_binding(cedar_newdict) {
+	ref d = cedar::new_obj<cedar::dict>();
+
+	while (!args.is_nil()) {
+		auto key = args.get_first();
+		args = args.get_rest();
+		auto val = args.get_first();
+		args = args.get_rest();
+		dict_set(d, key, val);
+	}
+	return d;
+}
+
+cedar_binding(cedar_dict_get) {
+	ref d = args.get_first();
+	args = args.get_rest();
+
+	ref k = args.get_first();
+	args = args.get_rest();
+
+	return dict_get(d, k);
+}
+cedar_binding(cedar_dict_set) {
+	ref d = args.get_first();
+	args = args.get_rest();
+
+	ref k = args.get_first();
+	args = args.get_rest();
+
+	ref v = args.get_first();
+	args = args.get_rest();
+
+	dict_set(d, k, v);
+	return v;
+}
+
+cedar_binding(cedar_dict_keys) {
+	ref d = args.get_first();
+	if (auto *dp = ref_cast<dict>(d); dp != nullptr) {
+		return dp->keys();
+	}
+	throw cedar::make_exception("(keys) call failed on non-dict");
+}
+
+void init_binding(cedar::vm::machine *m) {
+	m->bind("dict", cedar_newdict);
+	m->bind("get", cedar_dict_get);
+	m->bind("set", cedar_dict_set);
+	m->bind("keys", cedar_dict_keys);
+
+
+	m->bind("+", cedar_add);
+	m->bind("-", cedar_sub);
+	m->bind("*", cedar_mul);
+	m->bind("/", cedar_div);
+
+	m->bind("=", cedar_equal);
+	m->bind("eq", cedar_equal);
+
+
+
+	m->bind("type-of", cedar_typeof);
+	m->bind("print", cedar_print);
+	m->bind("hash", cedar_hash);
+
+	m->bind("first", cedar_first);
+	m->bind("rest", cedar_rest);
+
+	m->bind("pair", cedar_pair);
+}

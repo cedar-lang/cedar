@@ -41,13 +41,6 @@
 namespace cedar {
 	class object;
 
-	// these functions are an ugly workaround for
-	// some shortcomings of c++'s circular reference
-	// handling. They are defined in src/ref.cc
-	uint16_t change_refcount(object *, int);
-	uint16_t get_refcount(object *);
-	void delete_object(object *);
-
 
 	size_t number_hash_code(void);
 
@@ -63,14 +56,17 @@ namespace cedar {
 	u64 get_object_hash(object*);
 
 
-#define FLAG_NUMBER 0
-#define FLAG_DISABLE_REFCOUNT 1
 
+#define FLAG_FLT 2
+#define FLAG_INT 3
+#define FLAG_OBJ 4
+#define FLAG_PTR 5
 
 	enum ref_type {
 		ref_obj,
 		ref_int,
 		ref_flt,
+		ref_ptr, // unknown ref, just a voidptr
 	};
 
 	class ref {
@@ -78,103 +74,86 @@ namespace cedar {
 
 			std::bitset<8> flags;
 			union {
-				i64 m_int;
-				f64 m_flt;
-				double m_number;
-				object *obj = nullptr;
+				i64     m_int;
+				f64     m_flt;
+				object *m_obj;
+				void   *m_ptr;
+
 			};
 
-
-			inline uint16_t inc() {
-				if (!flags[FLAG_DISABLE_REFCOUNT])
-					return change_refcount(obj, 1);
-				return 0;
-			}
-
-			inline uint16_t dec() {
-				if (!flags[FLAG_DISABLE_REFCOUNT])
-					return change_refcount(obj, -1);
-				return 0;
-			}
-
-			inline uint16_t rc() {
-				if (!flags[FLAG_DISABLE_REFCOUNT])
-					return get_refcount(obj);
-				return 0;
-			}
-
-			inline void release(void) {
-				if (flags[FLAG_DISABLE_REFCOUNT]) return;
-				if (is_object() && obj != nullptr) {
-					if (dec() == 0) {
-						delete_object(obj);
-					}
-					obj = nullptr;
-				}
-			}
-
-			inline void retain() {
-				if (flags[FLAG_DISABLE_REFCOUNT]) return;
-				if (is_object() && obj != nullptr) {
-					inc();
-				}
-			}
+			void release(void);
+			void retain();
 
 		public:
+
 
 			inline ~ref() {
 				release();
 			}
 
 			inline ref() {
-				obj = nullptr;
-				flags[FLAG_NUMBER] = false;
+				clear_type_flags();
+				flags[FLAG_OBJ] = true;
+				m_obj = nullptr;
 			}
 
 			inline ref(object *o) {
-				flags[FLAG_NUMBER] = false;
-				set(o);
+				clear_type_flags();
+				store_obj(o);
 			}
 
 
 			inline ref(double d) {
-				flags[FLAG_NUMBER] = true;
-				m_number = d;
+				clear_type_flags();
+				flags[FLAG_FLT] = true;
+				m_flt = d;
 			}
 
-			inline ref(int64_t i) {
-				flags[FLAG_NUMBER] = true;
-				m_number = i;
-			}
-
-			inline ref(long int i) {
-				flags[FLAG_NUMBER] = true;
-				m_number = i;
+			inline ref(i64 i) {
+				clear_type_flags();
+				flags[FLAG_INT] = true;
+				m_int = i;
 			}
 
 			inline ref(int i) {
-				flags[FLAG_NUMBER] = true;
-				m_number = i;
+				clear_type_flags();
+				flags[FLAG_INT] = true;
+				m_int = i;
 			}
 
 			inline ref_type rtype(void) {
+				if (is_obj()) return ref_obj;
+				if (is_flt()) return ref_flt;
+				if (is_int()) return ref_int;
+				if (is_ptr()) return ref_ptr;
 				return ref_obj;
 			};
 
 
-
-			inline bool is_object(void) const {
-				return flags[FLAG_NUMBER] == false;
-			}
-
-
 			inline bool is_number(void) const {
-				return flags[FLAG_NUMBER] == true;
+				return is_flt() || is_int();
+			}
+			inline bool is_flt(void) const {
+				return flags[FLAG_FLT];
+			}
+			inline bool is_int(void) const {
+				return flags[FLAG_INT];
+			}
+			inline bool is_obj(void) const {
+				return flags[FLAG_OBJ];
+			}
+			inline bool is_ptr(void) const {
+				return flags[FLAG_PTR];
 			}
 
 
-			inline bool is_flt(void) const {
-				return false; // flags[FLAG_FLT];
+			// clear all the type flags. Useful when changing
+			// the value stored inside the ref
+			inline void clear_type_flags(void) {
+				flags[FLAG_OBJ] = 0;
+				flags[FLAG_FLT] = 0;
+				flags[FLAG_INT] = 0;
+				flags[FLAG_PTR] = 0;
 			}
 
 			bool is_nil(void) const;
@@ -190,61 +169,80 @@ namespace cedar {
 			// for storing arbitrary pointers. This behavior is for low-level
 			// VM operations and should ignore all refcounting after assigning this
 			inline ref & store_ptr(void * ptr) {
-				flags[FLAG_DISABLE_REFCOUNT] = true;
-				obj = (object*)ptr;
+				clear_type_flags();
+				flags[FLAG_PTR] = true;
+				m_ptr = ptr;
 				return *this;
 			}
 
 			inline ref& operator=(const ref& other) {
-				flags[FLAG_DISABLE_REFCOUNT] = other.flags[FLAG_DISABLE_REFCOUNT];
-				if (other.is_number()) {
-					m_number = other.m_number;
-				} else if (other.is_object()) {
-					set(other.obj);
+
+				if (is_obj()) release();
+
+				if (other.is_obj()) {
+					store_obj(other.m_obj);
+				} else {
+					// otherwise, copy the whole block of memory
+					m_int = other.m_int;
 				}
+				// copy over the flags
 				flags = other.flags;
 				return *this;
 			}
+
 			inline ref& operator=(ref&& other) {
-				flags[FLAG_DISABLE_REFCOUNT] = other.flags[FLAG_DISABLE_REFCOUNT];
-				if (other.is_number()) {
-					m_number = other.m_number;
-				} else if (other.is_object()) {
-					set(other.obj);
+
+				if (is_obj()) release();
+
+				if (other.is_obj()) {
+					store_obj(other.m_obj);
+				} else {
+					// otherwise, copy the whole block of memory
+					m_int = other.m_int;
 				}
+				// copy over the flags
 				flags = other.flags;
 				return *this;
 			}
 
 			inline ref& operator=(object *o) {
-				set(o);
+				store_obj(o);
 				return *this;
 			}
 
-			inline void set(object *new_ref) {
+			inline void store_obj(object *a_obj) {
 				release();
-				obj = new_ref;
-				flags[FLAG_NUMBER] = false;
-				if (obj != nullptr)
-					retain();
+				m_obj = a_obj;
+				clear_type_flags();
+				flags[FLAG_OBJ] = true;
+				retain();
 			}
 
 			inline object *operator*() const {
-				if (obj == nullptr)
-					return get_nil_object();
-				return obj;
+				return m_obj == nullptr ? get_nil_object() : m_obj;
 			}
-
 			inline object *operator->() const {
-
 				return operator*();
 			}
 
 
-			inline double to_float(void) {
-				if (!flags[FLAG_NUMBER])
+
+			template<typename T>
+				inline T num_cast(void) {
+					if (is_flt()) {
+						return m_flt;
+					}
+					if (is_int()) {
+						return m_int;
+					}
 					throw cedar::make_exception("attempt to cast non-number reference to a number");
-				return m_number;
+				}
+
+			inline double to_float(void) {
+				return num_cast<double>();
+			}
+			inline i64 to_int(void) {
+				return num_cast<i64>();
 			}
 
 
@@ -261,12 +259,12 @@ namespace cedar {
 
 			template<typename T>
 				inline T * get() const {
-					return dynamic_cast<T*>(obj);
+					return is_obj() ? dynamic_cast<T*>(m_obj) : nullptr;
 				}
 
 			template<typename T>
 				inline T reinterpret(void) const {
-					return reinterpret_cast<T>(obj);
+					return reinterpret_cast<T>(m_obj);
 				}
 
 			/*
@@ -287,7 +285,7 @@ namespace cedar {
 			 */
 			template<typename T>
 				inline T *as() const {
-					return is_object() ? dynamic_cast<T*>(obj) : nullptr;
+					return is_obj() ? dynamic_cast<T*>(m_obj) : nullptr;
 				}
 
 			/*
@@ -306,7 +304,7 @@ namespace cedar {
 			inline const char *object_type_name(void) {
 				if (is_number()) return "number";
 				if (is_nil()) return "nil";
-				return get_object_type_name(obj);
+				return get_object_type_name(m_obj);
 			}
 
 
@@ -317,19 +315,15 @@ namespace cedar {
 			 * that is extending the cedar::object class
 			 */
 			inline cedar::runes type_name() {
-
 				int status;
 
 				const char *given_name;
 
 				if (is_number()) {
 					given_name = get_number_typeid().name();
-				} else {
-					given_name = get_object_typeid(obj).name();
-				}
-
-				printf(":: %s\n", given_name);
-
+				} else if (is_obj()) {
+					given_name = get_object_typeid(m_obj).name();
+				} else given_name = "void";
 				// use the c++ abi to demangle the name that typeid gives back;
 				char *realname = abi::__cxa_demangle(given_name, 0, 0, &status);
 				if (status) {
@@ -347,83 +341,102 @@ namespace cedar {
 
 
 			inline u64 hash(void) {
-				if (is_number()) {
-					return *reinterpret_cast<u64*>(&m_number);
+				if (is_flt()) {
+					return *reinterpret_cast<u64*>(&m_flt);
+				}
+				if (is_int()) {
+					return m_int;
 				}
 				if (is_nil()) return 0lu;
-				auto h = get_object_hash(obj);
+				auto h = get_object_hash(m_obj);
 				return h;
 			}
 
 
+#define FOREACH_OP(V)\
+			V(add, +)      \
+			V(sub, -)      \
+			V(mul, *)      \
+			V(div, /)
+
+			enum binop {
+				#define V(name, op) name,
+					FOREACH_OP(V)
+				#undef V
+			};
+
+			static inline ref binary_op(binop op, ref & a, ref & b) {
+				if (a.is_number() && b.is_number()) {
+					switch (op) {
+						#define V(name, op) \
+							case name: {\
+													 return a.to_float() op b.to_float(); \
+												 }
+
+							FOREACH_OP(V)
+						#undef V
+						default:
+							throw cedar::make_exception("unknown op");
+					}
+				}
+
+				switch (op) {
+					#define V(name, op) case name: throw cedar::make_exception("Attempt to " #name " two non-numbers: ", a.to_string(), " " #op " ", b.to_string());
+					FOREACH_OP(V)
+					#undef V
+				}
+			}
+
+#undef FOREACH_OP
+
+
 			////////////////////////////////////////////////////////////////////////
 			inline ref operator+(ref other) {
-				if (!is_number() || !other.is_number()) {
-					throw cedar::make_exception("attempt to add non-numbers: ", to_string(), " + ", other.to_string());
-				}
-				return to_float() + other.to_float();
+				return binary_op(add, *this, other);
 			}
 
 			inline ref operator-(ref other) {
-				if (!is_number() || !other.is_number()) {
-					throw cedar::make_exception("attempt to subtract non-numbers: ", to_string(), " - ", other.to_string());
-				}
-				return to_float() - other.to_float();
+				return binary_op(sub, *this, other);
 			}
 
 			inline ref operator*(ref other) {
-				if (!is_number() || !other.is_number()) {
-					throw cedar::make_exception("attempt to multiply non-numbers: ", to_string(), " * ", other.to_string());
-				}
-				return to_float() * other.to_float();
+				return binary_op(mul, *this, other);
 			}
 
 			inline ref operator/(ref other) {
+				return binary_op(div, *this, other);
+			}
+
+			inline int compare(ref& other) const {
+				ref self = const_cast<ref&>(*this);
 				if (!is_number() || !other.is_number()) {
-					throw cedar::make_exception("attempt to divide non-numbers: ", to_string(), " / ", other.to_string());
+					return self.hash() - other.hash();
 				}
-				return to_float() / other.to_float();
+				return binary_op(sub, self, other).to_float();
 			}
 
 
-			inline int compare(ref& other) {
-				if (!is_number() || !other.is_number()) {
-					throw cedar::make_exception("attempt to compare non-numbers: ", to_string(), " and ", other.to_string());
-				}
-				return operator-(other).to_float();
-			}
-
-
-			inline bool operator<(ref other) {
+			inline bool operator<(ref other) const {
 				return compare(other) < 0;
 			}
-			inline bool operator<=(ref other) {
+			inline bool operator<=(ref other) const {
 				return compare(other) <= 0;
 			}
-			inline bool operator>(ref other) {
+			inline bool operator>(ref other) const {
 				return compare(other) > 0;
 			}
-			inline bool operator>=(ref&other) {
+			inline bool operator>=(ref&other) const {
 				return compare(other) >= 0;
 			}
-			inline bool operator==(ref other) {
+			inline bool operator==(ref other) const {
 				if (!is_number())
-					return (typeid(obj).hash_code() == typeid(other.obj).hash_code()) && other.hash() == hash();
+					return (typeid(m_obj).hash_code() == typeid(other.m_obj).hash_code()) && other.hash() == const_cast<ref&>(*this).hash();
 				return compare(other) == 0;
 			}
 
 			inline bool operator!=(ref other) {
 				return !operator==(other);
 			}
-
-#define LITERAL_BINARY_OP_TYPE(op, type) \
-			inline ref operator op(const type& val) { \
-				if (is_float()) return to_float() + val;  \
-				return to_int() + val;                    \
-			}
-
-// unsed literal binary op macro
-#define LITERAL_BINARY_OP(op) LITERAL_BINARY_OP_TYPE(op, double); LITERAL_BINARY_OP_TYPE(op,int);
 
 			////////////////////////////////////////////////////////////////////////
 
@@ -437,8 +450,7 @@ namespace cedar {
 
 	template<typename T, typename ...Args>
 		ref new_obj(Args...args) {
-			ref r;
-			r.set(new T(args...));
+			ref r = new T(args...);
 			return r;
 		}
 
@@ -447,4 +459,13 @@ namespace cedar {
 			return r.as<T>();
 		}
 
+
+
 } // namespace cedar
+
+template <>
+struct std::hash<cedar::ref> {
+	std::size_t operator()(const cedar::ref& k) const {
+		return const_cast<cedar::ref&>(k).hash();
+	}
+};
