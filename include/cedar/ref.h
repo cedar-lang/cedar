@@ -370,7 +370,7 @@ namespace cedar {
 					switch (op) {
 						#define V(name, op) \
 							case name: {\
-													 return a.to_float() op b.to_float(); \
+													 return (a.is_flt() || b.is_flt()) ? ref((i64)(a.to_float() op b.to_float())) : ref((i64)(a.to_int() op b.to_int())); \
 												 }
 
 							FOREACH_OP(V)
@@ -388,6 +388,8 @@ namespace cedar {
 			}
 
 #undef FOREACH_OP
+
+
 
 
 			////////////////////////////////////////////////////////////////////////
@@ -412,7 +414,7 @@ namespace cedar {
 				if (!is_number() || !other.is_number()) {
 					return self.hash() - other.hash();
 				}
-				return binary_op(sub, self, other).to_float();
+				return binary_op(sub, self, other).to_int();
 			}
 
 
@@ -425,7 +427,7 @@ namespace cedar {
 			inline bool operator>(ref other) const {
 				return compare(other) > 0;
 			}
-			inline bool operator>=(ref&other) const {
+			inline bool operator>=(ref other) const {
 				return compare(other) >= 0;
 			}
 			inline bool operator==(ref other) const {

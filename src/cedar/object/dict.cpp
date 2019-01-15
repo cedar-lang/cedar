@@ -63,6 +63,8 @@ cedar::runes dict::to_string(bool human) {
 ref dict::get(ref k) {
 	return table.at(k);
 }
+
+
 void dict::set(ref k, ref v) {
 	table[k] = v;
 }

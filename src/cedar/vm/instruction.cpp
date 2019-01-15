@@ -120,11 +120,12 @@ std::string cedar::vm::instruction::to_string(uint64_t offset) {
 	std::ostringstream buf;
 
 	char hexbuf[22];
-	sprintf(hexbuf, "0x%016lx", (u64)((char*)(address) + offset));
+	sprintf(hexbuf, "0x%08lx", (u64)((char*)(address) + offset));
 
 	buf << hexbuf << "  ";
-	buf << instruction_name(*this);
-	buf << "\t";
+
+	sprintf(hexbuf, "%-15s ", instruction_name(*this).c_str());
+	buf << hexbuf;
 
 
 	switch (type()) {
@@ -137,9 +138,15 @@ std::string cedar::vm::instruction::to_string(uint64_t offset) {
 			buf << arg_float;
 			break;
 
-		case imm_int:
-			buf << arg_int;
-			break;
+		case imm_int: {
+				if (op == OP_JUMP || op == OP_JUMP_IF_FALSE) {
+					sprintf(hexbuf, "0x%lx", (u64)(arg_int));
+					buf << hexbuf;
+					break;
+				}
+				buf << arg_int;
+				break;
+			}
 
 		case imm_ptr:
 			buf << arg_voidptr;

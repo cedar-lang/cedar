@@ -44,14 +44,14 @@ new_op('SET_LOCAL', 'imm_int', effect=0) # set a local from the start of the sta
 #
 # These instructions are used only to access global bindings not found in local scope or
 # freevars
-new_op('LOAD_GLOBAL', 'imm_int', effect=0)
+new_op('LOAD_GLOBAL', 'imm_int', effect=1)
 # SET_GLOBAL pops the name off the stack, then the value off the stack
 #  GLOBALS[POP()] = POP(); PUSH(GLOBALS[...]);
 new_op('SET_GLOBAL', 'imm_int', effect=0)
 
 new_op('CONS', effect=-1);
 
-new_op('CALL', effect=-1);
+new_op('CALL', 'imm_int', effect=0);
 new_op('MAKE_FUNC', 'imm_int', effect=1);
 
 # arg_pop pops one value from the argument list and updates the list
@@ -63,7 +63,9 @@ new_op('EXIT', effect=0);
 
 new_op('SKIP', effect=-1);
 
-new_op('MAKE_CLOSURE', effect=0)
+new_op('JUMP', 'imm_int', effect=0)
+new_op('JUMP_IF_FALSE', 'imm_int', effect=0)
+new_op('RECUR', 'imm_int', effect=0)
 
 def main(outfile):
     with open(outfile, 'w') as f:

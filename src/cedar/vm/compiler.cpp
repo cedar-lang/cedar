@@ -34,6 +34,7 @@
 #include <cedar/object/keyword.h>
 #include <cedar/object/number.h>
 #include <cedar/object/string.h>
+#include <cedar/vm/instruction.h>
 #include <memory>
 
 using namespace cedar;
@@ -130,8 +131,8 @@ ref cedar::vm::bytecode_pass(ref obj, vm::compiler *c) {
 	// build a lambda around the code
 	auto lambda = cedar::new_obj<cedar::lambda>(code);
 
-	ref_cast<cedar::lambda>(lambda)->closure_size = context.closure_size;
-	return lambda;
+  ref_cast<cedar::lambda>(lambda)->closure = 0;
+  return lambda;
 }
 
 
@@ -196,6 +197,35 @@ void vm::compiler::compile_progn(ref obj, vm::bytecode & code, scope_ptr sc, com
 }
 
 void vm::compiler::compile_list(ref obj, vm::bytecode & code, scope_ptr sc, compiler_ctx* ctx) {
+
+	if (list_is_call_to("if", obj)) {
+		obj = obj.get_rest();
+		ref cond = obj.get_first();
+		ref tru = obj.get_rest().get_first();
+		ref fls = obj.get_rest().get_rest().get_first();
+
+
+		compile_object(cond, code, sc, ctx);
+
+		code.write((u8)OP_JUMP_IF_FALSE);
+		i64 false_join_loc = code.write((u64)0);
+
+		// compile the true expression
+		compile_object(tru, code, sc, ctx);
+		// write a jump instruction to jump to after the true expr
+		code.write((u8)OP_JUMP);
+		i64 true_join_loc = code.write((u64)0);
+
+
+		// write to the false instruction's argument where to jump to
+		code.write_to(false_join_loc, code.get_size());
+		// compile the false expression
+		compile_object(fls, code, sc, ctx);
+		// write to the join location jump
+		code.write_to(true_join_loc, code.get_size());
+
+		return;
+	}
 	// def is a special form that attempts to change a local closure binding
 	// and if it can't, will set in the global scope
 	if (list_is_call_to("def", obj)) {
@@ -229,7 +259,7 @@ void vm::compiler::compile_list(ref obj, vm::bytecode & code, scope_ptr sc, comp
 		return;
 	}
 
-	if (list_is_call_to("lambda", obj)) {
+	if (list_is_call_to("lambda", obj) || list_is_call_to("fn", obj)) {
 		compile_lambda_expression(obj, code, sc, ctx);
 		return;
 	}
@@ -240,10 +270,24 @@ void vm::compiler::compile_list(ref obj, vm::bytecode & code, scope_ptr sc, comp
 	}
 
 
-	// otherwise it must be a method call, so compile using the calling convention
-	compile_call_arguments(obj.get_rest(), code, sc, ctx);
-	compile_object(obj.get_first(), code, sc, ctx);
-	code.write((uint8_t)OP_CALL);
+	i64 argc = -1;
+	ref args = obj;
+
+	bool recur_call = list_is_call_to("recur", obj);
+
+	if (recur_call) {
+		argc = 0;
+		args = args.get_rest();
+	}
+
+	while (!args.is_nil()) {
+		argc++;
+		compile_object(args.get_first(), code, sc, ctx);
+		args = args.get_rest();
+	}
+
+	code.write((uint8_t)(recur_call ? OP_RECUR : OP_CALL));
+	code.write((i64)argc);
 }
 
 void vm::compiler::compile_number(ref obj, vm::bytecode & code, scope_ptr, compiler_ctx*) {
@@ -354,21 +398,23 @@ void vm::compiler::compile_lambda_expression(ref expr, bytecode & code, scope_pt
 
 
 	if (is_top_level_lambda) {
-		new_code->write((u8)OP_MAKE_CLOSURE);
 	}
 
 	auto args = expr.get_rest().get_first();
 
+	i32 argc = 0;
+	i32 arg_index = ctx->closure_size;
 	while (true) {
 
 		if (args.is_nil()) break;
 		auto arg = args.get_first();
 
 		if (auto *sym = ref_cast<cedar::symbol>(arg); sym != nullptr) {
-			new_code->write((uint8_t)OP_ARG_POP);
-			new_code->write((uint64_t)ctx->closure_size);
+			// new_code->write((uint8_t)OP_ARG_POP);
+			// new_code->write((uint64_t)ctx->closure_size);
 			new_scope->set(arg, ctx->closure_size);
 			ctx->closure_size++;
+			argc++;
 		} else {
 			if (arg.is_nil()) {
 				throw cedar::make_exception("lambda arguments must be symbols: ", expr);
@@ -386,7 +432,11 @@ void vm::compiler::compile_lambda_expression(ref expr, bytecode & code, scope_pt
 	ctx->lambda_depth--;
 
 	new_code->finalize();
-	ref new_lambda = new_obj<cedar::lambda>(new_code);
+	auto *new_lambda = new lambda(new_code);
+	new_lambda->argc = argc;
+	new_lambda->arg_index = arg_index;
+
+
 	const int const_ind = code.push_const(new_lambda);
 	code.write((uint8_t)OP_MAKE_FUNC);
 	code.write((uint64_t)const_ind);

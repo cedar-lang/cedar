@@ -1,0 +1,3 @@
+(def square (lambda (x) (* x x)))
+(print (print "/////////////// PAST DEFN ///////////////"))
+(print (square (+ 1 2)))

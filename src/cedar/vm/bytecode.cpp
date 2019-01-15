@@ -78,8 +78,53 @@ void vm::bytecode::finalize(void) {
 
 
 	stack_size = stack_effect;
+}
 
-	for (int i = 0; i < 6; i++) {
-		write((uint8_t)OP_RETURN);
+
+
+void vm::bytecode::print(void) {
+	auto ins = decode_bytecode(this);
+	int path_width = 5;
+	for (auto i : ins) {
+		path_width += i.op == OP_JUMP || i.op == OP_JUMP_IF_FALSE;
 	}
+	path_width *= 2;
+	std::vector<std::string> paths(ins.size());
+	for (auto & s : paths) {
+		for (int i = 0; i < path_width + 8; i++) {
+			s += ' ';
+		}
+	}
+	int icount = ins.size();
+	int path_i = 0;
+	for (int i = 0; i < icount; i++) {
+		auto c = ins[i];
+		bool is_jump = c.op == OP_JUMP || c.op == OP_JUMP_IF_FALSE;
+		if (is_jump) {
+			path_i++;
+			int target_index = 0;
+			for (int t = 0; t < icount; t++) {
+				if (ins[t].address == (u64)c.arg_int) target_index = t;
+			}
+			paths[i][0] = '>';
+			paths[target_index][0] = '<';
+			for (int p = 0; p < path_i*2; p++) {
+				paths[i][p+1] = '-';
+				paths[target_index][p+1] = '-';
+			}
+			int start = std::min(i, target_index);
+			int end = std::max(i, target_index);
+			paths[start][path_i*2] = '.';
+			paths[end][path_i*2] = '\'';
+			for (int p = start+1; p < end; p++) {
+				paths[p][path_i*2] = '|';
+			}
+		}
+	}
+	for (int i = 0; i < icount; i++) {
+		std::string is = ins[i].to_string(0);
+		while (is.size() < 35) is += ' ';
+		std::cout << is << " " << paths[i] << std::endl;
+	}
+	std::cout << std::endl;
 }

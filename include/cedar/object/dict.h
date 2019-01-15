@@ -31,13 +31,13 @@
 #include <cedar/object/sequence.h>
 #include <cedar/runes.h>
 #include <cedar/ref.h>
-#include <map>
+#include <unordered_map>
 
 namespace cedar {
 
 	class dict : public object{
 		private:
-			std::map<ref, ref> table;
+			std::unordered_map<ref, ref> table;
 
 		public:
 			dict(void);

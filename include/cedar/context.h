@@ -55,6 +55,7 @@ namespace cedar {
 		public:
 			std::shared_ptr<cedar::vm::machine> m_evaluator = nullptr;
 			context();
+      void init(void);
 			void eval_file(cedar::runes);
 			void eval_string(cedar::runes);
 	};

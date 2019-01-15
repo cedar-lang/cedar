@@ -10,8 +10,8 @@
  * copies of the Software, and to permit persons to whom the Software is
  * furnished to do so, subject to the following conditions:
  *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
  *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -25,43 +25,42 @@
 #pragma once
 
 #include <cedar/ref.h>
-#include <cedar/vm/bytecode.h>
-#include <cedar/vm/compiler.h>
 #include <cedar/runes.h>
 #include <cedar/vm/binding.h>
+#include <cedar/vm/bytecode.h>
+#include <cedar/vm/compiler.h>
 
-#include <tuple>
-#include <map>
 #include <cstdio>
+#include <map>
+#include <tuple>
 
 namespace cedar {
-	namespace vm {
+  namespace vm {
 
+    class machine {
+     protected:
+      ref globals;
+      cedar::vm::compiler m_compiler;
 
-		class machine {
-			protected:
+      friend cedar::vm::compiler;
 
-				ref globals;
-				cedar::vm::compiler m_compiler;
+      // uint64_t stacksize = 0;
+      // ref *stack = nullptr;
 
-				friend cedar::vm::compiler;
+     public:
+      ref true_value;
+      machine(void);
+      ~machine(void);
 
-				// uint64_t stacksize = 0;
-				// ref *stack = nullptr;
+      void bind(ref &, ref);
+      void bind(cedar::runes, bound_function);
+      ref find(ref &);
 
-			public:
-				machine(void);
-				~machine(void);
-
-				void bind(ref &, ref);
-				void bind(cedar::runes, bound_function);
-				ref find(ref &);
-
-				/*
-				 * given some object reference,
-				 * compile it into this specific target
-				 */
-				ref eval(ref);
-		};
-	}
-}
+      /*
+       * given some object reference,
+       * compile it into this specific target
+       */
+      ref eval(ref);
+    };
+  }  // namespace vm
+}  // namespace cedar

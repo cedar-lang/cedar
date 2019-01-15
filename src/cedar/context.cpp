@@ -10,8 +10,8 @@
  * copies of the Software, and to permit persons to whom the Software is
  * furnished to do so, subject to the following conditions:
  *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
  *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -26,27 +26,35 @@
 #include <cedar/memory.h>
 #include <cedar/util.hpp>
 
+#include <ctime>
+
+#include "../lib/std.inc.h"
 
 using namespace cedar;
 
 context::context() {
-	reader = make<cedar::reader>();
-	m_evaluator = std::make_shared<cedar::vm::machine>();
+  reader = make<cedar::reader>();
+  m_evaluator = std::make_shared<cedar::vm::machine>();
+}
+
+void context::init(void) {
+  std::string stdsrc;
+  for (unsigned int i = 0; i < src_lib_std_inc_cdr_len; i++) {
+    stdsrc.push_back(src_lib_std_inc_cdr[i]);
+  }
+  eval_string(cedar::runes(stdsrc));
 }
 
 void context::eval_file(cedar::runes name) {
-	cedar::runes src = cedar::util::read_file(name);
-	return this->eval_string(src);
+  cedar::runes src = cedar::util::read_file(name);
+  return this->eval_string(src);
 }
 
 void context::eval_string(cedar::runes expr) {
-	parse_lock.lock();
+  parse_lock.lock();
 
-	auto top_level = reader->run(expr);
+  auto top_level = reader->run(expr);
 
-	for (auto obj : top_level) {
-		ref return_value = m_evaluator->eval(obj);
-		// std::cout << "res: " << return_value << std::endl;
-	}
-	parse_lock.unlock();
+  for (auto obj : top_level) m_evaluator->eval(obj);
+  parse_lock.unlock();
 }

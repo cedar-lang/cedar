@@ -10,8 +10,8 @@
  * copies of the Software, and to permit persons to whom the Software is
  * furnished to do so, subject to the following conditions:
  *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
  *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -25,8 +25,8 @@
 #pragma once
 
 #include <cedar/object.h>
-#include <cedar/runes.h>
 #include <cedar/ref.h>
+#include <cedar/runes.h>
 #include <cedar/vm/bytecode.h>
 #include <cedar/vm/machine.h>
 
@@ -34,58 +34,66 @@
 #include <functional>
 #include <memory>
 
-
 // define the number of references to store in the
 // closure itself, instead of in the vector
-#define CLOSURE_INTERNAL_SIZE 4
+#define CLOSURE_INTERNAL_SIZE 0
 
 namespace cedar {
 
+  // closure represents a wraper around closed values
+  // in functions, also known as "freevars" in LC
+  // It will attempt to store things in a fixed sized
+  // array if it can, but will also allocate a vector
+  // if needed
+  class closure {
+    i32 m_size = 0;
+    i32 m_index = 0;
+    std::shared_ptr<closure> m_parent;
 
+    std::vector<ref> m_vars;
 
-	// closure represents a wraper around closed values
-	// in functions, also known as "freevars" in LC
-	// It will attempt to store things in a fixed sized
-	// array if it can, but will also allocate a vector
-	// if needed
-	class closure {
+   public:
 
-		bool use_vec = false;
-		std::vector<ref> vars;
-		ref var_a[CLOSURE_INTERNAL_SIZE];
-		public:
-			// constructor to allocate n vars of closure space
-			closure(int);
-			~closure(void);
+    // constructor to allocate n vars of closure space
+    //
+    closure(i32, std::shared_ptr<closure> = nullptr, i32 = 0);
+    ~closure(void);
 
-			ref & at(int);
-	};
+    std::shared_ptr<closure> clone(void);
 
-	class lambda : public object {
-		public:
+    ref &at(int);
+  };
 
-			enum lambda_type {
-				bytecode_type,
-				function_binding_type,
-			};
+  class lambda : public object {
+   public:
+    enum lambda_type {
+      bytecode_type,
+      function_binding_type,
+    };
 
-			lambda_type type = bytecode_type;
-			std::shared_ptr<cedar::vm::bytecode> code;
-			int closure_size = -1;
-			std::shared_ptr<closure> closure = nullptr;
+    lambda_type type = bytecode_type;
+    std::shared_ptr<cedar::vm::bytecode> code;
+    std::shared_ptr<closure> closure = nullptr;
 
-			bound_function function_binding;
+    ref defining_expr;
 
-			lambda(void);
-			lambda(std::shared_ptr<cedar::vm::bytecode>);
-			lambda(cedar::bound_function);
-			~lambda(void);
+    i32 arg_index = 0;
+    i32 argc = 0;
 
-			ref to_number();
-			inline const char *object_type_name(void) { return "lambda"; };
-			u64 hash(void);
+    bound_function function_binding;
 
-		protected:
-			cedar::runes to_string(bool human = false);
-	};
-}
+    lambda(void);
+    lambda(std::shared_ptr<cedar::vm::bytecode>);
+    lambda(cedar::bound_function);
+    ~lambda(void);
+
+    ref to_number();
+    inline const char *object_type_name(void) { return "lambda"; };
+    u64 hash(void);
+
+    lambda *copy(void);
+
+   protected:
+    cedar::runes to_string(bool human = false);
+  };
+}  // namespace cedar

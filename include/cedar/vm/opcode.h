@@ -20,7 +20,9 @@
 #define OP_RETURN                   0x0d
 #define OP_EXIT                     0x0e
 #define OP_SKIP                     0x0f
-#define OP_MAKE_CLOSURE             0x10
+#define OP_JUMP                     0x10
+#define OP_JUMP_IF_FALSE            0x11
+#define OP_RECUR                    0x12
 
 /* Instruction opcode foreach macro for code generation */
 /* Arg order: (name, bytecode, type, stack effect */
@@ -32,15 +34,17 @@
   V(INT, OP_INT, imm_int, 1) \
   V(LOAD_LOCAL, OP_LOAD_LOCAL, imm_int, 1) \
   V(SET_LOCAL, OP_SET_LOCAL, imm_int, 0) \
-  V(LOAD_GLOBAL, OP_LOAD_GLOBAL, imm_int, 0) \
+  V(LOAD_GLOBAL, OP_LOAD_GLOBAL, imm_int, 1) \
   V(SET_GLOBAL, OP_SET_GLOBAL, imm_int, 0) \
   V(CONS, OP_CONS, no_arg, -1) \
-  V(CALL, OP_CALL, no_arg, -1) \
+  V(CALL, OP_CALL, imm_int, 0) \
   V(MAKE_FUNC, OP_MAKE_FUNC, imm_int, 1) \
   V(ARG_POP, OP_ARG_POP, imm_int, 1) \
   V(RETURN, OP_RETURN, no_arg, 0) \
   V(EXIT, OP_EXIT, no_arg, 0) \
   V(SKIP, OP_SKIP, no_arg, -1) \
-  V(MAKE_CLOSURE, OP_MAKE_CLOSURE, no_arg, 0)
+  V(JUMP, OP_JUMP, imm_int, 0) \
+  V(JUMP_IF_FALSE, OP_JUMP_IF_FALSE, imm_int, 0) \
+  V(RECUR, OP_RECUR, imm_int, 0)
 
 #endif

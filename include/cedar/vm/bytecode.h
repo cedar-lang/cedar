@@ -74,6 +74,9 @@ namespace cedar {
 				}
 
 
+				void print(void);
+
+
 				ref& get_const(int);
 				int push_const(ref);
 

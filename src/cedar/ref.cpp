@@ -79,10 +79,15 @@ void cedar::ref::set_rest(ref val) {
 
 cedar::runes ref::to_string(bool human) {
 
+	if (is_ptr()) {
+		char buf[30];
+		sprintf(buf, "%p", m_ptr);
+		return buf;
+	}
 	if (is_int()) {
 		return std::to_string(m_int);
 	}
-  if (is_number()) {
+  if (is_flt()) {
     auto str = std::to_string(m_flt);
     long len = str.length();
     for (int i = len - 1; i > 0; i--) {
@@ -90,6 +95,7 @@ cedar::runes ref::to_string(bool human) {
 				str.pop_back();
       } else if (str[i] == '.') {
 				str.pop_back();
+        str += ".0";
 				break;
       } else {
 				break;
