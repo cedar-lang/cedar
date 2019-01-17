@@ -25,5 +25,119 @@
 (def not (fn (x) (if x nil t)))
 
 (def or (fn (x y) (if x x y)))
-(def and (fn (x) (if x y x)))
+(def and (fn (x y) (if x y x)))
 
+
+(def nil? (fn (v) (= v nil)))
+(def list? (fn (v) (= (type-of v) :list)))
+(def dict? (fn (v) (= (type-of v) :dict)))
+(def vector? (fn (v) (= (type-of v) :vector)))
+(def number? (fn (v) (= (type-of v) :number)))
+(def string? (fn (v) (= (type-of v) :string)))
+(def symbol? (fn (v) (= (type-of v) :symbol)))
+(def keyword? (fn (v) (= (type-of v) :keyword)))
+
+
+(def map
+  (fn (f l)
+    (if (not (nil? l))
+      (cons (f (first l))
+            (map f (rest l))))))
+
+(def apply (fn (f args) (eval (cons f args))))
+
+;;;;
+;;;; MACRO EXPANDER
+;;
+;;  The Cedar macro expander is implemented in the language itself
+;;  so unfortunately the macro expander cannot use macros in it's
+;;  code. It's build around the (macroexpand) function and the
+;;  semi-special cased defmacro form. macroexpand takes a quoted
+;;  expression, and the defmacro function takes a quoted name,
+;;  quoted list, and quoted body.
+;;  The defmacro function will do analysis on the args and the body
+;;  and store the raw args and the raw body in the macros dictionary
+;;
+;;;;
+;; macros is a dictionary that stores the macros in the program.
+(let ((macros {}))
+
+    ;; helper functions that expect a macro definition object
+    ;; return the name of a macro
+    (def macro-name (fn (m) (first m)))
+    ;; return the body of a macro
+    (def macro-body (fn (m) (first (rest m))))
+    ;; return the args of a macro
+    (def macro-args (fn (m) (first (rest (rest m)))))
+
+
+    ;; defmacro takes the arguments, the args and the body and stores
+    ;; it into the macros dict for later evaluation
+    (def defmacro
+      (fn (id args body)
+        (let ((expander (eval (list 'fn args body))))
+          (set macros id expander)
+          expander)))
+
+    ;; macroexpand takes an expression as a value and returns the
+    ;; value representation of the recursively expanded macro
+    (def macroexpand
+      (fn (expr)
+          ;; only lists need to be macro expanded, cause they're calls.
+          ;; so if it's not a list, just return the bare expression
+          (if (not (list? expr))
+            expr
+            (if (= (first expr) 'quote)
+              expr
+              (let ((form (first expr))
+                    (args (map macroexpand (rest expr)))
+                    (mac (get macros (first expr) nil)))
+                (if (nil? mac)
+                  (cons form args)
+                  (let ((ex (apply mac
+                                   (map (fn (x) (list 'quote x)) args))))
+                    (if (list? ex)
+                      (if (= (cedar/hash ex) (cedar/hash expr))
+                        expr
+                        (cons (first ex) (rest ex)))
+                      ex))))))))
+    nil)
+
+
+(defmacro defn (name args body)
+  (list 'def name
+        (list 'fn args body)))
+
+
+(defmacro when
+  (test body)
+  (list 'if test body))
+
+(defmacro when-not
+  (test body)
+  (list 'if test nil body))
+
+
+(defn second (x) (first (rest x)))
+
+(defn next (x) (rest x))
+
+
+(defmacro cond
+  (clauses)
+  (when clauses
+    (let ((cl (first clauses)))
+      (list 'if (first cl)
+                (second cl)
+                (macroexpand (list 'cond (rest clauses)))))))
+
+(defmacro class
+  (name args fields)
+  (macroexpand
+    (list 'defn name args
+       (list 'let
+             '((this {}))
+           (list 'set 'this :type-of (cedar/keyword name))
+           (cons 'do
+                 (map (fn (f) (list 'set 'this (list 'quote (first f)) (second f))) fields))
+         'this))))

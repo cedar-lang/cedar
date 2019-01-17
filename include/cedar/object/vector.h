@@ -25,20 +25,38 @@
 #pragma once
 
 #include <cedar/object.h>
-#include <cedar/ref.h>
 
+#include <cedar/object/indexable.h>
+#include <cedar/object/sequence.h>
+#include <cedar/ref.h>
+#include <cedar/runes.h>
+#include <unordered_map>
 namespace cedar {
 
-  // a sequence represents something in cedar
-  // that has a first and a last, (car and cdr
-  // as it's known in old lisp)
-  class sequence : public object {
-   public:
-    virtual ~sequence(){};
-    virtual ref get_first(void) = 0;
-    virtual ref get_rest(void) = 0;
-    virtual void set_first(ref) = 0;
-    virtual void set_rest(ref) = 0;
-  };
-}  // namespace cedar
+  class vector : public indexable {
+   private:
+    std::vector<ref> items;
 
+   public:
+    vector(void);
+    ~vector(void);
+
+    ref to_number();
+
+    inline const char *object_type_name(void) { return "vector"; };
+
+    u64 hash(void);
+
+    ref get(ref);
+    ref set(ref, ref);
+    ref append(ref);
+    inline i64 size(void) {
+      return items.size();
+    }
+
+   protected:
+    cedar::runes to_string(bool human = false);
+  };
+
+
+}  // namespace cedar

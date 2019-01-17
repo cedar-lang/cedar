@@ -10,8 +10,8 @@
  * copies of the Software, and to permit persons to whom the Software is
  * furnished to do so, subject to the following conditions:
  *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
  *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -22,378 +22,355 @@
  * SOFTWARE.
  */
 
-#include <cedar/parser.h>
-#include <cedar/exception.hpp>
-#include <cedar/runes.h>
 #include <cedar/memory.h>
+#include <cedar/parser.h>
+#include <cedar/runes.h>
+#include <cedar/exception.hpp>
 
-#include <cedar/object/list.h>
-#include <cedar/object/symbol.h>
 #include <cedar/object/keyword.h>
-#include <cedar/object/string.h>
-#include <cedar/object/number.h>
+#include <cedar/object/list.h>
 #include <cedar/object/nil.h>
+#include <cedar/object/number.h>
+#include <cedar/object/string.h>
+#include <cedar/object/symbol.h>
 
+#include <cctype>
 #include <iostream>
 #include <string>
-#include <cctype>
-
 
 using namespace cedar;
 
-
-token::token() {
-	type = tok_eof;
-}
+token::token() { type = tok_eof; }
 
 token::token(uint8_t t, cedar::runes v) {
-	type = t;
-	val = v;
+  type = t;
+  val = v;
 }
-
 
 lexer::lexer(cedar::runes src) {
-	source = src;
-	index = 0;
+  source = src;
+  index = 0;
 }
 
-
 cedar::rune lexer::next() {
-	auto c = peek();
-	index++;
-	return c;
+  auto c = peek();
+  index++;
+  return c;
 }
 
 cedar::rune lexer::peek() {
-	if (index > source.size()) {
-			return -1;
-	}
-	return source[index];
+  if (index > source.size()) {
+    return -1;
+  }
+  return source[index];
 }
 
-
-
 bool in_charset(wchar_t c, const wchar_t *set) {
-	for (int i = 0; set[i]; i++) {
-		if (set[i] == c) return true;
-	}
+  for (int i = 0; set[i]; i++) {
+    if (set[i] == c) return true;
+  }
 
-	return false;
+  return false;
 }
 
 token lexer::lex() {
+  auto c = next();
 
-	auto c = next();
+  if (c == ';') {
+    while (peek() != '\n' && (int32_t)peek() != -1) next();
 
+    return lex();
+  }
 
-	if (c == ';') {
-		while (peek() != '\n' && (int32_t)peek() != -1) next();
+  // skip over spaces by calling again
+  if (isspace(c)) return lex();
 
-		return lex();
-	}
+  if ((int32_t)c == -1 || c == 0) {
+    return token(tok_eof, "");
+  }
 
-	// skip over spaces by calling again
-	if (isspace(c))
-		return lex();
-
-	if ((int32_t)c == -1 || c == 0) {
-		return token(tok_eof, "");
-	}
-
-
-	if (c == '`') {
-		return token(tok_backquote, "`");
-	}
+  /*
+  if (c == '`') {
+    return token(tok_backquote, "`");
+  }
+  */
 
 
-	if (c == ',') {
-		if (peek() == '@') {
-			next();
-			return token(tok_comma_at, ",@");
-		}
+  // treat commas as whitespace. it just allows for nicer dict construction
+  if (c == ',') {
+    next();
+    return lex();
+  }
 
-		return token(tok_comma, ",");
-	}
+  if (c == '(') return token(tok_left_paren, "(");
 
+  if (c == ')') return token(tok_right_paren, ")");
 
-	if (c == '(')
-		return token(tok_left_paren, "(");
+  if (c == '[') return token(tok_left_bracket, "[");
 
-	if (c == ')')
-		return token(tok_right_paren, ")");
+  if (c == ']') return token(tok_right_bracket, "]");
 
+  if (c == '{') return token(tok_left_curly, "{");
 
-	if (c == '\'')
-		return token(tok_quote, "'");
+  if (c == '}') return token(tok_right_curly, "}");
 
+  if (c == '\'') return token(tok_quote, "'");
 
-	if (c == '"') {
-		cedar::runes buf;
+  if (c == '"') {
+    cedar::runes buf;
 
+    bool escaped = false;
+    // ignore the first quote because a string shouldn't
+    // contain the encapsulating quotes in it's internal representation
+    while (true) {
+      c = next();
+      // also ignore the last double quote for the same reason as above
+      if (c == '"' && !escaped) break;
+      escaped = c == '\\';
+      buf += c;
+    }
 
-		bool escaped = false;
-		// ignore the first quote because a string shouldn't
-		// contain the encapsulating quotes in it's internal representation
-		while (true) {
-			c = next();
-			// also ignore the last double quote for the same reason as above
-			if (c == '"' && !escaped) break;
-			escaped = c == '\\';
-			buf += c;
-		}
+    return token(tok_string, buf);
+  }
 
+  // parse a number
+  if (isdigit(c) || c == '.' || (c == '-' && isdigit(peek()))) {
+    // it's a number (or it should be) so we should parse it as such
 
-		return token(tok_string, buf);
-	}
+    cedar::runes buf;
 
-	// parse a number
-	if (isdigit(c) || c == '.') {
-		// it's a number (or it should be) so we should parse it as such
+    buf += c;
+    bool has_decimal = c == '.';
 
-		cedar::runes buf;
+    while (isdigit(peek()) || peek() == '.') {
+      c = next();
+      buf += c;
+      if (c == '.') {
+        if (has_decimal)
+          throw make_exception("invalid number syntax: '", buf,
+                               "' too many decimal points");
+        has_decimal = true;
+      }
+    }
 
+    if (buf == ".") {
+      return token(tok_symbol, buf);
+    }
+    return token(tok_number, buf);
+  }  // digit parsing
 
-		buf += c;
-		bool has_decimal = c == '.';
+  // it wasn't anything else, so it must be
+  // either an symbol or a keyword token
 
-		while (isdigit(peek()) || peek() == '.') {
-			c = next();
-			buf += c;
-			if (c == '.') {
-				if (has_decimal)
-					throw make_exception("invalid number syntax: '", buf, "' too many decimal points");
-				has_decimal = true;
-			}
-		}
+  cedar::runes symbol;
+  symbol += c;
 
-		if (buf == ".") {
-			return token(tok_symbol, buf);
-		}
-		return token(tok_number, buf);
-	} // digit parsing
+  while (!in_charset(peek(), L" \n\t(){}[],'`@")) {
+    symbol += next();
+  }
 
+  if (symbol.length() == 0)
+    throw make_exception("lexer encountered zero-length identifier");
 
-	// it wasn't anything else, so it must be
-	// either an symbol or a keyword token
+  uint8_t type = tok_symbol;
 
+  if (symbol[0] == ':') {
+    if (symbol.size() == 1)
+      throw cedar::make_exception(
+          "Keyword token must have at least one character after the ':'");
+    type = tok_keyword;
+  }
 
-	cedar::runes symbol;
-	symbol += c;
-
-	while (!in_charset(peek(), L" \n\t(){},'`@")) {
-		symbol += next();
-	}
-
-
-	if (symbol.length() == 0)
-		throw make_exception("lexer encountered zero-length identifier");
-
-	uint8_t type = tok_symbol;
-
-	if (symbol[0] == ':')
-		type = tok_keyword;
-
-	return token(type, symbol);
+  return token(type, symbol);
 }
 
 // ----------- reader -----------
 reader::reader() {}
 
-
-
 /////////////////////////////////////////////////////
 std::vector<ref> reader::run(cedar::runes source) {
-	std::vector<ref> statements;
+  std::vector<ref> statements;
 
-	m_lexer = std::make_shared<cedar::lexer>(source);
+  m_lexer = std::make_shared<cedar::lexer>(source);
 
   tokens.clear();
 
-	// read all the tokens from the source code
-	token t;
-	while ((t = m_lexer->lex()).type != tok_eof) {
-		tokens.push_back(t);
-	}
+  // read all the tokens from the source code
+  token t;
+  while ((t = m_lexer->lex()).type != tok_eof) {
+    tokens.push_back(t);
+  }
 
   if (tokens.size() == 0) return statements;
-	// reset internal state of the reader
-	tok = tokens[0];
-	index = 0;
+  // reset internal state of the reader
+  tok = tokens[0];
+  index = 0;
 
-	while (tok.type != tok_eof) {
-		ref obj = parse_expr();
-		statements.push_back(obj);
-	}
+  while (tok.type != tok_eof) {
+    ref obj = parse_expr();
+    statements.push_back(obj);
+  }
 
-	// delete the lexer state
-	m_lexer = nullptr;
+  // delete the lexer state
+  m_lexer = nullptr;
   tokens.empty();
 
-	return statements;
+  return statements;
 }
-
-
-
 
 /////////////////////////////////////////////////////
 token reader::peek(int offset) {
-	uint64_t new_i = index + offset;
-	if (new_i >= tokens.size()) {
-		return token(tok_eof, U"");
-	}
+  uint64_t new_i = index + offset;
+  if (new_i >= tokens.size()) {
+    return token(tok_eof, U"");
+  }
 
-	return tokens[new_i];
+  return tokens[new_i];
 }
-
-
-
 
 /////////////////////////////////////////////////////
 token reader::move(int offset) {
-	tok = peek(offset);
-	index += offset;
+  tok = peek(offset);
+  index += offset;
 
-	return tok;
+  return tok;
 }
-
-
-
 
 /////////////////////////////////////////////////////
-token reader::next(void) {
-	return move(1);
-}
-
-
-
-
+token reader::next(void) { return move(1); }
 
 /////////////////////////////////////////////////////
-token reader::prev(void) {
-	return move(-1);
-}
-
-
+token reader::prev(void) { return move(-1); }
 
 /////////////////////////////////////////////////////
 ref reader::parse_expr(void) {
-
-	switch (tok.type) {
-		case tok_string:
-			return parse_string();
-		case tok_keyword:
-		case tok_symbol:
-			return parse_symbol();
-		case tok_number:
-			return parse_number();
-		case tok_left_paren:
-			return parse_list();
-		case tok_backquote:
-			return parse_special_syntax(U"quasiquote");
-		case tok_quote:
-			return parse_special_syntax(U"quote");
-		case tok_comma:
-			return parse_special_syntax(U"unquote");
-		case tok_comma_at:
-			return parse_special_syntax(U"unquote-splicing");
-	}
-	throw cedar::make_exception("Unimplmented token: ", tok);
+  switch (tok.type) {
+    case tok_string:
+      return parse_string();
+    case tok_keyword:
+    case tok_symbol:
+      return parse_symbol();
+    case tok_number:
+      return parse_number();
+    case tok_left_curly:
+      return parse_special_grouping_as_call("dict", tok_right_curly);
+    case tok_left_bracket:
+      return parse_special_grouping_as_call("vector", tok_right_bracket);
+    case tok_left_paren:
+      return parse_list();
+    case tok_backquote:
+      return parse_special_syntax(U"quasiquote");
+    case tok_quote:
+      return parse_special_syntax(U"quote");
+    case tok_comma:
+      return parse_special_syntax(U"unquote");
+    case tok_comma_at:
+      return parse_special_syntax(U"unquote-splicing");
+  }
+  throw cedar::make_exception("Unimplmented token: ", tok);
 }
-
-
 
 /////////////////////////////////////////////////////
 ref reader::parse_list(void) {
-	std::vector<ref> items;
+  std::vector<ref> items;
+  // skip over the first paren
+  next();
+  while (tok.type != tok_right_paren) {
+    if (tok.type == tok_eof) {
+      throw make_exception("unexpected eof in list");
+    }
+    ref item = parse_expr();
+    items.push_back(item);
+  }
+  ref list_obj = nullptr;
+  if (items.size() > 0) {
+    list_obj = cedar::new_obj<list>(items);
+  }
+  // skip over the closing paren
+  next();
 
-	// skip over the first paren
-	next();
-
-
-	while (tok.type != tok_right_paren) {
-		if (tok.type == tok_eof) {
-			throw make_exception("unexpected eof in list");
-		}
-		ref item = parse_expr();
-		items.push_back(item);
-	}
-
-
-	ref list_obj = nullptr;
-	if (items.size() > 0) {
-		list_obj = cedar::new_obj<list>(items);
-	}
-	// skip over the closing paren
-	next();
-
-	return list_obj;
+  return list_obj;
 }
-
-
-
 
 /////////////////////////////////////////////////////
 ref reader::parse_special_syntax(cedar::runes function_name) {
-	// skip over the "special syntax token"
-	next();
-	std::vector<ref> items = { new_obj<symbol>(function_name), parse_expr() };
-	ref obj = new_obj<list>(items);
-	return obj;
+  // skip over the "special syntax token"
+  next();
+  std::vector<ref> items = {new_obj<symbol>(function_name), parse_expr()};
+  ref obj = new_obj<list>(items);
+  return obj;
 }
-
-
-
-
 
 /////////////////////////////////////////////////////
 ref reader::parse_symbol(void) {
-	ref return_obj;
+  ref return_obj;
 
-	// since parse_symbol also parses keywords, the parser
-	// needs to special case symbols that start with ':'
-	if (tok.val[0] == ':') {
-		return_obj = new_obj<cedar::keyword>(tok.val);
-	} else if (tok.val == "nil") {
-		return_obj = nullptr;
-	} else {
-		return_obj = new_obj<cedar::symbol>(tok.val);
-	}
-	next();
-	return return_obj;
+  // since parse_symbol also parses keywords, the parser
+  // needs to special case symbols that start with ':'
+  if (tok.val[0] == ':') {
+    return_obj = new_obj<cedar::keyword>(tok.val);
+  } else if (tok.val == "nil") {
+    return_obj = nullptr;
+  } else {
+    return_obj = new_obj<cedar::symbol>(tok.val);
+  }
+  next();
+  return return_obj;
 }
-
-
 
 /////////////////////////////////////////////////////
 ref reader::parse_number(void) {
-	std::string str = tok.val;
+  std::string str = tok.val;
 
-	bool is_float = false;
+  bool is_float = false;
 
+  for (auto &c : tok.val) {
+    if (c == '.') {
+      is_float = true;
+      break;
+    }
+  }
 
-	for (auto & c : tok.val) {
-		if (c == '.') {
-			is_float = true;
-			break;
-		}
-	}
+  next();
 
-	next();
-
-	if (is_float) {
-		return ref(atof(str.c_str()));
-	} else {
-		i64 i = atoll(str.c_str());
-		return ref(i);
-	}
+  if (is_float) {
+    return ref(atof(str.c_str()));
+  } else {
+    i64 i = atoll(str.c_str());
+    return ref(i);
+  }
 }
-
-
 
 /////////////////////////////////////////////////////
 ref reader::parse_string(void) {
-	ref obj = new_obj<string>();
-	obj.as<string>()->set_content(tok.val);
-	next();
-	return obj;
+  ref obj = new_obj<string>();
+  obj.as<string>()->set_content(tok.val);
+  next();
+  return obj;
+}
+
+/////////////////////////////////////////////////////
+ref reader::parse_special_grouping_as_call(cedar::runes name,
+                                           tok_type closing) {
+  std::vector<ref> items;
+  // skip over the first grouping oper
+  next();
+
+  // push the call name to the begining of the list
+  items.push_back(new_obj<symbol>(name));
+  while (tok.type != closing) {
+    if (tok.type == tok_eof) {
+      throw make_exception("unexpected eof in list");
+    }
+    ref item = parse_expr();
+    items.push_back(item);
+  }
+  ref list_obj = nullptr;
+  if (items.size() > 0) {
+    list_obj = cedar::new_obj<list>(items);
+  }
+  // skip over the closing paren
+  next();
+
+  return list_obj;
 }

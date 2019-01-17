@@ -28,7 +28,7 @@
 #include <cedar/parser.h>
 #include <cedar/vm/machine.h>
 #include <cedar/memory.h>
-
+#include <cedar/ref.h>
 #include <vector>
 #include <mutex>
 
@@ -56,7 +56,7 @@ namespace cedar {
 			std::shared_ptr<cedar::vm::machine> m_evaluator = nullptr;
 			context();
       void init(void);
-			void eval_file(cedar::runes);
-			void eval_string(cedar::runes);
+			ref eval_file(cedar::runes);
+			ref eval_string(cedar::runes);
 	};
 }

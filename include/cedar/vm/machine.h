@@ -33,6 +33,7 @@
 #include <cstdio>
 #include <map>
 #include <tuple>
+#include <vector>
 
 namespace cedar {
   namespace vm {
@@ -40,6 +41,7 @@ namespace cedar {
     class machine {
      protected:
       ref globals;
+      std::vector<ref> symbol_table;
       cedar::vm::compiler m_compiler;
 
       friend cedar::vm::compiler;
@@ -52,7 +54,7 @@ namespace cedar {
       machine(void);
       ~machine(void);
 
-      void bind(ref &, ref);
+      void bind(ref, ref);
       void bind(cedar::runes, bound_function);
       ref find(ref &);
 
@@ -61,6 +63,8 @@ namespace cedar {
        * compile it into this specific target
        */
       ref eval(ref);
+
+      ref eval_coro(ref);
     };
   }  // namespace vm
 }  // namespace cedar

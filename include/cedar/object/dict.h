@@ -10,8 +10,8 @@
  * copies of the Software, and to permit persons to whom the Software is
  * furnished to do so, subject to the following conditions:
  *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
  *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -22,46 +22,40 @@
  * SOFTWARE.
  */
 
-
-
 #pragma once
 
 #include <cedar/object.h>
 
+#include <cedar/object/indexable.h>
 #include <cedar/object/sequence.h>
-#include <cedar/runes.h>
 #include <cedar/ref.h>
+#include <cedar/runes.h>
 #include <unordered_map>
-
 namespace cedar {
 
-	class dict : public object{
-		private:
-			std::unordered_map<ref, ref> table;
+  class dict : public indexable {
+   private:
+    std::unordered_map<ref, ref> table;
 
-		public:
-			dict(void);
-			~dict(void);
+   public:
+    dict(void);
+    ~dict(void);
 
-			ref to_number();
+    ref to_number();
 
-			inline const char *object_type_name(void) {
-				return "dict";
-			};
+    inline const char *object_type_name(void) { return "dict"; };
+    u64 hash(void);
+    ref get(ref);
+    ref set(ref, ref);
+    ref keys(void);
+    ref append(ref);
+    inline i64 size(void) {
+      return table.size();
+    }
 
-			u64 hash(void);
-
-			ref get(ref);
-			void set(ref, ref);
-			ref keys(void);
-
-		protected:
-			cedar::runes to_string(bool human = false);
-	};
+   protected:
+    cedar::runes to_string(bool human = false);
+  };
 
 
-	// set item on some ref, checking the type correctly
-	void dict_set(ref &, ref, ref);
-	// unsafe just does no type checking and just reinterpret casts the dict object
-	ref dict_get(ref &, ref);
-}
+}  // namespace cedar

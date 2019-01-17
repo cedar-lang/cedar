@@ -30,16 +30,21 @@
  */
 
 #include <cedar.h>
+#include <cedar/lib/linenoise.h>
 #include <ctype.h>
 #include <dlfcn.h>
 #include <getopt.h>
+#include <netinet/in.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/socket.h>
+#include <sys/types.h>
 #include <unistd.h>
 #include <chrono>
 #include <iostream>
 #include <string>
 #include <thread>
+#include <map>
 
 using ref = cedar::ref;
 class dynamic_library : public cedar::object {
@@ -111,21 +116,70 @@ cedar_binding(cedar_dlsym) {
   ref func = cedar::new_obj<cedar::lambda>(func_binding);
   return func;
 }
-
-struct cedar_options {
-  bool interactive = false;
-};
-
-void cedar_start(cedar_options &);
-
 static void usage(void);
 static void help(void);
 
-void cedar_start(cedar_options &) { auto eval_thread = std::thread(); }
+
+
+
+using ctx_ptr = std::shared_ptr<cedar::context>;
+
+void daemon_handle_connection(ctx_ptr ctx, int cfd) {
+
+
+  while (true) {
+    char readv[9];
+    readv[8] = 0;
+    std::string buf;
+    while (true) {
+      int readc = recv(cfd, readv, 8, 0);
+      if (readc == -1) goto discon;
+      buf += readv;
+      if (readc != 8) break;
+    }
+
+    cedar::runes expr = buf;
+    cedar::ref res = ctx->eval_string(expr);
+    std::string resp = res.to_string();
+
+    std::cout << expr << " -> " << resp << std::endl;
+    send(cfd, resp.c_str(), resp.size(), 0);
+  }
+
+discon:
+
+  close(cfd);
+}
+
+
+void cedar_daemon(ctx_ptr ctx, int port) {
+  int m_socket = socket(AF_INET, SOCK_STREAM, 0);
+  // define the server address structure
+  struct sockaddr_in server_address;
+  server_address.sin_family = AF_INET;
+  server_address.sin_port = htons(port);
+  server_address.sin_addr.s_addr = INADDR_ANY;
+  int s = bind(m_socket, (struct sockaddr *)&server_address,
+               sizeof(server_address));
+  if (s != 0) {
+    std::cerr << std::strerror(errno) << std::endl;
+    exit(0);
+  }
+  listen(m_socket, 20);
+
+  int new_sock;
+  while ((new_sock = accept(m_socket, 0, 0)) != -1) {
+    std::thread handler(&daemon_handle_connection, ctx, new_sock);
+    handler.detach();
+  }
+  close(m_socket);
+}
+
+
+
 
 int main(int argc, char **argv) {
   srand((unsigned int)time(nullptr));
-
   try {
     auto ctx = std::make_shared<cedar::context>();
     ctx->init();
@@ -133,14 +187,27 @@ int main(int argc, char **argv) {
     ctx->m_evaluator->bind("dlopen", *cedar_dlopen);
     ctx->m_evaluator->bind("dlsym", *cedar_dlsym);
 
+    bool interactive = false;
+    bool daemon = false;
+
+    std::thread daemon_thread;
     char c;
-    while ((c = getopt(argc, argv, "ihe:")) != -1) {
+    while ((c = getopt(argc, argv, "id:he:")) != -1) {
       switch (c) {
         case 'h':
           help();
           exit(0);
+
+        case 'd': {
+          daemon = true;
+          int port = atoi(optarg);
+          daemon_thread = std::thread(cedar_daemon, ctx, port);
+        } break;
+
         case 'i':
+          interactive = true;
           break;
+
           // TODO: implement evaluate argument
         case 'e': {
           cedar::runes expr = optarg;
@@ -155,6 +222,27 @@ int main(int argc, char **argv) {
     }
     for (int index = optind; index < argc; index++) {
       ctx->eval_file(argv[index]);
+    }
+
+    while (interactive) {
+      char *buf = linenoise("* ");
+      if (buf == nullptr) break;
+
+      cedar::runes b = buf;
+      free(buf);
+      if (b.size() == 0) continue;
+      b += "\n";
+      try {
+        ref res = ctx->eval_string(b);
+        std::cout << "=> " << res << std::endl;
+      } catch (std::exception &e) {
+        std::cerr << "err: " << e.what() << std::endl;
+      }
+    }
+
+    // wait for the daemon thread
+    if (daemon) {
+      daemon_thread.join();
     }
 
   } catch (std::exception &e) {

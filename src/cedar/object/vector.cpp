@@ -28,7 +28,7 @@
 #include <functional>
 #include <cedar/ref.h>
 #include <cedar/object.h>
-#include <cedar/object/dict.h>
+#include <cedar/object/vector.h>
 #include <cedar/object/list.h>
 #include <cedar/object/symbol.h>
 #include <cedar/memory.h>
@@ -36,49 +36,47 @@
 
 using namespace cedar;
 
-cedar::dict::dict(void) {
+cedar::vector::vector(void) {
 }
 
-cedar::dict::~dict(void) {
+cedar::vector::~vector(void) {
 }
 
-ref dict::to_number(void) {
-	throw cedar::make_exception("Attempt to cast dict to number failed");
+ref vector::to_number(void) {
+	throw cedar::make_exception("Attempt to cast vector to number failed");
 }
 
-cedar::runes dict::to_string(bool human) {
-	cedar::runes str = "{";
-  int written = 0;
-	for (auto it : table) {
-		if (written++ > 0) str += "  ";
-		ref key = const_cast<cedar::ref&>(it.first);
-		if (key.is<list>() || key.is<symbol>()) str += "'";
-		str += key.to_string();
-		str += " ";
-    ref val = const_cast<cedar::ref&>(it.second);
-		if (val.is<list>() || val.is<symbol>()) str += "'";
-		str += val.to_string();
-	}
-	str += "}";
+cedar::runes vector::to_string(bool human) {
+	cedar::runes str = "[";
+
+  for (u32 i = 0; i < items.size(); i++) {
+    str += items[i].to_string(false);
+    if (i != items.size()-1) str += " ";
+  }
+	str += "]";
 	return str;
 }
 
-ref dict::get(ref k) {
-	return table.at(k);
+ref vector::get(ref k) {
+  i64 i = k.to_int();
+  if (i < 0 || i >= (i64)items.size()) return nullptr;
+	return items[i];
 }
 
 
-ref dict::set(ref k, ref v) {
-	table[k] = v;
+ref vector::set(ref k, ref v) {
+  i64 i = k.to_int();
+  if (i < 0 || i >= (i64)items.size()) return nullptr;
+	items[i] = v;
   return v;
 }
 
-ref dict::append(ref v) {
-	table[v.get_first()] = v.get_rest();
-  return v.get_rest();
+ref vector::append(ref v) {
+  items.push_back(v);
+  return v;
 }
 
-u64 dict::hash(void) {
+u64 vector::hash(void) {
 
 	u64 x = 0;
 	u64 y = 0;
@@ -87,28 +85,10 @@ u64 dict::hash(void) {
 
 	x = 0x345678UL;
 
-	for (auto it : table) {
-		y = const_cast<ref&>(it.first).hash();
+	for (auto it : items) {
+		y = const_cast<ref&>(it).hash();
 		x = (x ^ y) * mult;
 		mult += (u64)(852520UL + 2);
-
-		y = const_cast<ref&>(it.second).hash();
-		x = (x ^ y) * mult;
-		mult += (u64)(852520UL);
-		x += 97531UL;
 	}
 	return x;
-}
-
-
-ref dict::keys(void) {
-	ref l = new_obj<list>();
-
-	for (auto it : table) {
-		l.set_first(const_cast<ref&>(it.first));
-		auto n = new_obj<list>();
-		n.set_rest(l);
-		l = n;
-	}
-	return l.get_rest();
 }

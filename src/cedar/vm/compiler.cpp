@@ -77,20 +77,38 @@ vm::compiler::compiler(cedar::vm::machine *vm) {
 vm::compiler::~compiler() {}
 
 
+static ref macroexpand_pass(ref obj, vm::compiler *c) {
+  ref s = new_obj<symbol>("macroexpand");
+  ref mac = c->m_vm->find(s);
+
+  // if the macro binding is nil, just ignore it and return the obj again
+  if (mac.is_nil()) {
+    return obj;
+  }
+  printf("has macro\n");
+  ref wrapped = newlist(s, newlist(new_obj<symbol>("quote"), obj));
+  std::cout << wrapped << std::endl;
+  return wrapped;
+}
 
 ref vm::compiler::compile(ref obj, vm::machine *machine) {
-
 	// run the value through some optimization and
 	// modification to the AST of the object before
 	// compiling to bytecode
 	auto controller = passcontroller(obj, this);
 
-	controller.pipe(vm::bytecode_pass, "bytecode emission");
+	// controller.pipe(macroexpand_pass, "macro expansion");
+
+  controller.pipe(vm::bytecode_pass, "bytecode emission");
 
 	ref compiled = controller.get();
 
 	return compiled;
 }
+
+
+
+
 
 // helper function for the list compiler for checking if
 // a list is a call to some special form function
@@ -131,7 +149,7 @@ ref cedar::vm::bytecode_pass(ref obj, vm::compiler *c) {
 	// build a lambda around the code
 	auto lambda = cedar::new_obj<cedar::lambda>(code);
 
-  ref_cast<cedar::lambda>(lambda)->closure = 0;
+  ref_cast<cedar::lambda>(lambda)->closure = nullptr;
   return lambda;
 }
 
@@ -154,18 +172,14 @@ void vm::compiler::compile_object(ref obj, vm::bytecode & code, scope_ptr sc, co
 	if (obj.is<cedar::symbol>()) {
 		return compile_symbol(obj, code, sc, ctx);
 	}
-
-	if (obj.is<cedar::string>() || obj.is<cedar::keyword>()) {
-		return compile_constant(obj, code, sc, ctx);
-	}
-
 	if (obj.is<cedar::nil>()) {
 		code.write((uint8_t)OP_NIL);
 		return;
 	}
 
+  // if we dont know what it is, just assume its a constant and move on...
+	return compile_constant(obj, code, sc, ctx);
 
-	std::cerr << "Unhandled object (type: " << obj.type_name() << ") " << obj << std::endl;
 }
 
 
@@ -264,14 +278,76 @@ void vm::compiler::compile_list(ref obj, vm::bytecode & code, scope_ptr sc, comp
 		return;
 	}
 
-	if (list_is_call_to("progn", obj)) {
+	if (list_is_call_to("progn", obj) || list_is_call_to("do", obj)) {
 		compile_progn(obj.get_rest(), code, sc, ctx);
 		return;
 	}
 
 
+
+
+
+  // let is a special form, not expanded by macros
+  if (list_is_call_to("let", obj)) {
+
+    std::vector<ref> arg_names;
+    std::vector<ref> arg_vals;
+
+    ref args = obj.get_rest().get_first();
+    ref body = obj.get_rest().get_rest();
+
+
+    if (!args.is_nil()) {
+      if (!args.is<list>()) throw cedar::make_exception("let expression requires second argument to be list of bindings");
+
+      while (true) {
+        if (args.is_nil()) break;
+        ref arg = args.get_first();
+        arg_names.push_back(arg.get_first());
+        arg_vals.push_back(arg.get_rest().get_first());
+        args = args.get_rest();
+      }
+    }
+
+    ref argobj = arg_names.size() == 0 ? nullptr : new_obj<list>(arg_names);
+
+    auto func = newlist(new_obj<symbol>("fn"), argobj, new_obj<list>(new_obj<symbol>("progn"), body));
+
+    std::vector<ref> call;
+    call.push_back(func);
+    for (auto it : arg_vals) {
+      call.push_back(it);
+    }
+
+    ref expr = new_obj<list>(call);
+
+    return compile_object(expr, code, sc, ctx);
+  }
+
+
+  if (list_is_call_to("eval", obj)) {
+    compile_object(obj.get_rest().get_first(), code, sc, ctx);
+    code.write((uint8_t)OP_EVAL);
+    return;
+  }
+
+
+  bool special_form = false;
+
+
 	i64 argc = -1;
 	ref args = obj;
+
+
+  // special forms like defmacro that pass unevaluated objects
+  if (list_is_call_to("defmacro", obj)) {
+    special_form = true;
+    compile_object(args.get_first(), code, sc, ctx);
+    argc = 0;
+    args = args.get_rest();
+  }
+
+
 
 	bool recur_call = list_is_call_to("recur", obj);
 
@@ -282,12 +358,24 @@ void vm::compiler::compile_list(ref obj, vm::bytecode & code, scope_ptr sc, comp
 
 	while (!args.is_nil()) {
 		argc++;
-		compile_object(args.get_first(), code, sc, ctx);
+    if (!special_form) {
+      compile_object(args.get_first(), code, sc, ctx);
+    } else {
+      compile_constant(args.get_first(), code, sc, ctx);
+    }
 		args = args.get_rest();
 	}
 
-	code.write((uint8_t)(recur_call ? OP_RECUR : OP_CALL));
-	code.write((i64)argc);
+
+  if (recur_call) {
+    code.write((uint8_t)OP_RECUR);
+    code.write((i64)argc);
+    return;
+  }
+
+  code.write((uint8_t)OP_CALL);
+  code.write((i64)argc);
+
 }
 
 void vm::compiler::compile_number(ref obj, vm::bytecode & code, scope_ptr, compiler_ctx*) {

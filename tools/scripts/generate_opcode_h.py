@@ -67,6 +67,14 @@ new_op('JUMP', 'imm_int', effect=0)
 new_op('JUMP_IF_FALSE', 'imm_int', effect=0)
 new_op('RECUR', 'imm_int', effect=0)
 
+
+new_op('THROW', effect=0)
+# PUSH_CATCH takes the instruction index
+new_op('PUSH_CATCH', 'imm_int', effect=0)
+
+
+new_op('EVAL', effect=0)
+
 def main(outfile):
     with open(outfile, 'w') as f:
         f.write(header)

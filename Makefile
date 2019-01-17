@@ -12,7 +12,6 @@ default: src/lib/std.inc.h
 	@mkdir -p $(BINDIR)
 	@cd $(BINDIR); cmake -DCMAKE_BUILD_TYPE=Release ../; make --no-print-directory
 
-
 src/lib/std.inc.h: ./src/lib/std.inc.cdr
 	xxd -i src/lib/std.inc.cdr > src/lib/std.inc.h
 

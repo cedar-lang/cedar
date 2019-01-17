@@ -22,63 +22,61 @@
  * SOFTWARE.
  */
 
-#include <cstdio>
-
-#include <string>
-#include <functional>
-
 #include <cedar/object.h>
-#include <cedar/object/keyword.h>
-#include <cedar/memory.h>
-#include <cedar/util.hpp>
+#include <cedar/object/coroutine.h>
 
 using namespace cedar;
 
+coroutine::coroutine(void) {
+  stack.reserve(32);
+  sp = 0;
+  fp = 0;
+  ip = nullptr;
+}
 
-// WARNING: the symbol table is interned, and therefor is not Garbage Collected or refcounted.
-// This is because there is no real way to check if something is refering to a symbol or not...
-std::vector<cedar::runes> cedar::keyword_table = {U":nil"};
 
-static int find_or_insert_symbol_table(cedar::runes sym) {
-  for (size_t i = 0; i < keyword_table.size(); i++) {
-    if (sym == keyword_table[i]) {
-      return i;
-    }
+i64 coroutine::push(ref val) {
+  if (sp >= stack.size()) {
+    stack.reserve(stack.size() + 32);
   }
-  keyword_table.push_back(sym);
-  return keyword_table.size() - 1;
+  stack[sp] = val;
+  // return the stack location that it was written to
+  return sp++;
 }
 
-cedar::keyword::keyword(void) {}
-cedar::keyword::keyword(cedar::runes content) {
-  id = find_or_insert_symbol_table(content);
-}
-
-
-cedar::keyword::~keyword() {
-}
-
-cedar::runes keyword::to_string(bool) {
-	return get_content();
-}
-
-void keyword::set_content(cedar::runes content) {
-  id = find_or_insert_symbol_table(content);
-}
-
-cedar::runes keyword::get_content(void) {
-	return keyword_table[id];
+ref coroutine::pop(void) {
+  ref val = stack[--sp];
+  // dec refcount of the item on the top of the stack
+  stack[sp+1] = nullptr;
+  return val;
 }
 
 
-ref keyword::to_number() {
-	throw cedar::make_exception("Attempt to cast keyword to number failed");
+void coroutine::push_frame(ref) {
 }
 
+void coroutine::pop_frame(void) {
 
-
-u64 keyword::hash(void) {
-	return std::hash<cedar::runes>()(keyword_table[id]);
 }
 
+u64 coroutine::hash(void) {
+  return (u64)this;
+}
 
+cedar::runes coroutine::to_string(bool) {
+  char addr_buf[30];
+  std::sprintf(addr_buf, "%p", this);
+  cedar::runes str;
+  str += "<coroutine ";
+  str += addr_buf;
+  str += ">";
+  return str;
+}
+
+lambda *coroutine::program() {
+  return stack[fp].reinterpret<lambda*>();
+}
+
+ref coroutine::to_number() {
+	throw cedar::make_exception("Attempt to cast coroutine to number failed");
+}

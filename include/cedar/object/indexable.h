@@ -29,16 +29,44 @@
 
 namespace cedar {
 
-  // a sequence represents something in cedar
-  // that has a first and a last, (car and cdr
-  // as it's known in old lisp)
-  class sequence : public object {
+  // any indexable object can be read from and set to randomly.
+  // Example: vectors or dicts
+  class indexable : public object {
    public:
-    virtual ~sequence(){};
-    virtual ref get_first(void) = 0;
-    virtual ref get_rest(void) = 0;
-    virtual void set_first(ref) = 0;
-    virtual void set_rest(ref) = 0;
+    virtual ~indexable(){};
+    virtual ref get(ref) = 0;
+    virtual ref set(ref, ref) = 0;
+    virtual ref append(ref) = 0;
+    virtual i64 size(void) = 0;
   };
+
+  inline ref idx_set(ref ir, ref k, ref v) {
+    if (auto *i = ref_cast<indexable>(ir); i != nullptr) {
+      return i->set(k, v);
+    }
+
+    throw cedar::make_exception("unable to index non-indexable object ", ir, " at ", k);
+  }
+  inline ref idx_get(ref ir, ref k) {
+    if (auto *i = ref_cast<indexable>(ir); i != nullptr) {
+      return i->get(k);
+    }
+    throw cedar::make_exception("unable to index non-indexable object ", ir, " at ", k);
+  }
+
+  inline ref idx_append(ref ir, ref v) {
+    if (auto *i = ref_cast<indexable>(ir); i != nullptr) {
+      return i->append(v);
+    }
+    throw cedar::make_exception("unable to append to non-indexable object ", ir);
+  }
+  inline ref idx_size(ref ir) {
+    if (auto *i = ref_cast<indexable>(ir); i != nullptr) {
+      return i->size();
+    }
+    throw cedar::make_exception("unable to get size of non-indexable object ", ir);
+  }
 }  // namespace cedar
+
+
 

@@ -24,6 +24,8 @@
 
 #include <cedar/context.h>
 #include <cedar/memory.h>
+#include <cedar/object/list.h>
+#include <cedar/object/symbol.h>
 #include <cedar/util.hpp>
 
 #include <ctime>
@@ -45,16 +47,33 @@ void context::init(void) {
   eval_string(cedar::runes(stdsrc));
 }
 
-void context::eval_file(cedar::runes name) {
+ref context::eval_file(cedar::runes name) {
   cedar::runes src = cedar::util::read_file(name);
   return this->eval_string(src);
 }
 
-void context::eval_string(cedar::runes expr) {
+ref context::eval_string(cedar::runes expr) {
   parse_lock.lock();
 
-  auto top_level = reader->run(expr);
 
-  for (auto obj : top_level) m_evaluator->eval(obj);
+  ref res = nullptr;
+  try {
+    auto top_level = reader->run(expr);
+    for (auto e : top_level) {
+      ref s = new_obj<symbol>("macroexpand");
+      ref mac = m_evaluator->find(s);
+      if (!mac.is_nil()) {
+        ref wrapped = newlist(s, newlist(new_obj<symbol>("quote"), e));
+        e = m_evaluator->eval(wrapped);
+      }
+      res = m_evaluator->eval(e);
+    }
+  } catch (...) {
+    parse_lock.unlock();
+    throw;
+  }
+
   parse_lock.unlock();
+
+  return res;
 }

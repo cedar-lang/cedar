@@ -37,14 +37,12 @@
 #include <cedar/vm/opcode.h>
 #include <unistd.h>
 
-
 using namespace cedar;
 
 void init_binding(cedar::vm::machine *m);
 
 vm::machine::machine(void) : m_compiler(this) {
   globals = new_obj<dict>();
-
   true_value = cedar::new_obj<cedar::symbol>("t");
   bind(true_value, true_value);
   init_binding(this);
@@ -54,27 +52,27 @@ vm::machine::~machine() {
   // delete[] stack;
 }
 
-void vm::machine::bind(ref &symbol, ref value) {
-  dict_set(globals, symbol, value);
+void vm::machine::bind(ref symbol, ref value) {
+  idx_set(globals, symbol, value);
 }
 
 void vm::machine::bind(runes name, bound_function f) {
   ref symbol = new_obj<cedar::symbol>(name);
   ref lambda = new_obj<cedar::lambda>(f);
-  dict_set(globals, symbol, lambda);
+  idx_set(globals, symbol, lambda);
 }
 
 ref vm::machine::find(ref &symbol) {
   try {
-    return dict_get(globals, symbol);
+    return idx_get(globals, symbol);
   } catch (...) {
     return nullptr;
   }
 }
 
 // #define VM_TRACE
-#define VM_TRACE_INTERACTIVE
-#define VM_TRACE_INTERACTIVE_AUTO
+// #define VM_TRACE_INTERACTIVE
+// #define VM_TRACE_INTERACTIVE_AUTO
 #define USE_PREDICT
 
 #ifdef VM_TRACE
@@ -94,6 +92,7 @@ static void *threaded_labels[255];
 bool created_thread_labels = false;
 
 ref vm::machine::eval(ref obj) {
+  // std::cout << "(eval " << obj << ")\n";
   ref compiled_lambda = m_compiler.compile(obj, this);
 
   auto *raw_program = ref_cast<cedar::lambda>(compiled_lambda);
@@ -102,10 +101,11 @@ ref vm::machine::eval(ref obj) {
     return compiled_lambda;
   }
 
-  u64 stacksize = 32;
+  ref return_value;
+  i32 stack_size_required = raw_program->code->stack_size + 10;
+  u64 stacksize = stack_size_required;
   ref *stack = new ref[stacksize];
 
-  i32 stack_size_required = 0;
 
   u64 fp, sp;
   fp = sp = 0;
@@ -149,9 +149,8 @@ ref vm::machine::eval(ref obj) {
     }
   };
 
-
-  auto print_stack = [&] () {
-		i64 height = 40;
+  auto print_stack = [&]() {
+    i64 height = 40;
     i64 upper_bound = std::min(stacksize, sp);
     i64 lower_bound = std::max((i64)0, (i64)(sp - height));
     printf("---------------------------------------\n");
@@ -182,7 +181,6 @@ ref vm::machine::eval(ref obj) {
 
   auto trace_current_state = [&](void) {
 
-
 #ifdef VM_TRACE_INTERACTIVE
     printf("\033[2J");
     printf("\033[2H");
@@ -207,7 +205,7 @@ ref vm::machine::eval(ref obj) {
     usleep(10000);
 #else
     std::cout << "Press Enter to Continue ";
-    std::cin.ignore(std::numeric_limits<std::streamsize>::max(),'\n');
+    std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
 #endif
 
 #endif
@@ -278,6 +276,7 @@ instruction_name(op)); \ last_time = now;
     SET_LABEL(OP_JUMP_IF_FALSE);
     SET_LABEL(OP_JUMP);
     SET_LABEL(OP_RECUR);
+    SET_LABEL(OP_EVAL);
     created_thread_labels = true;
   }
 
@@ -392,7 +391,7 @@ loop:
     ref key = PROG()->code->constants[ind];
 
     try {
-      ref val = dict_get(globals, key);
+      ref val = idx_get(globals, key);
       PUSH(val);
     } catch (std::exception &) {
       throw cedar::make_exception("global '", key, "' not bound");
@@ -409,7 +408,7 @@ loop:
     ref symbol = PROG()->code->constants[ind];
     ref val = POP();
 
-    dict_set(globals, symbol, val);
+    idx_set(globals, symbol, val);
 
     PUSH(val);
     CODE_SKIP(u64);
@@ -439,7 +438,6 @@ loop:
     int abp = sp - argc; /* argumement base pointer, represents the base of the
                             argument list */
 
-
     auto *new_program = stack[new_fp].reinterpret<cedar::lambda *>();
 
     if (new_program == nullptr) {
@@ -447,24 +445,43 @@ loop:
       goto error;
     }
 
-    callheight++;
-
-
     if (new_program->type == lambda::bytecode_type) {
-
-
       new_program = new_program->copy();
-      new_program->closure = std::make_shared<closure>(new_program->argc, new_program->closure, new_program->arg_index);
+      new_program->closure = std::make_shared<closure>(
+          argc, new_program->closure, new_program->arg_index);
 
-      if (argc != new_program->argc) {
+      if (argc > new_program->argc) {
         throw cedar::make_exception(
-            "Invalid number of arguments passed to function. given: ", argc,
+            "invalid arg count passed to function. given: ", argc,
             " expected: ", PROG()->argc);
+      }
+
+
+
+      if (argc == 0 && new_program->argc != 0) {
+        throw cedar::make_exception("partially applying a lambda with no arguments is not allowed");
+      }
+
+
+      for (int i = 0; i < new_program->argc; i++) {
+        new_program->closure->at(i + new_program->arg_index) = nullptr;
       }
       for (int i = 0; i < argc; i++) {
         new_program->closure->at(i + new_program->arg_index) = stack[abp + i];
         stack[abp + i] = nullptr; /* delete  */
       }
+
+      /*
+      if (argc < new_program->argc) {
+        sp = abp-1;
+        new_program->argc -= argc;
+        new_program->arg_index += argc;
+        PUSH(new_program);
+        DISPATCH;
+      }
+      */
+
+      callheight++;
 
       sp = abp;
 
@@ -472,7 +489,6 @@ loop:
       PUSH_PTR(fp);
 
       fp = new_fp;
-
 
       stack_size_required = new_program->code->stack_size;
       ip = new_program->code->code;
@@ -549,7 +565,7 @@ loop:
 
   TARGET(OP_SKIP) {
     PRELUDE;
-    ref a = POP();
+    sp--;
     DISPATCH;
   }
 
@@ -584,6 +600,7 @@ loop:
 
     int abp = sp - argc; /* argumement base pointer, represents the base of the
                             argument list */
+
     for (int i = 0; i < argc; i++) {
       PROG()->closure->at(i + PROG()->arg_index) = stack[abp + i];
       stack[abp + i] = nullptr;
@@ -594,16 +611,22 @@ loop:
     DISPATCH;
   }
 
+  TARGET(OP_EVAL) {
+    PRELUDE;
+    ref thing = POP();
+    ref res = eval(thing);
+    PUSH(res);
+    DISPATCH;
+  }
+
   goto loop;
-
-
 
 end:
 
+  return_value = POP();
   delete[] stack;
 
-  return POP();
-
+  return return_value;
 
 error:
   std::cerr << "FATAL ERROR IN EVALUATION:\n";

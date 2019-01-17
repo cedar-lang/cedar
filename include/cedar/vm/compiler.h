@@ -72,9 +72,8 @@ namespace cedar {
 		using scope_ptr = std::shared_ptr<scope>;
 
 		class compiler {
-			protected:
-				cedar::vm::machine *m_vm;
 			public:
+				cedar::vm::machine *m_vm;
 				compiler(cedar::vm::machine *vm);
 				~compiler();
 

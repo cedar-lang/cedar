@@ -18,9 +18,11 @@ add_library(cedar-lib SHARED
 	src/cedar/object/string.cpp
 	src/cedar/object/lambda.cpp
 	src/cedar/object/nil.cpp
+	src/cedar/object/vector.cpp
 	src/cedar/object/list.cpp
 	src/cedar/object/keyword.cpp
 	src/cedar/object/number.cpp
+	src/cedar/lib/linenoise.cpp
 )
 
 target_link_libraries(cedar-lib ${CMAKE_DL_LIBS})

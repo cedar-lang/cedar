@@ -43,6 +43,8 @@ list::list(ref first, ref rest) {
 
 list::list(std::vector<ref> items) {
 
+  if (items.size() == 0) return;
+
 	ref sac = new_obj<list>();
 	int len = items.size();
 	ref curr = nullptr;

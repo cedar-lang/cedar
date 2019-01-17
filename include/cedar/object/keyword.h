@@ -31,11 +31,12 @@
 
 namespace cedar {
 
+  extern std::vector<cedar::runes> keyword_table;
+
+
 	class keyword : public object {
 		private:
-			cedar::runes m_content;
-			uint64_t m_hash = 0;
-			bool m_hash_calculated = false;
+      i32 id;
 
 		public:
 			keyword(void);

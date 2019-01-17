@@ -31,13 +31,13 @@
 
 namespace cedar {
 
+
+  extern std::vector<cedar::runes> symbol_table;
+
 	class symbol : public object {
 		private:
-			cedar::runes m_content;
-			u64 m_hash = 0;
-			bool m_hash_calculated = false;
-
 		public:
+      i32 id;
 			symbol(void);
 			symbol(cedar::runes);
 			~symbol(void);

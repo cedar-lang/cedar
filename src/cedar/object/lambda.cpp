@@ -80,7 +80,6 @@ cedar::runes lambda::to_string(bool human) {
   cedar::runes str;
   str += "<lambda ";
   str += addr_buf;
-
   str += ">";
   return str;
 }
