@@ -1,7 +1,6 @@
 #include <cedar.h>
 #define GC_THREADS
-#include <gc.h>
-#include <gc/gc_cpp.h>
+#include <gc/gc.h>
 #define alloc_fn GC_MALLOC
 #define free_fn GC_FREE
 

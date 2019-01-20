@@ -391,7 +391,6 @@ cedar_binding(cedar_str) {
 }
 
 void init_binding(cedar::vm::machine *m) {
-  printf("init_bindings\n");
   m->bind("list", cedar_newlist);
   m->bind("dict", cedar_newdict);
   m->bind("vector", cedar_newvector);

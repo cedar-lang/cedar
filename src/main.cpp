@@ -146,10 +146,10 @@ void daemon_handle_connection(ctx_ptr ctx, int cfd) {
       cedar::runes expr = buf;
       cedar::ref res = ctx->eval_string(expr);
       std::string resp = res.to_string();
-      send(cfd, "000\n", 4, 0);
+      send(cfd, "200 OK\n", 4, 0);
       send(cfd, resp.c_str(), resp.size(), 0);
     } catch (std::exception & e) {
-      send(cfd, "001\n", 4, 0);
+      send(cfd, "400 ERR\n", 4, 0);
       send(cfd, e.what(), std::strlen(e.what()), 0);
     }
     send(cfd, "\n", 1, 0);
