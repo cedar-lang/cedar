@@ -36,6 +36,8 @@
 #include <vector>
 
 namespace cedar {
+
+  class lambda;
   namespace vm {
 
     class machine {
@@ -43,6 +45,14 @@ namespace cedar {
       ref globals;
       std::vector<ref> symbol_table;
       cedar::vm::compiler m_compiler;
+
+
+      // the global table is just a vector of objects which the
+      // compiler will index into in O(1) time
+      std::vector<ref> global_table;
+      // becuase the global_table doesn't have any name binding associated
+      // with it, we must have a mapping from hash values to indexes
+      std::map<u64, i64> global_symbol_lookup_table;
 
       friend cedar::vm::compiler;
 
@@ -63,8 +73,7 @@ namespace cedar {
        * compile it into this specific target
        */
       ref eval(ref);
-
-      ref eval_coro(ref);
+      ref eval_lambda(lambda *);
     };
   }  // namespace vm
 }  // namespace cedar

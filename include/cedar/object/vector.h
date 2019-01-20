@@ -54,6 +54,7 @@ namespace cedar {
       return items.size();
     }
 
+
    protected:
     cedar::runes to_string(bool human = false);
   };

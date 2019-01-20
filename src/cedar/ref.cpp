@@ -60,7 +60,7 @@ ref cedar::ref::get_rest() const {
   if (!is_obj())
     throw cedar::make_exception("unable to get rest of non-object reference");
   if (m_obj == nullptr) return nullptr;
-  return reinterpret_cast<sequence *>(m_obj)->get_rest();
+  return reinterpret_cast<sequence*>(m_obj)->get_rest();
 }
 
 void cedar::ref::set_first(ref val) {

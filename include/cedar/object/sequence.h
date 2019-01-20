@@ -29,9 +29,6 @@
 
 namespace cedar {
 
-  // a sequence represents something in cedar
-  // that has a first and a last, (car and cdr
-  // as it's known in old lisp)
   class sequence : public object {
    public:
     virtual ~sequence(){};

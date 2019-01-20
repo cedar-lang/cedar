@@ -22,37 +22,26 @@
  * SOFTWARE.
  */
 
-#pragma once
-
 #include <cedar/object.h>
-#include <cedar/object/indexable.h>
-#include <cedar/object/sequence.h>
-#include <cedar/ref.h>
-#include <cedar/runes.h>
-#include <unordered_map>
+#include <cedar/object_types.h>
 
-namespace cedar {
+using namespace cedar;
 
-  class dict : public indexable {
-   private:
-    std::unordered_map<ref, ref> table;
+// type_index allows quick comparison between two types (are they the same index?)
+static int type_index = 0;
 
-   public:
-    dict(void);
-    ~dict(void);
+object_type::object_type(cedar::runes name) {
+  m_name = name;
+  m_index = type_index++;
+}
 
-    ref to_number();
 
-    inline const char *object_type_name(void) { return "dict"; };
-    u64 hash(void);
-    ref get(ref);
-    ref set(ref, ref);
-    ref keys(void);
-    ref append(ref);
-    inline i64 size(void) { return table.size(); }
+const cedar::runes & object_type::name(void) {
+  return m_name;
+}
+const int & object_type::index(void) {
+  return m_index;
+}
 
-   protected:
-    cedar::runes to_string(bool human = false);
-  };
 
-}  // namespace cedar
+

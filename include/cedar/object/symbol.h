@@ -32,8 +32,6 @@
 namespace cedar {
 
 
-  extern std::vector<cedar::runes> symbol_table;
-
 	class symbol : public object {
 		private:
 		public:
@@ -47,10 +45,13 @@ namespace cedar {
 
 			ref to_number();
 			inline const char *object_type_name(void) { return "symbol"; };
-
 			u64 hash(void);
 
 		protected:
 			cedar::runes to_string(bool human = false);
 	};
+
+  inline ref newsymbol(cedar::runes r) {
+    return new symbol(r);
+  }
 }

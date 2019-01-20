@@ -34,6 +34,7 @@
 
 #include <cedar/runes.h>
 #include <cedar/exception.hpp>
+#include <cedar/fractional.h>
 #include <bitset>
 #include <cxxabi.h>
 #include <cedar/types.h>
@@ -78,6 +79,8 @@ namespace cedar {
 				f64     m_flt;
 				object *m_obj;
 				void   *m_ptr;
+
+        fractional m_frac;
 
 			};
 
@@ -230,10 +233,10 @@ namespace cedar {
 			template<typename T>
 				inline T num_cast(void) {
 					if (is_flt()) {
-						return m_flt;
+						return (T)m_flt;
 					}
 					if (is_int()) {
-						return m_int;
+						return (T)m_int;
 					}
 					throw cedar::make_exception("attempt to cast non-number reference to a number");
 				}
@@ -280,8 +283,6 @@ namespace cedar {
 
 			/*
 			 * as<T>
-			 *
-			 * attempts to cast the object to a shared pointer of another object type
 			 */
 			template<typename T>
 				inline T *as() const {

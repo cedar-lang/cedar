@@ -53,26 +53,41 @@ vm::machine::~machine() {
 }
 
 void vm::machine::bind(ref symbol, ref value) {
-  idx_set(globals, symbol, value);
+  u64 hash = symbol.hash();
+
+  i64 global_ind = 0;
+
+  if (global_symbol_lookup_table.find(hash) == global_symbol_lookup_table.end()) {
+    // make space in global table
+    global_ind = global_table.size();
+    global_table.push_back(nullptr);
+  } else {
+    global_ind = global_symbol_lookup_table.at(hash);
+  }
+  global_symbol_lookup_table[hash] = global_ind;
+  global_table[global_ind] = value;
 }
 
 void vm::machine::bind(runes name, bound_function f) {
   ref symbol = new_obj<cedar::symbol>(name);
   ref lambda = new_obj<cedar::lambda>(f);
-  idx_set(globals, symbol, lambda);
+  bind(symbol, lambda);
 }
 
 ref vm::machine::find(ref &symbol) {
-  try {
-    return idx_get(globals, symbol);
-  } catch (...) {
+  u64 hash = symbol.hash();
+
+  if (global_symbol_lookup_table.find(hash) == global_symbol_lookup_table.end()) {
     return nullptr;
+  } else {
+    return global_table[global_symbol_lookup_table.at(hash)];
   }
+  return nullptr;
 }
 
 // #define VM_TRACE
-// #define VM_TRACE_INTERACTIVE
-// #define VM_TRACE_INTERACTIVE_AUTO
+#define VM_TRACE_INTERACTIVE
+#define VM_TRACE_INTERACTIVE_AUTO
 #define USE_PREDICT
 
 #ifdef VM_TRACE
@@ -91,14 +106,23 @@ static const char *instruction_name(uint8_t op) {
 static void *threaded_labels[255];
 bool created_thread_labels = false;
 
-ref vm::machine::eval(ref obj) {
-  // std::cout << "(eval " << obj << ")\n";
-  ref compiled_lambda = m_compiler.compile(obj, this);
 
-  auto *raw_program = ref_cast<cedar::lambda>(compiled_lambda);
+
+ref vm::machine::eval(ref obj) {
+  ref compiled_lambda = m_compiler.compile(obj, this);
+  lambda *raw_program = ref_cast<cedar::lambda>(compiled_lambda);
+  return eval_lambda(raw_program);
+}
+
+
+
+ref vm::machine::eval_lambda(lambda *raw_program) {
+
+  // raw_program->code->print();
+
 
   if (raw_program == nullptr) {
-    return compiled_lambda;
+    throw cedar::make_exception("");
   }
 
   ref return_value;
@@ -280,18 +304,12 @@ instruction_name(op)); \ last_time = now;
     created_thread_labels = true;
   }
 
-  ref progref = cedar::new_obj<cedar::lambda>(raw_program->code);
 
-  // program is a pointer to the currently evaluating lambda expression.
-  // In the background this is still managed by a managed refcount, but this
-  // pointer is strictly a performance improvement in order to cut down on
-  // dynamic_casts in a reference
-  program = ref_cast<cedar::lambda>(progref);
+  program = raw_program; // ref_cast<cedar::lambda>(progref);
 
-  PROG()->closure = std::make_shared<closure>(0, nullptr, 0);
+  // PROG()->closure = std::make_shared<closure>(0, nullptr, 0);
 
   // obtain a reference to the code
-  PROG()->code = raw_program->code;
   // and set the instruction pointer to the begining of this code.
   ip = PROG()->code->code;
 
@@ -365,6 +383,7 @@ loop:
     auto ind = CODE_READ(u64);
     auto val = PROG()->closure->at(ind);
     PUSH(val);
+
     CODE_SKIP(u64);
     // load locals are typically packed into an argument
     // list, so it's reasonable to predict a possible
@@ -372,6 +391,7 @@ loop:
     // was invalid, then it's not a problem, performace wise
     // thanks to the CPU cache
     PREDICT(OP_CONS, DO_OP_CONS);
+
     DISPATCH;
   }
 
@@ -387,31 +407,20 @@ loop:
 
   TARGET(OP_LOAD_GLOBAL) {
     PRELUDE;
-    auto ind = CODE_READ(u64);
-    ref key = PROG()->code->constants[ind];
-
-    try {
-      ref val = idx_get(globals, key);
-      PUSH(val);
-    } catch (std::exception &) {
-      throw cedar::make_exception("global '", key, "' not bound");
-    }
-
-    CODE_SKIP(u64);
+    i64 ind = CODE_READ(i64);
+    CODE_SKIP(i64);
+    PUSH(global_table[ind]);
     DISPATCH;
   }
 
   TARGET(OP_SET_GLOBAL) {
     PRELUDE;
-    auto ind = CODE_READ(u64);
-
-    ref symbol = PROG()->code->constants[ind];
+    auto ind = CODE_READ(i64);
     ref val = POP();
-
-    idx_set(globals, symbol, val);
+    global_table[ind] = val;
 
     PUSH(val);
-    CODE_SKIP(u64);
+    CODE_SKIP(i64);
     DISPATCH;
   }
 
@@ -445,10 +454,13 @@ loop:
       goto error;
     }
 
-    if (new_program->type == lambda::bytecode_type) {
+    if (new_program->code_type == lambda::bytecode_type) {
       new_program = new_program->copy();
+
+
+      // new_program->code->print();
       new_program->closure = std::make_shared<closure>(
-          argc, new_program->closure, new_program->arg_index);
+          new_program->argc, new_program->closure, new_program->arg_index);
 
       if (argc > new_program->argc) {
         throw cedar::make_exception(
@@ -496,7 +508,7 @@ loop:
       stack[fp] = new_program;
       program = new_program;
 
-    } else if (new_program->type == lambda::function_binding_type) {
+    } else if (new_program->code_type == lambda::function_binding_type) {
       ref val = new_program->function_binding(argc, argv, this);
       sp = abp - 1;
 

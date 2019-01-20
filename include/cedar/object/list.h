@@ -10,8 +10,8 @@
  * copies of the Software, and to permit persons to whom the Software is
  * furnished to do so, subject to the following conditions:
  *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
  *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -22,64 +22,60 @@
  * SOFTWARE.
  */
 
-
-
 #pragma once
 
 #include <cedar/object.h>
 
+#include <cedar/object_types.h>
 #include <cedar/object/sequence.h>
-#include <cedar/runes.h>
 #include <cedar/ref.h>
+#include <cedar/runes.h>
 
 namespace cedar {
 
-	// the `list` type is the most common sequence used in cedar
-	// it is what gets read by the reader when the sequence (..)
-	// is encountered.
-	//
-	// It's also known as `cons` in some lisps, and you use `cons`
-	// to construct a lisp
-	class list : public sequence {
-		private:
-			// a list stores two references, the car/cdr in old lisp
-			// they will default to the `nil` singleton object
-			ref m_first = nullptr;
-			ref m_rest = nullptr;
+  // the `list` type is the most common sequence used in cedar
+  // it is what gets read by the reader when the sequence (..)
+  // is encountered.
+  //
+  // It's also known as `cons` in some lisps, and you use `cons`
+  // to construct a lisp
+  class list : public sequence {
+   private:
+    // a list stores two references, the car/cdr in old lisp
+    // they will default to the `nil` singleton object
+    ref m_first = nullptr;
+    ref m_rest = nullptr;
 
-		public:
-			list(void);
-			list(ref, ref);
-			list(std::vector<ref>);
-			~list(void);
-			ref get_first(void);
-			ref get_rest(void);
+   public:
+    list(void);
+    list(ref, ref);
+    list(std::vector<ref>);
+    ~list(void);
+    ref get_first(void);
+    ref get_rest(void);
 
-			void set_first(ref);
-			void set_rest(ref);
+    void set_first(ref);
+    void set_rest(ref);
 
-			ref to_number();
+    ref to_number();
 
-			inline const char *object_type_name(void) {
-				if (m_rest.is_nil() && m_first.is_nil())
-					return "nil";
-				return "list";
-			};
+    inline const char *object_type_name(void) {
+      if (m_rest.is_nil() && m_first.is_nil()) return "nil";
+      return "list";
+    };
 
-			u64 hash(void);
-		protected:
-			cedar::runes to_string(bool human = false);
-	};
+    u64 hash(void);
 
+   protected:
+    cedar::runes to_string(bool human = false);
+  };
 
-	inline ref newlist() {
-		return nullptr;
-	};
+  inline ref newlist() { return nullptr; };
 
-	template<typename F, typename... R>
-		inline ref newlist(F first, R... rest) {
-			ref l = new_obj<list>(nullptr, newlist(rest...));
-			l.set_first(first);
-			return l;
-		}
-}
+  template <typename F, typename... R>
+  inline ref newlist(F first, R... rest) {
+    ref l = new_obj<list>(nullptr, newlist(rest...));
+    l.set_first(first);
+    return l;
+  }
+}  // namespace cedar

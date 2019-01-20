@@ -88,11 +88,11 @@ cedar_binding(cedar_mul) {
 
 cedar_binding(cedar_div) {
   if (argc == 1) {
-    return ref{1} / argv[0];
+    return 1.0 / argv[0].to_float();
   }
-  ref acc = argv[0];
+  double acc = argv[0].to_float();
   for (int i = 1; i < argc; i++) {
-    acc = acc / argv[i];
+    acc = acc / argv[i].to_float();
   }
   return acc;
 }
@@ -123,11 +123,20 @@ cedar_binding(cedar_gte) {
 
 cedar_binding(cedar_print) {
   for (int i = 0; i < argc; i++) {
-    std::cout << argv[i].to_string(true) << " ";
+    std::cout << argv[i].to_string(true);
+    if (i < argc-1) std::cout << " ";
+  }
+  return 0;
+}
+cedar_binding(cedar_println) {
+  for (int i = 0; i < argc; i++) {
+    std::cout << argv[i].to_string(true);
+    if (i < argc-1) std::cout << " ";
   }
   std::cout << std::endl;
   return 0;
 }
+
 
 cedar_binding(cedar_typeof) {
   if (argc != 1)
@@ -349,7 +358,40 @@ cedar_binding(cedar_keyword) {
   return new_obj<keyword>(s);
 }
 
+cedar_binding(cedar_readstring) {
+  ERROR_IF_ARGS_PASSED_IS("read-string", !=, 1);
+  if (!argv[0].is<string>()) {
+    throw cedar::make_exception("read-string requires a string");
+  }
+  auto read_results = cedar::reader().run(argv[0].to_string(true));
+  if (read_results.size() == 0) return nullptr;
+  return read_results[0];
+}
+
+cedar_binding(cedar_new_lazy_sequence) {
+  ERROR_IF_ARGS_PASSED_IS("new-lazy-sequence", !=, 1);
+  ref seq = new_obj<lazy_sequence>(argv[0], machine);
+  return seq;
+}
+
+cedar_binding(cedar_read) {
+  ERROR_IF_ARGS_PASSED_IS("read", !=, 0);
+  std::string line;
+  if (std::getline(std::cin, line)) {
+    auto read_results = cedar::reader().run(line);
+    if (read_results.size() == 0) return nullptr;
+    return read_results[0];
+  }
+  return new_obj<keyword>(":EOF");
+}
+
+cedar_binding(cedar_str) {
+  ERROR_IF_ARGS_PASSED_IS("str", !=, 1);
+  return new_obj<string>(argv[0].to_string(true));
+}
+
 void init_binding(cedar::vm::machine *m) {
+  printf("init_bindings\n");
   m->bind("list", cedar_newlist);
   m->bind("dict", cedar_newdict);
   m->bind("vector", cedar_newvector);
@@ -369,6 +411,7 @@ void init_binding(cedar::vm::machine *m) {
   m->bind("is", cedar_is);
   m->bind("type-of", cedar_typeof);
   m->bind("print", cedar_print);
+  m->bind("println", cedar_println);
   m->bind("cedar/hash", cedar_hash);
   m->bind("cedar/id", cedar_id);
 
@@ -395,6 +438,12 @@ void init_binding(cedar::vm::machine *m) {
 
   m->bind("cedar/keyword", cedar_keyword);
   m->bind("cedar/refcount", cedar_refcount);
+  m->bind("read-string", cedar_readstring);
+  m->bind("read", cedar_read);
+  m->bind("cedar/new-lazy-sequence", cedar_new_lazy_sequence);
+
+  m->bind("str", cedar_str);
+
 #define BIND_CONSTANT(name, val) m->bind(new_obj<symbol>(#name), val)
 
   BIND_CONSTANT(S_IRWXU, 700);  /* RWX mask for owner */

@@ -46,14 +46,14 @@ namespace cedar {
   // array if it can, but will also allocate a vector
   // if needed
   class closure {
+
+   public:
+
     i32 m_size = 0;
     i32 m_index = 0;
     std::shared_ptr<closure> m_parent;
 
     std::vector<ref> m_vars;
-
-   public:
-
     // constructor to allocate n vars of closure space
     //
     closure(i32, std::shared_ptr<closure> = nullptr, i32 = 0);
@@ -71,7 +71,7 @@ namespace cedar {
       function_binding_type,
     };
 
-    lambda_type type = bytecode_type;
+    lambda_type code_type = bytecode_type;
     std::shared_ptr<cedar::vm::bytecode> code;
     std::shared_ptr<closure> closure = nullptr;
 
@@ -79,6 +79,7 @@ namespace cedar {
 
     i32 arg_index = 0;
     i32 argc = 0;
+    bool vararg = false;
 
     bound_function function_binding;
 

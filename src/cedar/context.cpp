@@ -55,7 +55,6 @@ ref context::eval_file(cedar::runes name) {
 ref context::eval_string(cedar::runes expr) {
   parse_lock.lock();
 
-
   ref res = nullptr;
   try {
     auto top_level = reader->run(expr);

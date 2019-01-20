@@ -58,12 +58,12 @@ ref &cedar::closure::at(int i) {
 cedar::lambda::lambda() { code = std::make_shared<cedar::vm::bytecode>(); }
 
 cedar::lambda::lambda(std::shared_ptr<vm::bytecode> bc) {
-  type = bytecode_type;
+  code_type = bytecode_type;
   code = bc;
 }
 
 cedar::lambda::lambda(bound_function func) {
-  type = function_binding_type;
+  code_type = function_binding_type;
   function_binding = func;
 }
 
@@ -71,9 +71,9 @@ cedar::lambda::~lambda() {}
 
 cedar::runes lambda::to_string(bool human) {
   char addr_buf[30];
-  if (type == bytecode_type) {
+  if (code_type == bytecode_type) {
     std::sprintf(addr_buf, "%p", (void *)code.get());
-  } else if (type == function_binding_type) {
+  } else if (code_type == function_binding_type) {
     std::sprintf(addr_buf, "binding %p", (void *)function_binding);
   }
 
@@ -90,11 +90,14 @@ ref lambda::to_number() {
 
 u64 lambda::hash(void) {
   return reinterpret_cast<u64>(
-      type == bytecode_type ? (void *)code.get() : (void *)function_binding);
+      code_type == bytecode_type ? (void *)code.get() : (void *)function_binding);
 }
 
 lambda *lambda::copy(void) {
   lambda *new_lambda = new lambda();
+  *new_lambda = *this;
+  new_lambda->refcount = 0;
+  return new_lambda;
 #define COPY_FIELD(name) new_lambda->name = name
   COPY_FIELD(type);
   COPY_FIELD(code);
@@ -102,6 +105,7 @@ lambda *lambda::copy(void) {
   COPY_FIELD(defining_expr);
   COPY_FIELD(arg_index);
   COPY_FIELD(argc);
+  COPY_FIELD(vararg);
   COPY_FIELD(function_binding);
   return new_lambda;
 }

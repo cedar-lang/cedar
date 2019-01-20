@@ -22,6 +22,8 @@
 ;; SOFTWARE.
 ;;
 
+(def t 't)
+
 (def not (fn (x) (if x nil t)))
 
 (def or (fn (x y) (if x x y)))
@@ -70,7 +72,6 @@
     ;; return the args of a macro
     (def macro-args (fn (m) (first (rest (rest m)))))
 
-
     ;; defmacro takes the arguments, the args and the body and stores
     ;; it into the macros dict for later evaluation
     (def defmacro
@@ -83,6 +84,7 @@
     ;; value representation of the recursively expanded macro
     (def macroexpand
       (fn (expr)
+        (do
           ;; only lists need to be macro expanded, cause they're calls.
           ;; so if it's not a list, just return the bare expression
           (if (not (list? expr))
@@ -99,8 +101,8 @@
                     (if (list? ex)
                       (if (= (cedar/hash ex) (cedar/hash expr))
                         expr
-                        (cons (first ex) (rest ex)))
-                      ex))))))))
+                        (macroexpand ex))
+                      ex)))))))))
     nil)
 
 
@@ -108,20 +110,32 @@
   (list 'def name
         (list 'fn args body)))
 
+(println "hello")
 
 (defmacro when
-  (test body)
-  (list 'if test body))
+  (c body)
+  (list 'if c body))
 
 (defmacro when-not
-  (test body)
-  (list 'if test nil body))
+  (c body)
+  (list 'if c nil body))
+
+
+
+(defmacro not (x)
+  (list 'if x 'nil 't))
+
+(defmacro or (x y)
+  (list 'if x x y))
+
+(defmacro and (x y)
+  (list 'if x y x))
+
 
 
 (defn second (x) (first (rest x)))
 
-(defn next (x) (rest x))
-
+(def next rest)
 
 (defmacro cond
   (clauses)

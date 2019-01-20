@@ -25,34 +25,11 @@
 #pragma once
 
 #include <cedar/object.h>
-#include <cedar/object/indexable.h>
-#include <cedar/object/sequence.h>
 #include <cedar/ref.h>
 #include <cedar/runes.h>
-#include <unordered_map>
 
 namespace cedar {
-
-  class dict : public indexable {
-   private:
-    std::unordered_map<ref, ref> table;
-
-   public:
-    dict(void);
-    ~dict(void);
-
-    ref to_number();
-
-    inline const char *object_type_name(void) { return "dict"; };
-    u64 hash(void);
-    ref get(ref);
-    ref set(ref, ref);
-    ref keys(void);
-    ref append(ref);
-    inline i64 size(void) { return table.size(); }
-
-   protected:
-    cedar::runes to_string(bool human = false);
+  class typeobject : public object {
+    cedar::runes name;
   };
-
-}  // namespace cedar
+};  // namespace cedar

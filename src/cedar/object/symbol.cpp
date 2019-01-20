@@ -35,17 +35,23 @@
 using namespace cedar;
 
 
-// WARNING: the symbol table is interned, and therefor is not Garbage Collected or refcounted.
-// This is because there is no real way to check if something is refering to a symbol or not...
-std::vector<cedar::runes> cedar::symbol_table = {U"nil"};
+
+struct symbol_table_entry {
+  u64 hash = 0;
+  cedar::runes sym;
+};
+
+
+std::vector<symbol_table_entry> symbol_table;
 
 static int find_or_insert_symbol_table(cedar::runes sym) {
+  u64 hash = std::hash<cedar::runes>()(sym);
   for (size_t i = 0; i < symbol_table.size(); i++) {
-    if (sym == symbol_table[i]) {
+    if (hash == symbol_table[i].hash) {
       return i;
     }
   }
-  symbol_table.push_back(sym);
+  symbol_table.push_back({hash, sym});
   return symbol_table.size() - 1;
 }
 
@@ -59,7 +65,7 @@ cedar::symbol::~symbol() {
 }
 
 cedar::runes symbol::to_string(bool) {
-	return symbol_table[id];
+	return symbol_table[id].sym;
 }
 
 void symbol::set_content(cedar::runes content) {
@@ -78,7 +84,7 @@ ref symbol::to_number() {
 
 
 u64 symbol::hash(void) {
-	return std::hash<cedar::runes>()(symbol_table[id]);
+	return symbol_table[id].hash;
 }
 
 

@@ -129,21 +129,30 @@ void daemon_handle_connection(ctx_ptr ctx, int cfd) {
 
   while (true) {
     char readv[9];
-    readv[8] = 0;
+    for (int i = 0; i < 9; i++) readv[i] = 0;
     std::string buf;
-    while (true) {
-      int readc = recv(cfd, readv, 8, 0);
-      if (readc == -1) goto discon;
-      buf += readv;
-      if (readc != 8) break;
+
+    char data;
+    ssize_t data_read;
+
+    while ((data_read = recv(cfd, &data, 1, 0)) > 0 && data != '\n')
+        buf += data;
+
+    if (data_read == -1) goto discon;
+
+
+
+    try {
+      cedar::runes expr = buf;
+      cedar::ref res = ctx->eval_string(expr);
+      std::string resp = res.to_string();
+      send(cfd, "000\n", 4, 0);
+      send(cfd, resp.c_str(), resp.size(), 0);
+    } catch (std::exception & e) {
+      send(cfd, "001\n", 4, 0);
+      send(cfd, e.what(), std::strlen(e.what()), 0);
     }
-
-    cedar::runes expr = buf;
-    cedar::ref res = ctx->eval_string(expr);
-    std::string resp = res.to_string();
-
-    std::cout << expr << " -> " << resp << std::endl;
-    send(cfd, resp.c_str(), resp.size(), 0);
+    send(cfd, "\n", 1, 0);
   }
 
 discon:
@@ -176,9 +185,8 @@ void cedar_daemon(ctx_ptr ctx, int port) {
 }
 
 
-
-
 int main(int argc, char **argv) {
+
   srand((unsigned int)time(nullptr));
   try {
     auto ctx = std::make_shared<cedar::context>();
@@ -229,9 +237,10 @@ int main(int argc, char **argv) {
       if (buf == nullptr) break;
 
       cedar::runes b = buf;
+			linenoiseHistoryAdd(buf);
       free(buf);
       if (b.size() == 0) continue;
-      b += "\n";
+      // b += "\n";
       try {
         ref res = ctx->eval_string(b);
         std::cout << "=> " << res << std::endl;

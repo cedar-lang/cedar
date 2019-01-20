@@ -27,8 +27,3 @@ target_compile_options(cedar-bin PRIVATE -Wall -Wextra -Wno-unused-parameter -fl
 
 install(TARGETS cedar-bin DESTINATION bin)
 install(TARGETS cedar-lib DESTINATION lib)
-
-
-
-
-

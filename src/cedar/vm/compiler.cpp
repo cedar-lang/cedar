@@ -77,27 +77,11 @@ vm::compiler::compiler(cedar::vm::machine *vm) {
 vm::compiler::~compiler() {}
 
 
-static ref macroexpand_pass(ref obj, vm::compiler *c) {
-  ref s = new_obj<symbol>("macroexpand");
-  ref mac = c->m_vm->find(s);
-
-  // if the macro binding is nil, just ignore it and return the obj again
-  if (mac.is_nil()) {
-    return obj;
-  }
-  printf("has macro\n");
-  ref wrapped = newlist(s, newlist(new_obj<symbol>("quote"), obj));
-  std::cout << wrapped << std::endl;
-  return wrapped;
-}
-
 ref vm::compiler::compile(ref obj, vm::machine *machine) {
 	// run the value through some optimization and
 	// modification to the AST of the object before
 	// compiling to bytecode
 	auto controller = passcontroller(obj, this);
-
-	// controller.pipe(macroexpand_pass, "macro expansion");
 
   controller.pipe(vm::bytecode_pass, "bytecode emission");
 
@@ -249,21 +233,38 @@ void vm::compiler::compile_list(ref obj, vm::bytecode & code, scope_ptr sc, comp
 			throw cedar::make_exception("Invalid syntax in def special form: ", obj);
 		}
 
-		auto val_obj = obj.get_rest().get_rest().get_first();
+    u8 opcode = 0;
+    i64 index = 0;
 
-		// compile the value onto the stack
-		compile_object(val_obj, code, sc, ctx);
 
 		if (const int ind = sc->find(name_obj); ind != -1) {
 			// is a local assignment
-			code.write((uint8_t)OP_SET_LOCAL);
-			code.write((uint64_t)ind);
+      opcode = OP_SET_LOCAL;
+      index = ind;
 		} else {
-			// is a global assignment
-			const int const_ind = code.push_const(name_obj);
-			code.write((uint8_t)OP_SET_GLOBAL);
-			code.write((uint64_t)const_ind);
+
+      u64 hash = name_obj.hash();
+
+      i64 global_ind = 0;
+
+      if (m_vm->global_symbol_lookup_table.find(hash) == m_vm->global_symbol_lookup_table.end()) {
+        // make space in global table
+        global_ind = m_vm->global_table.size();
+        m_vm->global_table.push_back(nullptr);
+
+        m_vm->global_symbol_lookup_table[hash] = global_ind;
+      } else {
+        global_ind = m_vm->global_symbol_lookup_table.at(hash);
+      }
+      opcode = OP_SET_GLOBAL;
+      index = global_ind;
 		}
+
+		auto val_obj = obj.get_rest().get_rest().get_first();
+		// compile the value onto the stack
+		compile_object(val_obj, code, sc, ctx);
+    code.write(opcode);
+    code.write(index);
 
 		return;
 	}
@@ -463,10 +464,17 @@ void vm::compiler::compile_symbol(ref sym, bytecode & code, scope_ptr sc, compil
 		return;
 	}
 
-	const int const_index = code.push_const(sym);
-	// lookup the symbol globally
+  u64 hash = sym.hash();
+
+  if (m_vm->global_symbol_lookup_table.find(hash) == m_vm->global_symbol_lookup_table.end()) {
+    throw cedar::make_exception("Symbol '", sym, "' not found");
+  }
+
+  auto ind = m_vm->global_symbol_lookup_table.at(hash);
+
+  // grab the symbol from the global scope
 	code.write((uint8_t)OP_LOAD_GLOBAL);
-	code.write((uint64_t)const_index);
+	code.write((i64)ind);
 
 }
 
@@ -476,6 +484,8 @@ void vm::compiler::compile_symbol(ref sym, bytecode & code, scope_ptr sc, compil
 // Closures need to be known at compile time, so top level lambda expressions need to
 // construct the closure on their call, not construction
 void vm::compiler::compile_lambda_expression(ref expr, bytecode & code, scope_ptr sc, compiler_ctx *ctx) {
+
+  auto amp_sym = newsymbol("&");
 
 	ctx->lambda_depth++;
 
@@ -492,17 +502,27 @@ void vm::compiler::compile_lambda_expression(ref expr, bytecode & code, scope_pt
 
 	i32 argc = 0;
 	i32 arg_index = ctx->closure_size;
+  bool vararg = false;
+
 	while (true) {
 
 		if (args.is_nil()) break;
 		auto arg = args.get_first();
 
+    if (arg == amp_sym) {
+      vararg = true;
+      args = args.get_rest();
+      continue;
+    }
+
 		if (auto *sym = ref_cast<cedar::symbol>(arg); sym != nullptr) {
-			// new_code->write((uint8_t)OP_ARG_POP);
-			// new_code->write((uint64_t)ctx->closure_size);
 			new_scope->set(arg, ctx->closure_size);
 			ctx->closure_size++;
 			argc++;
+      if (vararg && !arg.get_rest().is_nil()) {
+        throw cedar::make_exception("funciton variable arguments invalid: ", expr);
+      }
+
 		} else {
 			if (arg.is_nil()) {
 				throw cedar::make_exception("lambda arguments must be symbols: ", expr);
@@ -521,6 +541,7 @@ void vm::compiler::compile_lambda_expression(ref expr, bytecode & code, scope_pt
 
 	new_code->finalize();
 	auto *new_lambda = new lambda(new_code);
+	new_lambda->vararg = vararg;
 	new_lambda->argc = argc;
 	new_lambda->arg_index = arg_index;
 

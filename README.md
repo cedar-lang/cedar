@@ -12,12 +12,16 @@ Here's a quick example of the syntax:
 (def foo "bar")
 ; function setting macro
 (defn id (x) x)
-; classes
+
+;; classes
+; define
 (class person (name)
   ((say (fn (thing) (print name "says '" thing "'")))))
+; instantiate
 (def bob (person "Bob"))
+; call
 (bob.say "Hello World!)
-; => "Bob says 'Hello World!'"
+; prints: "Bob says 'Hello World!'"
 ```
 
 It's still in its early days, so I'll update this README as features get implemented

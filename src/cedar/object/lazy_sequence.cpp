@@ -22,37 +22,47 @@
  * SOFTWARE.
  */
 
-#pragma once
-
-#include <cedar/object.h>
-#include <cedar/object/indexable.h>
-#include <cedar/object/sequence.h>
+#include <cedar/object/lambda.h>
+#include <cedar/object/lazy_sequence.h>
+#include <cedar/object/list.h>
+#include <cedar/object/nil.h>
+#include <cedar/object/symbol.h>
 #include <cedar/ref.h>
-#include <cedar/runes.h>
-#include <unordered_map>
 
-namespace cedar {
 
-  class dict : public indexable {
-   private:
-    std::unordered_map<ref, ref> table;
+using namespace cedar;
 
-   public:
-    dict(void);
-    ~dict(void);
+lazy_sequence::lazy_sequence(ref f, vm::machine *m) {
+  if (!f.is<lambda>()) {
+    throw cedar::make_exception("lazy_sequence constructor requires a lambda reference");
+  }
+  m_machine = m;
+  m_fn = f;
+}
 
-    ref to_number();
+ref lazy_sequence::seq(void) {
+  if (evaluated) return m_seq;
+  if (lambda *fnt = ref_cast<lambda>(m_fn); fnt != nullptr) {
+    lambda *fn = fnt->copy();
+    fn->closure = std::make_shared<closure>(fn->argc, fn->closure, fn->arg_index);
+    ref res = m_machine->eval_lambda(fn);
+    evaluated = true;
+    m_seq = res;
+    return m_seq;
+  }
+  throw cedar::make_exception("lazy_sequence lambda value not a lambda");
+}
 
-    inline const char *object_type_name(void) { return "dict"; };
-    u64 hash(void);
-    ref get(ref);
-    ref set(ref, ref);
-    ref keys(void);
-    ref append(ref);
-    inline i64 size(void) { return table.size(); }
+ref lazy_sequence::get_first(void) {
+  return seq().get_first();
+}
 
-   protected:
-    cedar::runes to_string(bool human = false);
-  };
+ref lazy_sequence::get_rest(void) {
+  return seq().get_rest();
+}
 
-}  // namespace cedar
+void lazy_sequence::set_rest(ref) {
+}
+void lazy_sequence::set_first(ref) {
+}
+

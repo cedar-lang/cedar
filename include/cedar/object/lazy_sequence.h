@@ -25,34 +25,34 @@
 #pragma once
 
 #include <cedar/object.h>
-#include <cedar/object/indexable.h>
-#include <cedar/object/sequence.h>
 #include <cedar/ref.h>
-#include <cedar/runes.h>
-#include <unordered_map>
+#include <cedar/object/sequence.h>
+#include <cedar/vm/machine.h>
 
 namespace cedar {
 
-  class dict : public indexable {
-   private:
-    std::unordered_map<ref, ref> table;
+  class lazy_sequence : public sequence {
+    bool evaluated = false;
+    ref m_fn = nullptr;
+    ref m_seq = nullptr;
+    vm::machine *m_machine;
 
+    ref seq(void);
    public:
-    dict(void);
-    ~dict(void);
+    lazy_sequence(ref, vm::machine*);
 
-    ref to_number();
-
-    inline const char *object_type_name(void) { return "dict"; };
-    u64 hash(void);
-    ref get(ref);
-    ref set(ref, ref);
-    ref keys(void);
-    ref append(ref);
-    inline i64 size(void) { return table.size(); }
-
-   protected:
-    cedar::runes to_string(bool human = false);
+    ref get_first(void);
+    ref get_rest(void);
+    void set_first(ref);
+    void set_rest(ref);
+    inline ref to_number() {throw cedar::make_exception("attempt to cast list to number failed");}
+    inline const char *object_type_name(void) { return "list"; };
+    inline u64 hash(void) {
+      return seq().hash();
+    }
+    inline cedar::runes to_string(bool human = false) {
+      return seq().to_string(human);
+    }
   };
-
 }  // namespace cedar
+

@@ -10,8 +10,8 @@
  * copies of the Software, and to permit persons to whom the Software is
  * furnished to do so, subject to the following conditions:
  *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
  *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -22,34 +22,32 @@
  * SOFTWARE.
  */
 
-
 #pragma once
 
 #include <cedar/object.h>
-#include <cedar/runes.h>
 #include <cedar/ref.h>
+#include <cedar/runes.h>
 
 namespace cedar {
 
-	class string : public object {
-		private:
-			cedar::runes m_content;
+  class string : public object {
+   private:
+    cedar::runes m_content;
 
-		public:
-			string(void);
-			string(cedar::runes);
-			~string(void);
+   public:
+    string(void);
+    string(cedar::runes);
+    ~string(void);
 
-			void set_content(cedar::runes);
-			cedar::runes get_content(void);
+    void set_content(cedar::runes);
+    cedar::runes get_content(void);
 
-			ref to_number();
-			inline const char *object_type_name(void) { return "string"; };
+    ref to_number();
+    inline const char *object_type_name(void) { return "string"; };
 
+    u64 hash(void);
 
-			u64 hash(void);
-
-		protected:
-			cedar::runes to_string(bool human = false);
-	};
-}
+   protected:
+    cedar::runes to_string(bool human = false);
+  };
+}  // namespace cedar

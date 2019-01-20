@@ -89,17 +89,12 @@ token lexer::lex() {
     return token(tok_eof, "");
   }
 
-  /*
   if (c == '`') {
     return token(tok_backquote, "`");
   }
-  */
 
-
-  // treat commas as whitespace. it just allows for nicer dict construction
   if (c == ',') {
-    next();
-    return lex();
+    return token(tok_comma, ",");
   }
 
   if (c == '(') return token(tok_left_paren, "(");
@@ -165,8 +160,11 @@ token lexer::lex() {
   cedar::runes symbol;
   symbol += c;
 
+
   while (!in_charset(peek(), L" \n\t(){}[],'`@")) {
-    symbol += next();
+    auto v = next();
+    if ((i32)v == -1 || v == 0) break;
+    symbol += v;
   }
 
   if (symbol.length() == 0)
@@ -232,7 +230,6 @@ token reader::peek(int offset) {
 token reader::move(int offset) {
   tok = peek(offset);
   index += offset;
-
   return tok;
 }
 
