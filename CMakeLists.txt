@@ -6,6 +6,10 @@ if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
 endif()
 
+
+link_directories(/usr/local/lib)
+include_directories(/usr/local/include)
+
 set (CMAKE_CXX_STANDARD 17)
 
 # set(CMAKE_CXX_FLAGS_DEBUG "-g")
