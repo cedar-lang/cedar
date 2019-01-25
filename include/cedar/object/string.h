@@ -27,10 +27,12 @@
 #include <cedar/object.h>
 #include <cedar/ref.h>
 #include <cedar/runes.h>
+#include <cedar/object/indexable.h>
+#include <cedar/object/sequence.h>
 
 namespace cedar {
 
-  class string : public object {
+  class string : public sequence, public indexable {
    private:
     cedar::runes m_content;
 
@@ -42,10 +44,23 @@ namespace cedar {
     void set_content(cedar::runes);
     cedar::runes get_content(void);
 
-    ref to_number();
     inline const char *object_type_name(void) { return "string"; };
 
     u64 hash(void);
+
+    ref first(void);
+    ref rest(void);
+    // these are nops, ignore.
+    inline void set_first(ref) {};
+    inline void set_rest(ref) {};
+
+    ref get(ref);
+    ref set(ref, ref);
+    ref append(ref);
+
+    inline i64 size(void) {
+      return m_content.size();
+    }
 
    protected:
     cedar::runes to_string(bool human = false);

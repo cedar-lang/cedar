@@ -49,32 +49,42 @@ void cedar::ref::release(void) {
 	}
 }
 
-ref cedar::ref::get_first() const {
+ref cedar::ref::first() const {
   if (!is_obj())
     throw cedar::make_exception("unable to get first of non-object reference");
   if (m_obj == nullptr) return nullptr;
-  return reinterpret_cast<sequence *>(m_obj)->get_first();
+  return dynamic_cast<sequence*>(m_obj)->first();
 }
 
-ref cedar::ref::get_rest() const {
+ref cedar::ref::rest() const {
   if (!is_obj())
     throw cedar::make_exception("unable to get rest of non-object reference");
   if (m_obj == nullptr) return nullptr;
-  return reinterpret_cast<sequence*>(m_obj)->get_rest();
+  return dynamic_cast<sequence*>(m_obj)->rest();
+}
+
+
+ref cedar::ref::cons(ref v) {
+  if (is_obj()) {
+    if (sequence *seq = ref_cast<sequence>(m_obj); seq != nullptr) {
+      return seq->cons(v);
+    }
+  }
+  return new list(v, *this);
 }
 
 void cedar::ref::set_first(ref val) {
   if (!is_obj())
     throw cedar::make_exception("unable to set first of non-object reference");
   if (m_obj == nullptr) return;
-  return reinterpret_cast<sequence *>(m_obj)->set_first(val);
+  return dynamic_cast<sequence *>(m_obj)->set_first(val);
 }
 
 void cedar::ref::set_rest(ref val) {
   if (!is_obj())
     throw cedar::make_exception("unable to set rest of non-object reference");
   if (m_obj == nullptr) return;
-  return reinterpret_cast<sequence *>(m_obj)->set_rest(val);
+  return dynamic_cast<sequence *>(m_obj)->set_rest(val);
 }
 
 cedar::runes ref::to_string(bool human) {
@@ -129,7 +139,7 @@ bool cedar::ref::is_nil(void) const {
 		if (is<cedar::nil>()) return true;
 		/*
     if (auto *list = ref_cast<cedar::list>(*this); list != nullptr) {
-    	if (list->get_first().is_nil() && list->get_rest().is_nil()) return true;
+    	if (list->first().is_nil() && list->rest().is_nil()) return true;
     }
 		*/
   }

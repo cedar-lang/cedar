@@ -45,10 +45,6 @@ cedar::runes number::to_string(bool) {
 	return std::to_string(0);
 }
 
-cedar::ref number::to_number() {
-	return this;
-}
-
 u64 number::hash(void) {
 	return 0lu;
 }

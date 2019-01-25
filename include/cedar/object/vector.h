@@ -30,34 +30,39 @@
 #include <cedar/object/sequence.h>
 #include <cedar/ref.h>
 #include <cedar/runes.h>
+#include <immer/flex_vector.hpp>
 #include <unordered_map>
+
 namespace cedar {
 
-  class vector : public indexable {
+  class vector : public indexable, public sequence {
    private:
-    std::vector<ref> items;
+    immer::flex_vector<ref> items;
 
    public:
+    vector(immer::flex_vector<ref>);
     vector(void);
     ~vector(void);
 
-    ref to_number();
-
     inline const char *object_type_name(void) { return "vector"; };
 
+
+    ref at(int);
     u64 hash(void);
+
+    ref first(void);
+    ref rest(void);
+    ref cons(ref);
+    inline void set_first(ref) {}
+    inline void set_rest(ref) {}
 
     ref get(ref);
     ref set(ref, ref);
     ref append(ref);
-    inline i64 size(void) {
-      return items.size();
-    }
-
+    inline i64 size(void) { return items.size(); }
 
    protected:
     cedar::runes to_string(bool human = false);
   };
-
 
 }  // namespace cedar

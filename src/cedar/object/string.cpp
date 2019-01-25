@@ -87,10 +87,57 @@ void string::set_content(cedar::runes content) { m_content = content; }
 
 cedar::runes string::get_content(void) { return m_content; }
 
-ref string::to_number() {
-  throw cedar::make_exception("Attempt to cast string to number failed");
-}
-
 u64 string::hash(void) {
   return (std::hash<cedar::runes>()(m_content) & ~0x3) | 1;
 }
+
+ref string::first(void) {
+  cedar::runes str;
+  str += m_content[0];
+  return new string(str);
+}
+
+ref string::rest(void) {
+  if (m_content.size() <= 1) return nullptr;
+  cedar::runes str;
+  for (u32 i = 1; i < m_content.size(); i++) str += m_content[i];
+  return new string(str);
+}
+
+
+ref string::get(ref ind) {
+  if (ind.is_number()) {
+    i64 i = ind.to_int();
+    if (i >= m_content.size() || i < 0) return nullptr;
+    cedar::runes c;
+    c += m_content;
+    return new string(c);
+  } else {
+    throw cedar::make_exception("unable to index into string by a non-number");
+  }
+}
+
+ref string::set(ref ind, ref val) {
+  if (ind.is_number()) {
+    i64 n = ind.to_int();
+    if (n >= m_content.size() || n < 0) return this;
+
+    cedar::runes c;
+    for (u32 i = 0; i < m_content.size(); i++) {
+      if (i == n) c += val.to_string(true);
+      c += m_content[i];
+    }
+    return new string(c);
+  } else {
+    throw cedar::make_exception("unable to index into string by a non-number");
+  }
+}
+
+ref string::append(ref val) {
+  cedar::runes v = m_content;
+  v += val.to_string(true);
+  return new string(v);
+}
+
+
+

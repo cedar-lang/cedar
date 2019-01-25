@@ -51,13 +51,13 @@ namespace cedar {
     list(ref, ref);
     list(std::vector<ref>);
     ~list(void);
-    ref get_first(void);
-    ref get_rest(void);
+    ref first(void);
+    ref rest(void);
+    ref cons(ref);
 
     void set_first(ref);
     void set_rest(ref);
 
-    ref to_number();
 
     inline const char *object_type_name(void) {
       if (m_rest.is_nil() && m_first.is_nil()) return "nil";
@@ -67,7 +67,54 @@ namespace cedar {
     u64 hash(void);
 
    protected:
-    cedar::runes to_string(bool human = false);
+    inline cedar::runes to_string(bool) {
+      cedar::runes s;
+
+      if (rest().is_nil()) {
+        if (first().is_nil()) return "(nil)";
+        s += "(";
+        s += first().to_string();
+        s += ")";
+        return s;
+      }
+
+      if (is_pair()) {
+        s += "(";
+        s += first().to_string();
+        s += " . ";
+        s += rest().to_string();
+        s += ")";
+        return s;
+      }
+
+      s += "(";
+      ref curr = this;
+
+      while (true) {
+        s += curr.first().to_string();
+
+        if (curr.rest().is_nil()) {
+          break;
+        } else {
+          s += " ";
+        }
+
+        if (!curr.rest().is_nil()) {
+          if (curr.rest()->is_pair()) {
+            s += curr.rest().first().to_string();
+            s += " . ";
+            s += curr.rest().rest().to_string();
+            break;
+          }
+        }
+
+        curr = curr.rest();
+      }
+
+      s += ")";
+
+      return s;
+    }
   };
 
   inline ref newlist() { return nullptr; };

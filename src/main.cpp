@@ -42,9 +42,13 @@
 #include <unistd.h>
 #include <chrono>
 #include <iostream>
+#include <map>
 #include <string>
 #include <thread>
-#include <map>
+#include <signal.h>
+#include <exception>
+#include <typeinfo>
+#include <stdexcept>
 
 using ref = cedar::ref;
 class dynamic_library : public cedar::object {
@@ -59,10 +63,6 @@ class dynamic_library : public cedar::object {
       throw cedar::make_exception("Unable to find function with name ", name);
     }
     return (cedar::bound_function)loc;
-  }
-  ref to_number() {
-    throw cedar::make_exception(
-        "Attempt to cast dynamic_library to number failed");
   }
 
   u64 hash(void) { return reinterpret_cast<u64>(m_handle); }
@@ -118,15 +118,8 @@ cedar_binding(cedar_dlsym) {
 }
 static void usage(void);
 static void help(void);
-
-
-
-
-using ctx_ptr = std::shared_ptr<cedar::context>;
-
-void daemon_handle_connection(ctx_ptr ctx, int cfd) {
-
-
+void daemon_handle_connection(cedar::vm::machine *vm, int cfd) {
+  /*
   while (true) {
     char readv[9];
     for (int i = 0; i < 9; i++) readv[i] = 0;
@@ -135,35 +128,38 @@ void daemon_handle_connection(ctx_ptr ctx, int cfd) {
     char data;
     ssize_t data_read;
 
-    while ((data_read = recv(cfd, &data, 1, 0)) > 0 && data != '\n')
-        buf += data;
+    while ((data_read = recv(cfd, &data, 1, 0)) > 0 && data != '\n') {
+      printf("%02x", (u8)data);
+      buf += data;
+    }
 
-    if (data_read == -1) goto discon;
-
-
+    if (data_read == -1) {
+      goto discon;
+    }
 
     try {
       cedar::runes expr = buf;
       cedar::ref res = ctx->eval_string(expr);
       std::string resp = res.to_string();
       const char *msg = "200 OK\n";
-      send(cfd, msg, sizeof(msg), 0);
-      send(cfd, resp.c_str(), resp.size(), 0);
-    } catch (std::exception & e) {
+      write(cfd, msg, sizeof(msg));
+      write(cfd, resp.c_str(), resp.size());
+    } catch (std::exception &e) {
       const char *msg = "400 ERR\n";
-      send(cfd, msg, sizeof(msg), 0);
-      send(cfd, e.what(), std::strlen(e.what()), 0);
+      write(cfd, msg, sizeof(msg));
+      write(cfd, e.what(), std::strlen(e.what()));
     }
     send(cfd, "\n", 1, 0);
   }
 
 discon:
-
+  printf("Disconnection\n");
   close(cfd);
+  */
 }
 
-
-void cedar_daemon(ctx_ptr ctx, int port) {
+void cedar_daemon(cedar::vm::machine *ctx, int port) {
+  signal(SIGPIPE, SIG_IGN);
   int m_socket = socket(AF_INET, SOCK_STREAM, 0);
   // define the server address structure
   struct sockaddr_in server_address;
@@ -176,7 +172,7 @@ void cedar_daemon(ctx_ptr ctx, int port) {
     std::cerr << std::strerror(errno) << std::endl;
     exit(0);
   }
-  listen(m_socket, 20);
+  listen(m_socket, 200);
 
   int new_sock;
   while ((new_sock = accept(m_socket, 0, 0)) != -1) {
@@ -187,15 +183,21 @@ void cedar_daemon(ctx_ptr ctx, int port) {
 }
 
 
+
+
+
+
 int main(int argc, char **argv) {
+
+  cedar::vm::machine vm;
 
   srand((unsigned int)time(nullptr));
   try {
-    auto ctx = std::make_shared<cedar::context>();
-    ctx->init();
 
-    ctx->m_evaluator->bind("dlopen", *cedar_dlopen);
-    ctx->m_evaluator->bind("dlsym", *cedar_dlsym);
+    // ctx->evalf("(* $1 $1)", 30);
+
+    vm.bind("dlopen", *cedar_dlopen);
+    vm.bind("dlsym", *cedar_dlsym);
 
     bool interactive = false;
     bool daemon = false;
@@ -210,8 +212,8 @@ int main(int argc, char **argv) {
 
         case 'd': {
           daemon = true;
-          int port = atoi(optarg);
-          daemon_thread = std::thread(cedar_daemon, ctx, port);
+          // int port = atoi(optarg);
+          // daemon_thread = std::thread(cedar_daemon, ctx, port);
         } break;
 
         case 'i':
@@ -221,7 +223,7 @@ int main(int argc, char **argv) {
           // TODO: implement evaluate argument
         case 'e': {
           cedar::runes expr = optarg;
-          ctx->eval_string(expr);
+          vm.eval_string(expr);
           break;
         };
         default:
@@ -231,25 +233,45 @@ int main(int argc, char **argv) {
       }
     }
     for (int index = optind; index < argc; index++) {
-      ctx->eval_file(argv[index]);
+      vm.eval_file(argv[index]);
     }
 
-    while (interactive) {
-      char *buf = linenoise("* ");
-      if (buf == nullptr) break;
 
-      cedar::runes b = buf;
-			linenoiseHistoryAdd(buf);
-      free(buf);
-      if (b.size() == 0) continue;
-      // b += "\n";
-      try {
-        ref res = ctx->eval_string(b);
-        std::cout << "=> " << res << std::endl;
-      } catch (std::exception &e) {
-        std::cerr << "err: " << e.what() << std::endl;
+
+
+    // the repl
+    int repl_ind = 0;
+    if (interactive) {
+      cedar::reader repl_reader;
+
+      while (interactive) {
+        char *buf = linenoise("* ");
+        if (buf == nullptr) break;
+
+        cedar::runes b = buf;
+
+        if (b.size() == 0) {
+          free(buf);
+          continue;
+        }
+
+        linenoiseHistoryAdd(buf);
+        free(buf);
+        try {
+          ref res = vm.eval_string(b);
+          cedar::runes name = "$";
+          name += std::to_string(repl_ind++);
+          ref binding = cedar::new_obj<cedar::symbol>(name);
+          vm.bind(binding, res);
+          std::cout << name << ": " << res << std::endl;
+        } catch (std::exception &e) {
+            std::cerr << "err: " << e.what() << std::endl;
+        }
       }
     }
+
+
+
 
     // wait for the daemon thread
     if (daemon) {
@@ -257,10 +279,10 @@ int main(int argc, char **argv) {
     }
 
   } catch (std::exception &e) {
-    std::cerr << "Fatal Exception: " << e.what() << std::endl;
+    std::cerr << "Uncaught exception: " << e.what() << std::endl;
     exit(-1);
-  } catch (...) {
-    printf("unknown\n");
+  } catch (cedar::ref r) {
+    std::cerr << "Uncaught exception: " << r << std::endl;
     exit(-1);
   }
 

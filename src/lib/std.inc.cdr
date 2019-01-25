@@ -1,28 +1,31 @@
-;;
-;; MIT License
-;;
-;; Copyright (c) 2018 Nick Wanninger
-;;
-;; Permission is hereby granted, free of charge, to any person obtaining a copy
-;; of this software and associated documentation files (the "Software"), to deal
-;; in the Software without restriction, including without limitation the rights
-;; to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-;; copies of the Software, and to permit persons to whom the Software is
-;; furnished to do so, subject to the following conditions:
-;;
-;; The above copyright notice and this permission notice shall be included in
-;; all copies or substantial portions of the Software.
-;;
-;; THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-;; IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-;; FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-;; AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-;; LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-;; OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-;; SOFTWARE.
-;;
+
+; MIT License
+;
+; Copyright (c) 2018 Nick Wanninger
+;
+; Permission is hereby granted, free of charge, to any person obtaining a copy
+; of this software and associated documentation files (the "Software"), to deal
+; in the Software without restriction, including without limitation the rights
+; to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+; copies of the Software, and to permit persons to whom the Software is
+; furnished to do so, subject to the following conditions:
+;
+; The above copyright notice and this permission notice shall be included in
+; all copies or substantial portions of the Software.
+;
+; THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+; IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+; FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+; AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+; LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+; OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+; SOFTWARE.
+
+
 
 (def t 't)
+(def true 'true)
+(def false nil)
 
 (def not (fn (x) (if x nil t)))
 
@@ -40,11 +43,12 @@
 (def keyword? (fn (v) (= (type-of v) :keyword)))
 
 
-(def map
+(def map-1
   (fn (f l)
     (if (not (nil? l))
       (cons (f (first l))
-            (map f (rest l))))))
+            (map-1 f (rest l))))))
+
 
 (def apply (fn (f args) (eval (cons f args))))
 
@@ -61,89 +65,124 @@
 ;;  and store the raw args and the raw body in the macros dictionary
 ;;
 ;;;;
-;; macros is a dictionary that stores the macros in the program.
-(let ((macros {}))
 
-    ;; helper functions that expect a macro definition object
-    ;; return the name of a macro
-    (def macro-name (fn (m) (first m)))
-    ;; return the body of a macro
-    (def macro-body (fn (m) (first (rest m))))
-    ;; return the args of a macro
-    (def macro-args (fn (m) (first (rest (rest m)))))
 
-    ;; defmacro takes the arguments, the args and the body and stores
-    ;; it into the macros dict for later evaluation
-    (def defmacro
-      (fn (id args body)
-        (let ((expander (eval (list 'fn args body))))
-          (set macros id expander)
-          expander)))
+;; by default, quasiquote expand does nothing
+(def qq/expand (fn (x) x))
 
-    ;; macroexpand takes an expression as a value and returns the
-    ;; value representation of the recursively expanded macro
-    (def macroexpand
-      (fn (expr)
+
+
+(let ((*macros* {}))
+  ;; defmacro takes the arguments, the args and the body and stores
+  ;; it into the macros dict for later evaluation
+  (def defmacro
+    (fn (id args body)
+      (let ((expander (eval (list 'fn args (qq/expand body)))))
+        (set *macros* id expander)
+        expander)))
+
+  ;; list-specialize does special things to lists. like checks for . notation
+  ;; on dictionaries, because you cannot create a macro for '.'
+  ;; this will be replaced with a real implementation once cond is defined
+  (def macro/list-specialize
+    (fn (l) l))
+
+  ;; macroexpand takes an expression as a value and returns the
+  ;; value representation of the recursively expanded macro
+  (def macroexpand
+    (fn (raw-expr)
+      (let ((expr (qq/expand raw-expr)))
         (do
           ;; only lists need to be macro expanded, cause they're calls.
           ;; so if it's not a list, just return the bare expression
           (if (not (list? expr))
             expr
-            (if (= (first expr) 'quote)
-              expr
-              (let ((form (first expr))
-                    (args (map macroexpand (rest expr)))
-                    (mac (get macros (first expr) nil)))
-                (if (nil? mac)
-                  (cons form args)
-                  (let ((ex (apply mac
-                                   (map (fn (x) (list 'quote x)) args))))
-                    (if (list? ex)
-                      (if (= (cedar/hash ex) (cedar/hash expr))
-                        expr
-                        (macroexpand ex))
-                      ex)))))))))
-    nil)
+            (do (def expr (macro/list-specialize expr))
+              (if (= (first expr) 'quote)
+                expr
+                (let ((form (first expr))
+                      (args (map-1 macroexpand (rest expr)))
+                      (mac (get *macros* (first expr) nil)))
+                  (if (nil? mac)
+                    (cons form args)
+                    (let ((ex (apply mac (map-1 (fn (x) (list 'quote x)) args))))
+                      (if (seq? ex)
+                        (if (= (cedar/hash ex) (cedar/hash expr))
+                          expr
+                          (macroexpand ex))
+                        ex))))))))))))
 
 
-(defmacro defn (name args body)
+
+(defmacro defn (name args & body)
   (list 'def name
-        (list 'fn args body)))
+        (list 'fn args (cons 'do body))))
 
-(println "hello")
+(defn inc (n) (+ n 1))
+(defn dec (n) (- n 1))
+
+
+
+(defmacro catch (expr id body)
+  (list 'catch* (list (list 'fn nil expr)) (list 'fn (list id) body)))
+
 
 (defmacro when
-  (c body)
-  (list 'if c body))
+  (c & body)
+  (list 'if c (cons 'do body)))
+
 
 (defmacro when-not
-  (c body)
-  (list 'if c nil body))
+  (c & body)
+  (list 'if c nil (cons 'do body)))
 
+
+(def symbol cedar/symbol)
+
+(let ((gensym-id 0))
+  (defn gensyms (s)
+      (do (def gensym-id (inc gensym-id))
+          (symbol (str s gensym-id))))
+  (defn gensym () (gensyms "G__")))
 
 
 (defmacro not (x)
   (list 'if x 'nil 't))
 
+
 (defmacro or (x y)
-  (list 'if x x y))
+  (let ((sym (gensyms "OR-")))
+    (list 'let (list (list sym x)) (list 'if sym sym y))))
 
 (defmacro and (x y)
-  (list 'if x y x))
+  (let ((sym (gensyms "AND-")))
+    (list 'let (list (list sym x)) (list 'if sym y sym))))
 
 
 
 (defn second (x) (first (rest x)))
 
+
 (def next rest)
 
-(defmacro cond
-  (clauses)
-  (when clauses
-    (let ((cl (first clauses)))
-      (list 'if (first cl)
-                (second cl)
-                (macroexpand (list 'cond (rest clauses)))))))
+
+(defmacro cond* (clauses)
+ (when clauses
+   (let ((cl (first clauses)))
+     (list 'if (first cl)
+               (second cl)
+               (macroexpand (list 'cond (rest clauses)))))))
+
+
+
+(defmacro cond (& a)
+  (let ((c (first a))
+        (e (second a))
+        (r (rest (rest a))))
+    (list 'if c e
+        (when r (cons 'cond r)))))
+
+
 
 (defmacro class
   (name args fields)
@@ -153,5 +192,191 @@
              '((this {}))
            (list 'set 'this :type-of (cedar/keyword name))
            (cons 'do
-                 (map (fn (f) (list 'set 'this (list 'quote (first f)) (second f))) fields))
+                 (map-1 (fn (f) (list 'set 'this (list 'quote (first f)) (second f))) fields))
          'this))))
+
+
+(defmacro % (a f b) (list f b a))
+
+;; redefine the def special form to allow a more
+;; complicated scheme-like function definition
+;; ex: (def foo :bar) => defines foo to :bar
+;;     (def (id x) x) => defines the id function
+;; why have this *and* the defn macro? Why not.
+(defmacro def (& args)
+  (let ((name (first args))
+        (val  (second args)))
+    (if (list? name)
+      (list 'def (first name) (list 'fn (rest name) val))
+      (list 'def name val))))
+
+(def (atom? n)
+  (cond (nil? n)     true
+        (number? n)  true
+        (string? n)  true
+        (symbol? n)  true
+        (keyword? n) true
+        :else nil))
+
+
+
+
+
+
+
+(defmacro dot (key obj & args)
+  (cons (list 'get obj (list 'quote key)) (cons obj args)))
+
+
+(def (internal/dot-expansion l)
+  (let ((key (second l))
+        (obj (first (rest (rest l))))
+        (args (rest (rest (rest l)))))
+    (cons (list 'get obj key) (cons obj args))))
+
+
+(def (macro/list-specialize l)
+  (let ((frst (first l)))
+    (cond (= frst (symbol ".")) (macroexpand (cons 'dot (rest l)))
+          :else l)))
+
+
+(def (every? pred coll)
+  (cond (nil? coll) t
+        (pred (first coll)) (recur pred (rest coll))
+        :else nil))
+
+(def (some? pred coll)
+  (or (pred (first coll)) (recur pred (rest coll))))
+
+(def (constantly x)
+  (fn (& a) x))
+
+
+(def (zip-lists ls)
+  (let ((c (map-1 first ls)))
+    (cond (every? nil? c) nil
+          :else (cons (map-1 first ls) (zip-lists (map-1 rest ls))))))
+
+
+;; zip any number of lists together into a single list, the
+;; nth of which contains the nth item in each list passed
+(def (zip & lists)
+  (zip-lists lists))
+
+(def (map f & colls)
+  (cond (nil? (rest colls)) (map-1 f (first colls))
+        (map-1 f (zip-lists colls))))
+
+(def (foldl f i xs)
+  (if (nil? xs)
+    i
+    (recur f (f i (first xs)) (rest xs))))
+
+(def (foldr f i xs)
+  (if (nil? xs)
+    i
+    (f (first xs) (foldr f i (rest xs)))))
+
+
+(def (reverse xs)
+  (foldl (fn (a b) (cons b a)) () xs))
+
+
+(def (filter pred coll)
+  (foldr (fn (x r) (if (pred x) (cons x r) r))
+         () coll))
+
+;;;;
+(def (count* c xs)
+  (if (nil? xs) c
+    (recur (inc c) (rest xs))))
+
+
+(def (count coll)
+  (count* 0 coll))
+;;;;
+
+
+(def reduce foldl)
+
+(def car first)
+(def cdr rest)
+(def (caar x)   (car (car x)))
+(def (cadr x)   (car (cdr x)))
+(def (cdar x)   (cdr (car x)))
+(def (cddr x)   (cdr (cdr x)))
+(def (caaar x)  (car (car (car x))))
+(def (caadr x)  (car (car (cdr x))))
+(def (cadar x)  (car (cdr (car x))))
+(def (caddr x)  (car (cdr (cdr x))))
+(def (cdaar x)  (cdr (car (car x))))
+(def (cdadr x)  (cdr (car (cdr x))))
+(def (cddar x)  (cdr (cdr (car x))))
+(def (cdddr x)  (cdr (cdr (cdr x))))
+(def (caaaar x) (car (car (car (car x)))))
+(def (caaadr x) (car (car (car (cdr x)))))
+(def (caadar x) (car (car (cdr (car x)))))
+(def (caaddr x) (car (car (cdr (cdr x)))))
+(def (cadaar x) (car (cdr (car (car x)))))
+(def (cadadr x) (car (cdr (car (cdr x)))))
+(def (caddar x) (car (cdr (cdr (car x)))))
+(def (cadddr x) (car (cdr (cdr (cdr x)))))
+(def (cdaaar x) (cdr (car (car (car x)))))
+(def (cdaadr x) (cdr (car (car (cdr x)))))
+(def (cdadar x) (cdr (car (cdr (car x)))))
+(def (cdaddr x) (cdr (car (cdr (cdr x)))))
+(def (cddaar x) (cdr (cdr (car (car x)))))
+(def (cddadr x) (cdr (cdr (car (cdr x)))))
+(def (cdddar x) (cdr (cdr (cdr (car x)))))
+(def (cddddr x) (cdr (cdr (cdr (cdr x)))))
+
+
+(def (append-1 l1 l2)
+  (if (nil? l1)
+    l2
+    (cons (first l1)
+          (append-1 (rest l1) l2))))
+
+(def (append & lists)
+  (reduce append-1 (first lists) (rest lists)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(def qq/transform-quasiquote-arg nil)
+(def qq/transform nil)
+
+
+(def (qq/transform form)
+  (if (seq? form)
+    (let ((car (first form)))
+        (cond (= car 'unquote)          (list 'list (cadr form))
+              (= car 'unquote-splicing) (cadr form)
+              :otherwise                (list 'list (qq/transform-quasiquote-arg form))))
+    (list 'list (qq/transform-quasiquote-arg form))))
+
+
+(def (qq/transform-compound compound)
+  (if (atom? compound)
+    (list (list 'quote compound))
+    (cons (qq/transform (first compound)) (qq/transform-compound (rest compound)))))
+
+
+(def (qq/transform-quasiquote-arg-list argument)
+  (let ((car (first argument)))
+    (cond (= car 'unquote)          (cadr argument)
+          (= car 'unquote-splicing) (throw "UNQUOTE-SPLICING UNIMPLEMENTED HERE")
+          :else            (cons 'append (qq/transform-compound argument)))))
+
+
+(def (qq/transform-quasiquote-arg argument)
+  (cond (list? argument) (qq/transform-quasiquote-arg-list argument)
+        :otherwise       (list 'quote argument)))
+
+(def (qq/expand form)
+  (if (atom? form)
+    form
+    (let ((expanded (cons (qq/expand (first form)) (qq/expand (rest form)))))
+      (if (= (first expanded) 'quasiquote)
+        (qq/transform-quasiquote-arg (second expanded))
+        expanded))))

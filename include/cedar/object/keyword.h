@@ -46,7 +46,6 @@ namespace cedar {
 			void set_content(cedar::runes);
 			cedar::runes get_content(void);
 
-			ref to_number();
 			inline const char *object_type_name(void) { return "keyword"; };
 
 			u64 hash(void);

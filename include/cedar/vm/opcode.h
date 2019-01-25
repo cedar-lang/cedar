@@ -15,17 +15,16 @@
 #define OP_SET_GLOBAL               0x08
 #define OP_CONS                     0x09
 #define OP_CALL                     0x0a
-#define OP_MAKE_FUNC                0x0b
-#define OP_ARG_POP                  0x0c
-#define OP_RETURN                   0x0d
-#define OP_EXIT                     0x0e
-#define OP_SKIP                     0x0f
-#define OP_JUMP                     0x10
-#define OP_JUMP_IF_FALSE            0x11
-#define OP_RECUR                    0x12
-#define OP_THROW                    0x13
-#define OP_PUSH_CATCH               0x14
-#define OP_EVAL                     0x15
+#define OP_CALL_EXCEPTIONAL         0x0b
+#define OP_MAKE_FUNC                0x0c
+#define OP_ARG_POP                  0x0d
+#define OP_RETURN                   0x0e
+#define OP_EXIT                     0x0f
+#define OP_SKIP                     0x10
+#define OP_JUMP                     0x11
+#define OP_JUMP_IF_FALSE            0x12
+#define OP_RECUR                    0x13
+#define OP_EVAL                     0x14
 
 /* Instruction opcode foreach macro for code generation */
 /* Arg order: (name, bytecode, type, stack effect */
@@ -41,6 +40,7 @@
   V(SET_GLOBAL, OP_SET_GLOBAL, imm_int, 0) \
   V(CONS, OP_CONS, no_arg, -1) \
   V(CALL, OP_CALL, imm_int, 0) \
+  V(CALL_EXCEPTIONAL, OP_CALL_EXCEPTIONAL, imm_int, 0) \
   V(MAKE_FUNC, OP_MAKE_FUNC, imm_int, 1) \
   V(ARG_POP, OP_ARG_POP, imm_int, 1) \
   V(RETURN, OP_RETURN, no_arg, 0) \
@@ -49,8 +49,6 @@
   V(JUMP, OP_JUMP, imm_int, 0) \
   V(JUMP_IF_FALSE, OP_JUMP_IF_FALSE, imm_int, 0) \
   V(RECUR, OP_RECUR, imm_int, 0) \
-  V(THROW, OP_THROW, no_arg, 0) \
-  V(PUSH_CATCH, OP_PUSH_CATCH, imm_int, 0) \
   V(EVAL, OP_EVAL, no_arg, 0)
 
 #endif

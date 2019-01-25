@@ -12,37 +12,6 @@
                   (reduce f (f i (first xs)) (rest xs)))))
 
 
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(class account
-       (balance)
-       ((withdraw (fn (c) (def balance (- balance c))))
-        (deposit (fn (c) (def balance (+ balance c))))
-        (get-balance (fn () balance))))
-
-(def checking (account 30))
-(checking.withdraw 10)
-(checking.deposit 300)
-
-
-
-((get checking 'deposit) 300)
-
-(class person (name)
-  ((speak (fn () (println name "says hi!")))))
-
-
-(def guy (person "bob"))
-(guy.speak)
-
-
-
-(defmacro defn-memo (name args body))
-
-
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defn fib (n)
@@ -51,26 +20,222 @@
     (+ (fib (- n 2)) (fib (- n 1)))))
 
 
+
+
 (defn read-eval ()
   (do
-    (print "* ")
+    (print "CEDAR> ")
     (eval (macroexpand (read)))))
 
-
-
-
 ;; (let ((v nil))
-;;   (def v (read-eval))
+;;   (def v (catch (read-eval)
+;;            e (do (println "unhandled exception:" e) nil)))
 ;;   (if (not (= v :EOF))
 ;;     (do
 ;;       (println v)
 ;;       (recur nil))))
 
 
-(defmacro lazy-seq
-  (body)
-  (list 'cedar/new-lazy-sequence (list 'fn () body)))
-
 
 (defn inc (n) (+ n 1))
 (defn dec (n) (- n 1))
+
+
+(defmacro class (name & fields)
+  `(do
+      ,(if (not (symbol? name)) (throw (str "Invalid class name: " name)))
+      ;; define the name as a global class
+      (def ,name (cedar/make-class ',name))
+      ;; map over each of the fields, expand them
+      ;; and convert the defs as class fields
+      (do ,@(map (fn (mexpr)
+                   (if (not (list? mexpr)) (throw (str "invalid class field: " mexpr))
+                      (let ((expr (macroexpand mexpr)))
+                        (cond (= 'def (first expr))
+                              `(cedar/register-class-field ,name
+                                                           ',(first (rest expr))
+                                                           ,(first (rest (rest expr))))
+                              (= :extends (first expr)) :EXTENDS
+                              :else (throw (str "Invalid class field: " mexpr))))))
+                 fields))))
+
+
+
+;; since setting dict entries with keys as idents is
+;; so common, this macro automatically quotes the key
+;; identifier so you dont have to think about it.
+(defmacro setq (coll name val)
+  `(set ,coll (quote ,name) ,val))
+
+;; define a macro for use inside classes to clean up
+;; the (set self 'name val) form. Cause it's ugly.
+(defmacro set-self (name val)
+  `(set self (quote ,name) ,val))
+
+;; the stream class is a basic io class
+;; it offers .write and .read
+(class stream
+  (def write nil)
+  (def read nil))
+
+(class file-descriptor (:extends steam)
+  (def fd nil)
+  ;; constructor that
+  (def (new self fd_arg)
+    (set-self fd fd_arg))
+  (def (write self s)
+    (os-write self.fd s))
+  (def (read self n)
+    (os-read self.fd n)))
+
+
+
+(def (fopen-flags path flags)
+  (let ((fd (os-open path flags)))
+    (cond (= fd -1)  (throw (str "unable to open file '" path "'"))
+          :otherwise (new file-descriptor fd))))
+
+(def (fopen path)
+  (fopen-flags path (bit-or O_RDWR O_APPEND O_CREAT)))
+
+
+(def file (fopen "file.txt"))
+
+
+
+
+(def (join l s)
+  (reduce (fn (a b) (str a s b)) (str (first l)) (rest l)))
+
+
+
+
+
+(class lazy-seq
+  ;; the function that will be called eventually
+  (def func nil)
+  ;; if the lazy sequence has been evaluated yet
+  (def evaluated nil)
+  ;; the value stored in the list. will be filled
+  ;; when .seq is called
+  (def value :lazy-not-evaluated)
+  ;; constructor. Takes the function that will be
+  ;; evaluated on .seq
+  (def (new self f) (set self 'func f))
+  ;; implementations of first and rest
+  (def (first self) (first (.seq self)))
+  (def (rest self) (rest (.seq self)))
+  ;; the seq function "steps" this lazy sequence.
+  ;; this means it checks if it's been evaluated
+  ;; yet, and if it needs to, evaluates the function
+  ;; caching it's result and returning it. If it
+  ;; has already been evaluated, there is no reason
+  ;; in calling the function again and it returns
+  ;; the value it had cached
+  (def (seq self)
+    (if self.evaluated self.value
+      (do (set self 'evaluated t)
+          (set self 'value (self.func)))))
+  ;; convert the lazy list into a string.
+  ;; WARNING: this will consume the *entire*
+  ;; list
+  (def (str self)
+    (str "(" (join self " ") ")")))
+
+(defmacro lazily (& expr)
+  `(new lazy-seq (fn () (do ,@expr))))
+
+(class lazy-range
+  ;; constructor that loads in the values
+  (def (new self lo hi st)
+    (set-self lo lo)
+    (set-self hi hi)
+    (set-self st st))
+  ;; convert the lazy list into a string.
+  ;; WARNING: this will consume the *entire*
+  ;; list
+  (def (str self)
+    (str "(" (join self " ") ")"))
+
+  ;; overload first
+  (def (first self) self.lo)
+  ;; overload rest
+  (def (rest self)
+    (let ((lo self.lo)
+          (hi self.hi)
+          (st self.st))
+      (println "REST")
+      (if (or (= hi :inf) (not (> hi lo)))
+        (new lazy-range (+ lo st) hi st)
+        :wqw))))
+
+(def (step lo hi st)
+  (new lazy-range lo hi st))
+
+
+(def (pos n)
+  (lazily (cons n (pos (inc n)))))
+
+(def positive-numbers (pos 1))
+(def (square x) (* x x))
+
+(def (consume-lazy l)
+  (map (fn (x) x) l))
+
+
+
+(class assertion-error
+  (def (new self msg) (set self 'msg msg)))
+
+(defmacro assert (claim)
+  (list 'when-not claim
+    (list 'throw (list 'assertion-error (str claim)))))
+
+
+(defmacro comment (& body)
+  nil)
+
+
+(defmacro case (check & cases)
+  (let ((sym (gensym)))
+    (list 'let (list (list sym check)))))
+
+
+(def each
+  (fn (f l)
+    (if (not (nil? l))
+      (do (f (first l))
+          (each f (rest l))))))
+
+
+(def (drop n l)
+  (if (= n 0) l
+    (drop (dec n) (rest l))))
+
+(def (take n l)
+  (if (= n 0) nil
+    (lazily (cons (first l) (take (dec n) (rest l))))))
+
+
+(def (infinite-list-from ind)
+  (lazily (cons ind (range (inc ind)))))
+
+(def (step-inf lo st)
+  (lazily (cons lo (step-inf (inc lo) (+ lo st)))))
+
+(def (range lo & xs)
+    (let ((nx (first xs))
+          (hi (second xs)))
+      (cond (nil? nx)   (if (= lo :inf) (step-inf 0 1) (step 0 (dec lo) 1))
+            (nil? hi)   (if (= nx :inf) (step-inf lo 1) (step lo nx 1))
+            (= hi :inf) (step-inf lo (- nx lo))
+            :else       (step lo hi (- nx lo)))))
+
+
+(def (filter pred coll)
+  (lazily
+    (let ((s (seq coll)))
+      (let ((f (first s)) (r (rest s)))
+        (if (pred f)
+          (cons f (filter pred r))
+          (filter pred r))))))

@@ -94,6 +94,10 @@ token lexer::lex() {
   }
 
   if (c == ',') {
+    if (peek() == '@') {
+      next();
+      return token(tok_comma_at, ",@");
+    }
     return token(tok_comma, ",");
   }
 
@@ -274,7 +278,7 @@ ref reader::parse_list(void) {
   next();
   while (tok.type != tok_right_paren) {
     if (tok.type == tok_eof) {
-      throw make_exception("unexpected eof in list");
+      throw unexpected_eof_error("unexpected eof in list");
     }
     ref item = parse_expr();
     items.push_back(item);
@@ -357,7 +361,7 @@ ref reader::parse_special_grouping_as_call(cedar::runes name,
   items.push_back(new_obj<symbol>(name));
   while (tok.type != closing) {
     if (tok.type == tok_eof) {
-      throw make_exception("unexpected eof in list");
+      throw unexpected_eof_error("unexpected eof in list");
     }
     ref item = parse_expr();
     items.push_back(item);

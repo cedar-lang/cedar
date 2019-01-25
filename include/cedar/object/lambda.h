@@ -75,7 +75,7 @@ namespace cedar {
     std::shared_ptr<cedar::vm::bytecode> code;
     std::shared_ptr<closure> closure = nullptr;
 
-    ref defining_expr;
+    ref defining_expr = nullptr;
 
     i32 arg_index = 0;
     i32 argc = 0;
@@ -88,11 +88,14 @@ namespace cedar {
     lambda(cedar::bound_function);
     ~lambda(void);
 
-    ref to_number();
     inline const char *object_type_name(void) { return "lambda"; };
     u64 hash(void);
 
     lambda *copy(void);
+
+    // prime_args configures the lambda with a closure and loads it
+    // with the arguments according to that lambda's calling conv
+    void prime_args(int argc = 0, ref *argv = nullptr);
 
    protected:
     cedar::runes to_string(bool human = false);

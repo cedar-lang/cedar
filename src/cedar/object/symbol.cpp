@@ -77,11 +77,6 @@ cedar::runes symbol::get_content(void) {
 }
 
 
-ref symbol::to_number() {
-	throw cedar::make_exception("Attempt to cast symbol to number failed");
-}
-
-
 
 u64 symbol::hash(void) {
 	return symbol_table[id].hash;

@@ -3,22 +3,22 @@
 
 add_library(cedar-lib SHARED
 	src/cedar/ref.cpp
-	src/cedar/context.cpp
 	src/cedar/object.cpp
 	src/cedar/passes.cpp
+	src/cedar/gc.cpp
 	src/cedar/runes.cpp
 	src/cedar/parser.cpp
-	src/cedar/main.cpp
 	src/cedar/vm/bytecode.cpp
 	src/cedar/vm/compiler.cpp
 	src/cedar/vm/instruction.cpp
 	src/cedar/vm/machine.cpp
 	src/cedar/vm/bindings.cpp
 	src/cedar/object/symbol.cpp
+	src/cedar/object/user_type.cpp
 	src/cedar/object/dict.cpp
 	src/cedar/object/string.cpp
 	src/cedar/object/lambda.cpp
-	src/cedar/object/lazy_sequence.cpp
+	src/cedar/object/sequence.cpp
 	src/cedar/object/nil.cpp
 	src/cedar/object/vector.cpp
 	src/cedar/object/list.cpp
@@ -27,5 +27,5 @@ add_library(cedar-lib SHARED
 	src/cedar/lib/linenoise.cpp
 )
 
-target_link_libraries(cedar-lib ${CMAKE_DL_LIBS} -lgc)
+target_link_libraries(cedar-lib ${CMAKE_DL_LIBS} -lgc -lgccpp)
 set_target_properties(cedar-lib PROPERTIES OUTPUT_NAME cedar)

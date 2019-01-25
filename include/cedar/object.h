@@ -34,6 +34,10 @@
 #include <atomic>
 #include <cstdint>
 #include <new>
+#include <map>
+
+#define GC_OPERATOR_NEW_ARRAY
+#include <gc/gc_cpp.h>
 
 namespace cedar {
 
@@ -41,9 +45,31 @@ namespace cedar {
   class object_type;
 
 
-  class object {
+  class object : public gc {
+   public:
+
+    // object_type *type = nullptr;
+    // refcount is used by the `ref` class to determine how many things hold
+    // references to this particular object on the heap
+    u32 refcount = 0;
+
+
+    virtual u64 hash(void) = 0;
+
+    virtual ~object() {};
+
+    virtual const char *object_type_name(void) = 0;
+
+    bool is_pair(void);
+
+
    protected:
+
+    // refs should be able to access values of objects, as it is always safer to
+    // go through a reference to call these functions
     friend ref;
+
+
     virtual cedar::runes to_string(bool human = false) = 0;
 
     /*
@@ -94,31 +120,6 @@ namespace cedar {
      * returns the type hash_code from typeid()
      */
     inline size_t type_id() const { return typeid(*this).hash_code(); }
-
-   public:
-
-    object_type *type = nullptr;
-
-    virtual u64 hash(void) = 0;
-    // const char *name = "object";
-
-    // set no_autofree to true to have the refcount system ignore this object
-    // when it would be freed
-    bool no_autofree = false;
-
-    // refcount is used by the `ref` class to determine how many things hold
-    // references to this particular object on the heap
-    // uint32_t refcount = 0;
-    u64 refcount = 0;
-
-    virtual ~object(){};
-
-    virtual ref to_number() = 0;
-
-    virtual const char *object_type_name(void) = 0;
-
-    bool is_pair(void);
-
 
   };
 

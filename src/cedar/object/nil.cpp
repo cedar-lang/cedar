@@ -36,7 +36,6 @@ static ref the_nil = nullptr;
 object *cedar::get_nil_object(void) {
 	if (the_nil == nullptr) {
 		the_nil = new_obj<nil>();
-		the_nil->no_autofree = 1;
 	}
 	return the_nil.get<cedar::nil>();
 }
@@ -44,7 +43,6 @@ object *cedar::get_nil_object(void) {
 ref cedar::get_nil(void) {
 	if (the_nil == nullptr) {
 		the_nil = new_obj<nil>();
-		the_nil->no_autofree = 1;
 	}
 
 	return the_nil;
@@ -56,11 +54,6 @@ cedar::nil::~nil() {}
 
 cedar::runes nil::to_string(bool) {
 	return U"nil";
-}
-
-
-ref nil::to_number() {
-	throw cedar::make_exception("Attempt to cast nil to number failed");
 }
 
 

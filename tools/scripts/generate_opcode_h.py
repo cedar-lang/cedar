@@ -36,8 +36,8 @@ new_op('FLOAT', 'imm_float', effect=1)
 
 
 new_op('INT',   'imm_int', effect=1)
-new_op('LOAD_LOCAL', 'imm_int', effect=1) # load a local from the start of the stack frame
-new_op('SET_LOCAL', 'imm_int', effect=0) # set a local from the start of the stack frame
+new_op('LOAD_LOCAL', 'imm_int', effect=1)
+new_op('SET_LOCAL', 'imm_int', effect=0)
 
 # pop the name off the stack, look it up, then push the value found,
 # otherwise throw because it wasn't found
@@ -49,10 +49,12 @@ new_op('LOAD_GLOBAL', 'imm_int', effect=1)
 #  GLOBALS[POP()] = POP(); PUSH(GLOBALS[...]);
 new_op('SET_GLOBAL', 'imm_int', effect=0)
 
-new_op('CONS', effect=-1);
+new_op('CONS', effect=-1)
 
-new_op('CALL', 'imm_int', effect=0);
-new_op('MAKE_FUNC', 'imm_int', effect=1);
+new_op('CALL', 'imm_int', effect=0)
+new_op('CALL_EXCEPTIONAL', 'imm_int', effect=0)
+new_op('MAKE_FUNC', 'imm_int', effect=1)
+
 
 # arg_pop pops one value from the argument list and updates the list
 # at the argument index in the stack call frame
@@ -67,10 +69,6 @@ new_op('JUMP', 'imm_int', effect=0)
 new_op('JUMP_IF_FALSE', 'imm_int', effect=0)
 new_op('RECUR', 'imm_int', effect=0)
 
-
-new_op('THROW', effect=0)
-# PUSH_CATCH takes the instruction index
-new_op('PUSH_CATCH', 'imm_int', effect=0)
 
 
 new_op('EVAL', effect=0)
@@ -96,18 +94,4 @@ def main(outfile):
 
 if __name__ == '__main__':
     main('include/cedar/vm/opcode.h')
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 

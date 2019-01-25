@@ -36,11 +36,8 @@ using namespace cedar;
 bool object::is_pair(void) {
 	// a thing cannot be a pair if it isn't a list
 	list *lst = this->as<list>();
-	ref rest = lst->get_rest();
+	ref rest = lst->rest();
 	if (rest.is_nil()) return false;
-
 	if (rest.is<list>()) return false;
-
 	return true;
 }
-

@@ -49,7 +49,6 @@ namespace cedar {
 			number(double);
 			~number(void);
 
-			ref to_number();
 			inline const char *object_type_name(void) { return "number"; };
 			u64 hash(void);
 		protected:

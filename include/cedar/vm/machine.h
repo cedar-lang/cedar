@@ -40,19 +40,20 @@ namespace cedar {
   class lambda;
   namespace vm {
 
+    // a "var" is a storage cell in the machine. It allows
+    // storage of values, docs, etc...
+    struct var {
+      ref docs;
+      ref meta;
+      ref value;
+    };
+
+
     class machine {
      protected:
-      ref globals;
-      std::vector<ref> symbol_table;
       cedar::vm::compiler m_compiler;
 
 
-      // the global table is just a vector of objects which the
-      // compiler will index into in O(1) time
-      std::vector<ref> global_table;
-      // becuase the global_table doesn't have any name binding associated
-      // with it, we must have a mapping from hash values to indexes
-      std::map<u64, i64> global_symbol_lookup_table;
 
       friend cedar::vm::compiler;
 
@@ -60,6 +61,14 @@ namespace cedar {
       // ref *stack = nullptr;
 
      public:
+      // the global table is just a vector of objects which the
+      // compiler will index into in O(1) time
+      std::vector<var> global_table;
+      // becuase the global_table doesn't have any name binding associated
+      // with it, we must have a mapping from hash values to indexes
+      std::map<u64, i64> global_symbol_lookup_table;
+
+
       ref true_value;
       machine(void);
       ~machine(void);
@@ -74,6 +83,9 @@ namespace cedar {
        */
       ref eval(ref);
       ref eval_lambda(lambda *);
+
+      ref eval_file(cedar::runes);
+      ref eval_string(cedar::runes);
     };
   }  // namespace vm
 }  // namespace cedar

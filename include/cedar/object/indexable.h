@@ -31,7 +31,7 @@ namespace cedar {
 
   // any indexable object can be read from and set to randomly.
   // Example: vectors or dicts
-  class indexable : public object {
+  class indexable : virtual public object {
    public:
     virtual ~indexable(){};
     virtual ref get(ref) = 0;

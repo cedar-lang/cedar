@@ -71,12 +71,6 @@ cedar::runes keyword::get_content(void) {
 }
 
 
-ref keyword::to_number() {
-	throw cedar::make_exception("Attempt to cast keyword to number failed");
-}
-
-
-
 u64 keyword::hash(void) {
 	return std::hash<cedar::runes>()(keyword_table[id]);
 }

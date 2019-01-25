@@ -27,20 +27,24 @@
 // dlopen and dlsym binding defined in src/main.cpp
 
 #include <cedar.h>
+#include <cedar/object/lazy_seq.h>
 #include <cedar/vm/binding.h>
-
 #include <fcntl.h>
 #include <stdio.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <thread>
+
+#define GC_THREADS
+#include <gc/gc.h>
 
 using namespace cedar;
 
-#define ERROR_IF_ARGS_PASSED_IS(name, op, c)                    \
-  if (argc op c)                                                \
-    throw cedar::make_exception("(" #name " ...) requires ", c, \
-                                " arg", (c == 1 ? "" : "s"), "given ", argc);
+#define ERROR_IF_ARGS_PASSED_IS(name, op, c)                            \
+  if (argc op c)                                                        \
+    throw cedar::make_exception("(" #name " ...) requires ", c, " arg", \
+                                (c == 1 ? "" : "s"), "given ", argc);
 
 cedar_binding(cedar_hash) {
   ERROR_IF_ARGS_PASSED_IS("cedar/hash", !=, 1);
@@ -55,7 +59,9 @@ cedar_binding(cedar_id) {
 cedar_binding(cedar_is) {
   ERROR_IF_ARGS_PASSED_IS("is", !=, 2);
   if (argv[0].is_obj() && argv[1].is_obj())
-    return argv[0].reinterpret<u64>() == argv[0].reinterpret<u64>() ? machine->true_value : nullptr;
+    return argv[0].reinterpret<u64>() == argv[0].reinterpret<u64>()
+               ? machine->true_value
+               : nullptr;
   return argv[0] == argv[0] ? machine->true_value : nullptr;
 }
 
@@ -97,6 +103,16 @@ cedar_binding(cedar_div) {
   return acc;
 }
 
+cedar_binding(cedar_mod) {
+  ERROR_IF_ARGS_PASSED_IS("mod", !=, 2);
+  auto a = argv[0];
+  auto b = argv[1];
+  if (a.is_flt() || b.is_flt()) {
+    return fmod(a.to_float(), b.to_float());
+  }
+  return a.to_int() % b.to_int();
+}
+
 cedar_binding(cedar_equal) {
   if (argc < 2)
     throw cedar::make_exception(
@@ -124,19 +140,18 @@ cedar_binding(cedar_gte) {
 cedar_binding(cedar_print) {
   for (int i = 0; i < argc; i++) {
     std::cout << argv[i].to_string(true);
-    if (i < argc-1) std::cout << " ";
+    if (i < argc - 1) std::cout << " ";
   }
   return 0;
 }
 cedar_binding(cedar_println) {
   for (int i = 0; i < argc; i++) {
     std::cout << argv[i].to_string(true);
-    if (i < argc-1) std::cout << " ";
+    if (i < argc - 1) std::cout << " ";
   }
   std::cout << std::endl;
   return 0;
 }
-
 
 cedar_binding(cedar_typeof) {
   if (argc != 1)
@@ -159,32 +174,40 @@ cedar_binding(cedar_first) {
   if (argc != 1)
     throw cedar::make_exception("(first ...) requires one argument, given ",
                                 argc);
-  return argv[0].get_first();
+  try {
+    return argv[0].first();
+  } catch (std::exception &e) {
+    return nullptr;
+  }
 }
 
 cedar_binding(cedar_rest) {
   if (argc != 1)
     throw cedar::make_exception("(rest ...) requires one argument, given ",
                                 argc);
-  return argv[0].get_rest();
+  try {
+    return argv[0].rest();
+  } catch (std::exception &e) {
+    return nullptr;
+  }
 }
 
 cedar_binding(cedar_cons) {
   if (argc != 2)
     throw cedar::make_exception("(cons ...) requires two argument, given ",
                                 argc);
-  return new_obj<list>(argv[0], argv[1]);
-}
 
+  return argv[1].cons(argv[0]);
+}
 
 cedar_binding(cedar_newlist) {
   ref l = new_obj<list>();
   ref base = l;
   for (int i = 0; i < argc; i++) {
     l.set_first(argv[i]);
-    if (i < argc-1) {
+    if (i < argc - 1) {
       l.set_rest(new_obj<list>());
-      l = l.get_rest();
+      l = l.rest();
     }
   }
 
@@ -197,7 +220,7 @@ cedar_binding(cedar_newdict) {
         "(dict ...) requires an even number of arguments, given ", argc);
 
   ref d = cedar::new_obj<cedar::dict>();
-  for (int i = 0; i < argc; i += 1) {
+  for (int i = 0; i < argc; i += 2) {
     idx_set(d, argv[i], argv[i + 1]);
   }
   return d;
@@ -224,8 +247,7 @@ cedar_binding(cedar_set) {
                                 argc);
   // set the 0th argument's dict entry at the 1st argument to the second
   // argument
-  idx_set(argv[0], argv[1], argv[2]);
-  return argv[2];
+  return idx_set(argv[0], argv[1], argv[2]);
 }
 
 cedar_binding(cedar_dict_keys) {
@@ -245,7 +267,6 @@ cedar_binding(cedar_size) {
                                 argc);
   return idx_size(argv[0]);
 }
-
 
 cedar_binding(cedar_refcount) {
   if (argc != 1)
@@ -287,13 +308,24 @@ cedar_binding(cedar_os_open) {
   }
   int flags = opts.to_int();
   std::string path_s = path.to_string(true);
-  return (i64)open(path_s.c_str(), flags);
+  return (i64)open(path_s.c_str(), flags, 0666);
 }
 
 cedar_binding(cedar_os_write) {
   ERROR_IF_ARGS_PASSED_IS("os-write", !=, 2);
   std::string buf = argv[1].to_string(true);
   return (i64)write(argv[0].to_int(), buf.c_str(), buf.size());
+}
+
+cedar_binding(cedar_os_read) {
+  ERROR_IF_ARGS_PASSED_IS("os-read", !=, 2);
+  int fd = argv[0].to_int();
+  int ct = argv[1].to_int();
+  char *buf = new char[ct + 1];
+  buf[ct] = 0;
+  read(fd, buf, ct);
+  cedar::runes res = buf;
+  return new string(res);
 }
 
 cedar_binding(cedar_os_close) {
@@ -345,17 +377,24 @@ cedar_binding(cedar_binary_shift_right) {
 
 cedar_binding(cedar_newvector) {
   ref v = new_obj<vector>();
-  for (int i = 0; i < argc; i++) idx_append(v, argv[i]);
+  for (int i = 0; i < argc; i++) v = idx_append(v, argv[i]);
   return v;
 }
 
-
 cedar_binding(cedar_keyword) {
-  ERROR_IF_ARGS_PASSED_IS("cedar/symbol", !=, 1);
-
+  ERROR_IF_ARGS_PASSED_IS("cedar/keyword", !=, 1);
+  if (!argv[0].is<string>())
+    throw cedar::make_exception("cedar/keyword requires a :string");
   cedar::runes s = ":";
   s += argv[0].to_string(true);
   return new_obj<keyword>(s);
+}
+cedar_binding(cedar_symbol) {
+  ERROR_IF_ARGS_PASSED_IS("cedar/symbol", !=, 1);
+  if (!argv[0].is<string>())
+    throw cedar::make_exception("cedar/symbol requires a :string");
+  cedar::runes s = argv[0].to_string(true);
+  return new_obj<symbol>(s);
 }
 
 cedar_binding(cedar_readstring) {
@@ -366,12 +405,6 @@ cedar_binding(cedar_readstring) {
   auto read_results = cedar::reader().run(argv[0].to_string(true));
   if (read_results.size() == 0) return nullptr;
   return read_results[0];
-}
-
-cedar_binding(cedar_new_lazy_sequence) {
-  ERROR_IF_ARGS_PASSED_IS("new-lazy-sequence", !=, 1);
-  ref seq = new_obj<lazy_sequence>(argv[0], machine);
-  return seq;
 }
 
 cedar_binding(cedar_read) {
@@ -386,8 +419,89 @@ cedar_binding(cedar_read) {
 }
 
 cedar_binding(cedar_str) {
-  ERROR_IF_ARGS_PASSED_IS("str", !=, 1);
-  return new_obj<string>(argv[0].to_string(true));
+  cedar::runes s;
+  for (int i = 0; i < argc; i++) {
+    s += argv[i].to_string(true);
+  }
+  return new_obj<string>(s);
+}
+
+cedar_binding(cedar_make_class) {
+  ERROR_IF_ARGS_PASSED_IS("cedar/make-class", !=, 1);
+  if (!argv[0].is<symbol>())
+    throw cedar::make_exception("cedar/make-class requires a symbol as a name");
+  ref cl = new user_type(argv[0].to_string(false));
+  return cl;
+}
+
+cedar_binding(cedar_register_class_field) {
+  ERROR_IF_ARGS_PASSED_IS("cedar/register-class-field", !=, 3);
+  if (!argv[0].is<user_type>())
+    throw cedar::make_exception(
+        "'cedar/register-class-field requires a class as the first argument");
+  auto *cl = ref_cast<user_type>(argv[0]);
+  cl->add_field(argv[1], argv[2]);
+  return cl;
+}
+cedar_binding(cedar_register_class_parent) {
+  ERROR_IF_ARGS_PASSED_IS("cedar/register-class-parent", !=, 3);
+  if (!argv[0].is<user_type>())
+    throw cedar::make_exception(
+        "'cedar/register-class-parent requires a class as the first argument");
+  auto *cl = ref_cast<user_type>(argv[0]);
+  cl->add_parent(argv[1]);
+  return cl;
+}
+
+cedar_binding(cedar_new_class_instance) {
+  ERROR_IF_ARGS_PASSED_IS("new", <, 1);
+  if (!argv[0].is<user_type>())
+    throw cedar::make_exception("'new' requires a type as the first argument");
+  auto *cl = ref_cast<user_type>(argv[0]);
+  return cl->instantiate(argc - 1, argv + 1, machine);
+}
+
+// cedar_throw is a simple wrapper around the c++ exception system
+cedar_binding(cedar_throw) {
+  ERROR_IF_ARGS_PASSED_IS("throw", !=, 1);
+  throw argv[0];
+}
+
+cedar_binding(cedar_apply) {
+  ERROR_IF_ARGS_PASSED_IS("apply", !=, 2);
+  ref f = argv[0];
+
+  std::cout << argv[1] << std::endl;
+  if (lambda *fnc = ref_cast<lambda>(f); fnc != nullptr) {
+    fnc = fnc->copy();
+
+    std::vector<ref> args;
+    ref c = argv[1];
+    int i = 0;
+    for (ref c = argv[1]; !c.rest().is_nil(); c = c.rest()) {
+      i++;
+      args.push_back(c.first());
+    }
+    fnc->prime_args(i, args.data());
+    return machine->eval_lambda(fnc);
+  } else {
+    throw cedar::make_exception("(apply ...) to '", f,
+                                "' failed because it's not a function");
+  }
+}
+
+cedar_binding(cedar_is_seq) {
+  ERROR_IF_ARGS_PASSED_IS("seq?", !=, 1);
+  return ref_cast<sequence>(argv[0]) == nullptr ? nullptr : machine->true_value;
+}
+cedar_binding(cedar_seq) {
+  ERROR_IF_ARGS_PASSED_IS("seq", !=, 1);
+  return ref_cast<sequence>(argv[0]);
+}
+
+cedar_binding(cedar_new_lazy_seq) {
+  ERROR_IF_ARGS_PASSED_IS("lazy-seq", !=, 1);
+  return new lazy_seq(argv[0], machine);
 }
 
 void init_binding(cedar::vm::machine *m) {
@@ -403,6 +517,7 @@ void init_binding(cedar::vm::machine *m) {
   m->bind("-", cedar_sub);
   m->bind("*", cedar_mul);
   m->bind("/", cedar_div);
+  m->bind("mod", cedar_mod);
 
   m->bind("=", cedar_equal);
   m->bind("eq", cedar_equal);
@@ -431,6 +546,7 @@ void init_binding(cedar::vm::machine *m) {
 
   m->bind("os-open", cedar_os_open);
   m->bind("os-write", cedar_os_write);
+  m->bind("os-read", cedar_os_read);
   m->bind("os-close", cedar_os_close);
 
   m->bind("os-chmod", cedar_os_chmod);
@@ -439,9 +555,25 @@ void init_binding(cedar::vm::machine *m) {
   m->bind("cedar/refcount", cedar_refcount);
   m->bind("read-string", cedar_readstring);
   m->bind("read", cedar_read);
-  m->bind("cedar/new-lazy-sequence", cedar_new_lazy_sequence);
+
+  m->bind("cedar/symbol", cedar_symbol);
 
   m->bind("str", cedar_str);
+
+  m->bind("cedar/make-class", cedar_make_class);
+  m->bind("cedar/register-class-field", cedar_register_class_field);
+  m->bind("cedar/register-class-parent", cedar_register_class_parent);
+  m->bind("new", cedar_new_class_instance);
+
+  m->bind("throw", cedar_throw);
+
+  m->bind("apply", cedar_apply);
+
+  m->bind("seq", cedar_seq);
+  m->bind("seq?", cedar_is_seq);
+
+  m->bind("lazy-seq", cedar_new_lazy_seq);
+
 
 #define BIND_CONSTANT(name, val) m->bind(new_obj<symbol>(#name), val)
 

@@ -6,3 +6,4 @@ build
 test/test
 test/*.o
 bin
+cmake-build-debug

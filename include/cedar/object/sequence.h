@@ -29,13 +29,69 @@
 
 namespace cedar {
 
-  class sequence : public object {
+  class sequence : virtual public object {
    public:
     virtual ~sequence(){};
-    virtual ref get_first(void) = 0;
-    virtual ref get_rest(void) = 0;
+    // get the first of the sequence
+    virtual ref first(void) = 0;
+    // get the rest of the sequence
+    virtual ref rest(void) = 0;
+    // cons an object onto the object, returning the mutated item
+    virtual ref cons(ref f);
+
+
     virtual void set_first(ref) = 0;
     virtual void set_rest(ref) = 0;
+
+   protected:
+    cedar::runes to_string(bool) {
+      cedar::runes s;
+
+      if (rest().is_nil()) {
+        if (first().is_nil()) return "(nil)";
+        s += "(";
+        s += first().to_string();
+        s += ")";
+        return s;
+      }
+
+      if (is_pair()) {
+        s += "(";
+        s += first().to_string();
+        s += " . ";
+        s += rest().to_string();
+        s += ")";
+        return s;
+      }
+
+      s += "(";
+      ref curr = this;
+
+      while (true) {
+        s += curr.first().to_string();
+
+        if (curr.rest().is_nil()) {
+          break;
+        } else {
+          s += " ";
+        }
+
+        if (!curr.rest().is_nil()) {
+          if (curr.rest()->is_pair()) {
+            s += curr.rest().first().to_string();
+            s += " . ";
+            s += curr.rest().rest().to_string();
+            break;
+          }
+        }
+
+        curr = curr.rest();
+      }
+
+      s += ")";
+
+      return s;
+    }
   };
 }  // namespace cedar
 

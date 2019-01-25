@@ -41,7 +41,6 @@ namespace cedar {
 		public:
 			nil(void);
 			~nil(void);
-			ref to_number();
 			inline const char *object_type_name(void) { return "nil"; };
 			u64 hash(void);
 		protected:

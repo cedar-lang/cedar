@@ -29,8 +29,11 @@
 #include <cedar/ref.h>
 #include <cedar/runes.h>
 #include <cedar/util.hpp>
-
+#include <stdexcept>
 #include <vector>
+
+
+
 
 // allow programatic access to defining token
 // types, but by only actually defining them once
@@ -59,6 +62,16 @@ namespace cedar {
 #define V(name, code) name = code,
     FOREACH_TOKEN_TYPE(V)
 #undef V
+  };
+
+  class unexpected_eof_error : public std::exception {
+    private:
+      std::string _what = nullptr;
+    public:
+      unexpected_eof_error(std::string what_arg) : _what(what_arg) {}
+			const char *what() const noexcept {
+				return (const char*)_what.c_str();
+			};
   };
 
   // a token represents a single atomic lexeme that gets parsed

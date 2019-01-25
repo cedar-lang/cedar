@@ -42,6 +42,7 @@ namespace cedar {
 		class machine;
 
 		struct compiler_ctx {
+      bool inside_catch = false;
 			u64 closure_size = 0;
 			u16 lambda_depth = 0;
 		};
@@ -78,7 +79,8 @@ namespace cedar {
 				~compiler();
 
 
-				class context {};
+				class context {
+        };
 
 				/*
 				 * given some object reference,

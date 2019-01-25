@@ -249,8 +249,9 @@ namespace cedar {
 			}
 
 
-			ref get_first(void) const;
-			ref get_rest(void) const;
+			ref first(void) const;
+			ref rest(void) const;
+      ref cons(ref);
 
 			void set_first(ref);
 			void set_rest(ref);
@@ -371,7 +372,7 @@ namespace cedar {
 					switch (op) {
 						#define V(name, op) \
 							case name: {\
-													 return (a.is_flt() || b.is_flt()) ? ref((i64)(a.to_float() op b.to_float())) : ref((i64)(a.to_int() op b.to_int())); \
+													 return (a.is_flt() || b.is_flt()) ? ref((a.to_float() op b.to_float())) : ref((i64)(a.to_int() op b.to_int())); \
 												 }
 
 							FOREACH_OP(V)

@@ -43,10 +43,6 @@ cedar::dict::dict(void) {
 cedar::dict::~dict(void) {
 }
 
-ref dict::to_number(void) {
-	throw cedar::make_exception("Attempt to cast dict to number failed");
-}
-
 cedar::runes dict::to_string(bool human) {
 	cedar::runes str = "{";
   int written = 0;
@@ -68,6 +64,12 @@ ref dict::get(ref k) {
 	return table.at(k);
 }
 
+bool dict::has_key(ref k) {
+  if (table.find(k) == table.end()) {
+    return false;
+  }
+  return true;
+}
 
 ref dict::set(ref k, ref v) {
 	table[k] = v;
@@ -75,8 +77,8 @@ ref dict::set(ref k, ref v) {
 }
 
 ref dict::append(ref v) {
-	table[v.get_first()] = v.get_rest();
-  return v.get_rest();
+	table[v.first()] = v.rest();
+  return v.rest();
 }
 
 u64 dict::hash(void) {
@@ -111,5 +113,5 @@ ref dict::keys(void) {
 		n.set_rest(l);
 		l = n;
 	}
-	return l.get_rest();
+	return l.rest();
 }

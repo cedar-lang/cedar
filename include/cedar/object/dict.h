@@ -41,9 +41,9 @@ namespace cedar {
     dict(void);
     ~dict(void);
 
-    ref to_number();
 
     inline const char *object_type_name(void) { return "dict"; };
+    bool has_key(ref);
     u64 hash(void);
     ref get(ref);
     ref set(ref, ref);

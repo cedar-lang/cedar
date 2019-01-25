@@ -34,7 +34,13 @@
 #include <cedar/memory.h>
 #include <cedar/util.hpp>
 
+
 using namespace cedar;
+
+
+cedar::vector::vector(immer::flex_vector<ref> v) {
+  items = v;
+}
 
 cedar::vector::vector(void) {
 }
@@ -42,15 +48,15 @@ cedar::vector::vector(void) {
 cedar::vector::~vector(void) {
 }
 
-ref vector::to_number(void) {
-	throw cedar::make_exception("Attempt to cast vector to number failed");
+ref vector::at(int i) {
+  return const_cast<ref&>(items[i]);
 }
 
 cedar::runes vector::to_string(bool human) {
 	cedar::runes str = "[";
 
   for (u32 i = 0; i < items.size(); i++) {
-    str += items[i].to_string(false);
+    str += at(i).to_string(false);
     if (i != items.size()-1) str += " ";
   }
 	str += "]";
@@ -60,20 +66,21 @@ cedar::runes vector::to_string(bool human) {
 ref vector::get(ref k) {
   i64 i = k.to_int();
   if (i < 0 || i >= (i64)items.size()) return nullptr;
-	return items[i];
+	return at(i);
 }
 
 
 ref vector::set(ref k, ref v) {
   i64 i = k.to_int();
-  if (i < 0 || i >= (i64)items.size()) return nullptr;
-	items[i] = v;
-  return v;
+  if (i < 0 || i >= (i64)items.size())
+    throw cedar::make_exception("vector set out of bounds");
+
+  return new vector(items.set(i, v));
 }
 
 ref vector::append(ref v) {
-  items.push_back(v);
-  return v;
+  const auto v2 = items.push_back(v);
+  return new vector(v2);
 }
 
 u64 vector::hash(void) {
@@ -91,4 +98,19 @@ u64 vector::hash(void) {
 		mult += (u64)(852520UL + 2);
 	}
 	return x;
+}
+
+
+ref vector::first(void) {
+  if (items.size() == 0) return nullptr;
+  return at(0);
+}
+
+ref vector::rest(void) {
+  if (items.size() <= 1) return nullptr;
+  return new vector(items.drop(1));
+}
+
+ref vector::cons(ref f) {
+  return new vector(items.push_back(f));
 }
