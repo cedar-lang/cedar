@@ -78,8 +78,9 @@ list::list(std::vector<ref> items) {
   set_rest(curr.rest());
 }
 
-list::~list(void) {}
 
+list::~list(void) {
+}
 ref list::first(void) { return this->m_first; }
 
 ref list::rest(void) { return this->m_rest; }

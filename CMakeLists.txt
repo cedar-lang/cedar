@@ -12,8 +12,8 @@ include_directories(/usr/local/include)
 
 set (CMAKE_CXX_STANDARD 17)
 
-# set(CMAKE_CXX_FLAGS_DEBUG "-g")
-# set(CMAKE_CXX_FLAGS_RELEASE "-O3 -g")
+set(CMAKE_CXX_FLAGS_DEBUG "-g -O0 -DBUILD_MODE=Debug")
+set(CMAKE_CXX_FLAGS_RELEASE "-O3 -g -DBUILD_MODE=Release")
 
 
 include_directories(${CMAKE_SOURCE_DIR}/include)
@@ -23,7 +23,7 @@ target_compile_options(cedar-lib PRIVATE -g -Wall -Wextra -Wno-unused-parameter 
 
 add_executable(cedar-bin src/main.cpp)
 
-target_link_libraries(cedar-bin cedar-lib ${CMAKE_DL_LIBS})
+target_link_libraries(cedar-bin cedar-lib ${CMAKE_DL_LIBS} -luv)
 set_target_properties(cedar-bin PROPERTIES OUTPUT_NAME cedar)
 
 target_compile_options(cedar-bin PRIVATE -Wall -Wextra -Wno-unused-parameter -flto)

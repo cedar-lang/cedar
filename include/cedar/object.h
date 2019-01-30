@@ -35,17 +35,22 @@
 #include <cstdint>
 #include <new>
 #include <map>
+#include <cedar/with_meta.h>
 
 #define GC_OPERATOR_NEW_ARRAY
+#include <gc/gc.h>
 #include <gc/gc_cpp.h>
 
+
 namespace cedar {
+
 
   class object;
   class object_type;
 
+  extern long object_count;
 
-  class object : public gc {
+  class object : public gc_cleanup, public with_meta {
    public:
 
     // object_type *type = nullptr;
@@ -56,12 +61,16 @@ namespace cedar {
 
     virtual u64 hash(void) = 0;
 
-    virtual ~object() {};
+    object() {
+      object_count++;
+    }
+    ~object() {
+      object_count--;
+    };
 
     virtual const char *object_type_name(void) = 0;
 
     bool is_pair(void);
-
 
    protected:
 

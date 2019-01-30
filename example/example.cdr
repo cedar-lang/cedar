@@ -1,15 +1,16 @@
+
 (def range-step (fn (a b step)
                   (if (< a b) (cons a (range-step (+ a step) b step)))))
 
 
-(def range (fn (a b)
-             (if (< a b) (cons a (range-step (+ 1 a) b 1)))))
+(def (range a b)
+    (if (< a b) (cons a (range-step (+ 1 a) b 1))))
 
 ;; reduce the function f over xs starting at i
-(def reduce (fn (f i xs)
-              (if (nil? xs)
-                  i
-                  (reduce f (f i (first xs)) (rest xs)))))
+(def (reduce f i xs)
+     (if (nil? xs)
+         i
+         (reduce f (f i (first xs)) (rest xs))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -35,77 +36,6 @@
 ;;       (println v)
 ;;       (recur nil))))
 
-
-
-(defn inc (n) (+ n 1))
-(defn dec (n) (- n 1))
-
-
-(defmacro class (name & fields)
-  `(do
-      ,(if (not (symbol? name)) (throw (str "Invalid class name: " name)))
-      ;; define the name as a global class
-      (def ,name (cedar/make-class ',name))
-      ;; map over each of the fields, expand them
-      ;; and convert the defs as class fields
-      (do ,@(map (fn (mexpr)
-                   (if (not (list? mexpr)) (throw (str "invalid class field: " mexpr))
-                      (let ((expr (macroexpand mexpr)))
-                        (cond (= 'def (first expr))
-                              `(cedar/register-class-field ,name
-                                                           ',(first (rest expr))
-                                                           ,(first (rest (rest expr))))
-                              (= :extends (first expr)) :EXTENDS
-                              :else (throw (str "Invalid class field: " mexpr))))))
-                 fields))))
-
-
-
-;; since setting dict entries with keys as idents is
-;; so common, this macro automatically quotes the key
-;; identifier so you dont have to think about it.
-(defmacro setq (coll name val)
-  `(set ,coll (quote ,name) ,val))
-
-;; define a macro for use inside classes to clean up
-;; the (set self 'name val) form. Cause it's ugly.
-(defmacro set-self (name val)
-  `(set self (quote ,name) ,val))
-
-;; the stream class is a basic io class
-;; it offers .write and .read
-(class stream
-  (def write nil)
-  (def read nil))
-
-(class file-descriptor (:extends steam)
-  (def fd nil)
-  ;; constructor that
-  (def (new self fd_arg)
-    (set-self fd fd_arg))
-  (def (write self s)
-    (os-write self.fd s))
-  (def (read self n)
-    (os-read self.fd n)))
-
-
-
-(def (fopen-flags path flags)
-  (let ((fd (os-open path flags)))
-    (cond (= fd -1)  (throw (str "unable to open file '" path "'"))
-          :otherwise (new file-descriptor fd))))
-
-(def (fopen path)
-  (fopen-flags path (bit-or O_RDWR O_APPEND O_CREAT)))
-
-
-(def file (fopen "file.txt"))
-
-
-
-
-(def (join l s)
-  (reduce (fn (a b) (str a s b)) (str (first l)) (rest l)))
 
 
 
@@ -161,81 +91,89 @@
   (def (first self) self.lo)
   ;; overload rest
   (def (rest self)
-    (let ((lo self.lo)
-          (hi self.hi)
-          (st self.st))
+    (let [lo self.lo
+          hi self.hi
+          st self.st]
       (println "REST")
       (if (or (= hi :inf) (not (> hi lo)))
         (new lazy-range (+ lo st) hi st)
         :wqw))))
 
-(def (step lo hi st)
-  (new lazy-range lo hi st))
-
-
-(def (pos n)
-  (lazily (cons n (pos (inc n)))))
-
-(def positive-numbers (pos 1))
-(def (square x) (* x x))
-
-(def (consume-lazy l)
-  (map (fn (x) x) l))
 
 
 
-(class assertion-error
-  (def (new self msg) (set self 'msg msg)))
-
-(defmacro assert (claim)
-  (list 'when-not claim
-    (list 'throw (list 'assertion-error (str claim)))))
-
-
-(defmacro comment (& body)
-  nil)
-
-
-(defmacro case (check & cases)
-  (let ((sym (gensym)))
-    (list 'let (list (list sym check)))))
+(defmacro struct (id & fields)
+  (do
+    (println fields)
+    (let [fsets (map (fn (fname)
+                       `(set-self ,fname ,fname))
+                     fields)]
+        `(class ,id
+            (def (new self ,@fields)
+              (do ,@fsets))))))
 
 
-(def each
-  (fn (f l)
-    (if (not (nil? l))
-      (do (f (first l))
-          (each f (rest l))))))
+;; TODO: add this to the stdlib
+(def (contains? coll k)
+  (cond (nil? coll) nil
+        (= (first coll) k) true
+        :otherwise (recur (rest coll) k)))
+
+;; TODO: add to stdlib
+(def (contains-where? coll pred)
+  (cond (nil? coll) nil
+        (pred (first coll)) true
+        :otherwise (recur (rest coll) pred)))
+
+;; TODO: add all flavours to stdlib
+(def (contains-number? coll)
+  (contains-where? coll number?))
 
 
-(def (drop n l)
-  (if (= n 0) l
-    (drop (dec n) (rest l))))
+(def (hexchar x)
+  (get "0123456789ABCDEF" (bit-and x 0x0F)))
 
-(def (take n l)
-  (if (= n 0) nil
-    (lazily (cons (first l) (take (dec n) (rest l))))))
-
-
-(def (infinite-list-from ind)
-  (lazily (cons ind (range (inc ind)))))
-
-(def (step-inf lo st)
-  (lazily (cons lo (step-inf (inc lo) (+ lo st)))))
-
-(def (range lo & xs)
-    (let ((nx (first xs))
-          (hi (second xs)))
-      (cond (nil? nx)   (if (= lo :inf) (step-inf 0 1) (step 0 (dec lo) 1))
-            (nil? hi)   (if (= nx :inf) (step-inf lo 1) (step lo nx 1))
-            (= hi :inf) (step-inf lo (- nx lo))
-            :else       (step lo hi (- nx lo)))))
+(def (hex x)
+  (when (number? x)
+    (cond (= 0 x) ""
+          :else (str (hex (bit-shift-right x 4))
+                     (hexchar (bit-and 0x0F x))))))
 
 
-(def (filter pred coll)
-  (lazily
-    (let ((s (seq coll)))
-      (let ((f (first s)) (r (rest s)))
-        (if (pred f)
-          (cons f (filter pred r))
-          (filter pred r))))))
+
+
+(class c-extension
+  (def name "ext")
+  (def c-files nil)
+  (def (new self name c-files)
+    (do
+      (set-self name name)
+      (set-self c-files c-files))))
+
+
+(class base
+  (def (new self)
+    (set-self foo 30)))
+
+(class derived
+  (:extends base)
+  (def (new self)
+    (println self)))
+
+(def (vrange n)
+  (let [i 0
+        v []]
+    (if (< i n)
+      (recur (inc i) (cons i v))
+      v)))
+
+(def (memoize f)
+  (let [mem {}
+        not-found-sym (gensym)]
+    (fn (& args)
+      (let [r (get mem args not-found-sym)]
+        (if (= r not-found-sym)
+          (set mem args (apply f args))
+          r)))))
+
+(def memfib (memoize fib))

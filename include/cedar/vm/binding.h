@@ -38,5 +38,9 @@ namespace cedar {
 
 #define cedar_binding_sig(name) cedar::ref name(int argc, cedar::ref *argv, cedar::vm::machine * machine)
 #define cedar_binding(name) \
-	cedar_binding_sig(name) asm ("_" #name); \
+	cedar_binding_sig(name) asm ("_$CDR$" #name); \
 	cedar_binding_sig(name)
+
+#define cedar_init_sig() void cedar_module_init(void)
+#define cedar_init() cedar_init_sig() asm ("$CDR-INIT$"); cedar_init_sig()
+

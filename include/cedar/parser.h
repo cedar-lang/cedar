@@ -52,7 +52,8 @@
   V(tok_left_bracket, 12)     \
   V(tok_right_bracket, 13)    \
   V(tok_left_curly, 14)     \
-  V(tok_right_curly, 15)
+  V(tok_right_curly, 15)   \
+  V(tok_hash_modifier, 16)
 
 namespace cedar {
 
@@ -145,6 +146,9 @@ namespace cedar {
     ref parse_expr(void);
     // parse list literals
     ref parse_list(void);
+
+    ref parse_vector(void);
+
     // parse things like
     //    'a  -> (quote a)
     //    `a  -> (quasiquote a)
@@ -157,6 +161,7 @@ namespace cedar {
     ref parse_string(void);
 
     ref parse_number(void);
+    ref parse_hash_modifier(void);
 
     ref parse_special_grouping_as_call(cedar::runes name, tok_type closing);
   };

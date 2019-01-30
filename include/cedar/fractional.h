@@ -22,7 +22,13 @@
  * SOFTWARE.
  */
 
+
 #include <cedar/types.h>
+
+#pragma once
+
+#ifndef CEDAR_FRACTIONAL
+#define CEDAR_FRACTIONAL
 
 namespace cedar {
   struct fractional {
@@ -30,3 +36,5 @@ namespace cedar {
     i32 den;
   };
 }
+
+#endif

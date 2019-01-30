@@ -29,6 +29,7 @@
 
 #include <cedar/object/keyword.h>
 #include <cedar/object/list.h>
+#include <cedar/object/vector.h>
 #include <cedar/object/nil.h>
 #include <cedar/object/number.h>
 #include <cedar/object/string.h>
@@ -76,6 +77,22 @@ bool in_charset(wchar_t c, const wchar_t *set) {
 token lexer::lex() {
   auto c = next();
 
+
+  auto in_set = [] (cedar::runes & set, cedar::rune c) {
+    for (auto & n : set) {
+      if (n == c) return true;
+    }
+    return false;
+  };
+
+  auto accept_run = [&] (cedar::runes set) {
+    cedar::runes buf;
+    while (in_set(set, peek())) {
+      buf += next();
+    }
+    return buf;
+  };
+
   if (c == ';') {
     while (peek() != '\n' && (int32_t)peek() != -1) next();
 
@@ -99,6 +116,18 @@ token lexer::lex() {
       return token(tok_comma_at, ",@");
     }
     return token(tok_comma, ",");
+  }
+
+
+  if (c == '#') {
+    cedar::runes tok;
+    tok += '#';
+    if (isalpha(peek())) {
+      tok += next();
+    } else {
+      throw cedar::make_exception("invalid hash modifier syntax: #", peek());
+    }
+    return token(tok_hash_modifier, tok);
   }
 
   if (c == '(') return token(tok_left_paren, "(");
@@ -140,6 +169,31 @@ token lexer::lex() {
 
     buf += c;
     bool has_decimal = c == '.';
+
+
+    if (peek() == 'x') {
+      next();
+      cedar::runes hex = accept_run("0123456789abcdefABCDEF");
+      long long x;
+      std::stringstream ss;
+      ss << std::hex << hex;
+      ss >> x;
+      auto s = std::to_string(x);
+      return token(tok_number, s);
+    }
+
+
+    if (peek() == 'o') {
+      next();
+      cedar::runes hex = accept_run("012345567");
+      unsigned long long x;
+      std::stringstream ss;
+      ss << std::oct << hex;
+      ss >> x;
+      auto s = std::to_string(x);
+      return token(tok_number, s);
+    }
+
 
     while (isdigit(peek()) || peek() == '.') {
       c = next();
@@ -256,7 +310,7 @@ ref reader::parse_expr(void) {
     case tok_left_curly:
       return parse_special_grouping_as_call("dict", tok_right_curly);
     case tok_left_bracket:
-      return parse_special_grouping_as_call("vector", tok_right_bracket);
+      return parse_vector();
     case tok_left_paren:
       return parse_list();
     case tok_backquote:
@@ -267,6 +321,8 @@ ref reader::parse_expr(void) {
       return parse_special_syntax(U"unquote");
     case tok_comma_at:
       return parse_special_syntax(U"unquote-splicing");
+    case tok_hash_modifier:
+      return parse_hash_modifier();
   }
   throw cedar::make_exception("Unimplmented token: ", tok);
 }
@@ -291,6 +347,30 @@ ref reader::parse_list(void) {
   next();
 
   return list_obj;
+}
+
+
+/////////////////////////////////////////////////////
+ref reader::parse_vector(void) {
+  std::vector<ref> items;
+  // skip over the first bracket
+  next();
+  while (tok.type != tok_right_bracket) {
+    if (tok.type == tok_eof) {
+      throw unexpected_eof_error("unexpected eof in list");
+    }
+    ref item = parse_expr();
+    items.push_back(item);
+  }
+
+  ref vec = new vector();
+  for (auto & item : items) {
+    vec = vec.cons(item);
+  }
+  // skip over the closing bracket
+  next();
+
+  return vec;
 }
 
 /////////////////////////////////////////////////////
@@ -342,6 +422,18 @@ ref reader::parse_number(void) {
   }
 }
 
+/////////////////////////////////////////////////////
+ref reader::parse_hash_modifier(void) {
+  std::string str = tok.val;
+
+  int mod = str[1];
+  switch (mod) {
+    default:
+      throw cedar::make_exception("invalid hash modifier: ", str);
+  }
+  next();
+  return nullptr;
+}
 /////////////////////////////////////////////////////
 ref reader::parse_string(void) {
   ref obj = new_obj<string>();

@@ -70,7 +70,6 @@ cedar::lambda::~lambda() {}
 
 cedar::runes lambda::to_string(bool human) {
   cedar::runes str;
-  if (defining_expr.is_nil()) {
     char addr_buf[30];
     if (code_type == bytecode_type) {
       std::sprintf(addr_buf, "%p", (void *)code.get());
@@ -79,11 +78,13 @@ cedar::runes lambda::to_string(bool human) {
     }
 
     str += "<lambda ";
+
+    if (!name.is_nil()) {
+      str += name.to_string(false);
+      str += " ";
+    }
     str += addr_buf;
     str += ">";
-  } else {
-    str += defining_expr.to_string(false);
-  }
   return str;
 }
 
@@ -102,7 +103,6 @@ lambda *lambda::copy(void) {
   COPY_FIELD(code_type);
   COPY_FIELD(code);
   COPY_FIELD(closure);
-  COPY_FIELD(defining_expr);
   COPY_FIELD(arg_index);
   COPY_FIELD(argc);
   COPY_FIELD(vararg);
@@ -155,7 +155,7 @@ void lambda::prime_args(int a_argc, ref *a_argv) {
       for (int i = a_argc - 1; i >= argc - 1; i--) {
         valist = new_obj<list>(a_argv[i], valist);
       }
-      closure->at(argc - 1) = valist;
+      closure->at(arg_index + argc - 1) = valist;
     }
   }
 }

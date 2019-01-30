@@ -27,6 +27,7 @@
 // dlopen and dlsym binding defined in src/main.cpp
 
 #include <cedar.h>
+#include <cedar/object/bytes.h>
 #include <cedar/object/lazy_seq.h>
 #include <cedar/vm/binding.h>
 #include <fcntl.h>
@@ -281,6 +282,21 @@ cedar_binding(cedar_refcount) {
   return 1;
 }
 
+cedar_binding(cedar_newbytes) {
+  immer::flex_vector<unsigned char> buf;
+
+  for (int i = 0; i < argc; i++) {
+    if (!argv[i].is_int())
+      throw cedar::make_exception(
+          "(bytes ...) requires a series of integers only");
+    buf = buf.push_back(argv[i].to_int());
+  }
+  auto *b = new bytes(buf);
+  return b;
+}
+
+cedar_binding(cedar_objcount) { return cedar::object_count; }
+
 // give a macro expansion for each open option argument
 #define FOREACH_OPEN_OPTION(V) \
   V(O_RDONLY)                  \
@@ -371,7 +387,7 @@ cedar_binding(cedar_binary_shift_left) {
 
 cedar_binding(cedar_binary_shift_right) {
   ERROR_IF_ARGS_PASSED_IS("bit-shift-right", !=, 2);
-  i64 res = argv[0].to_int() << argv[1].to_int();
+  i64 res = argv[0].to_int() >> argv[1].to_int();
   return res;
 }
 
@@ -444,7 +460,7 @@ cedar_binding(cedar_register_class_field) {
   return cl;
 }
 cedar_binding(cedar_register_class_parent) {
-  ERROR_IF_ARGS_PASSED_IS("cedar/register-class-parent", !=, 3);
+  ERROR_IF_ARGS_PASSED_IS("cedar/register-class-parent", !=, 2);
   if (!argv[0].is<user_type>())
     throw cedar::make_exception(
         "'cedar/register-class-parent requires a class as the first argument");
@@ -471,23 +487,31 @@ cedar_binding(cedar_apply) {
   ERROR_IF_ARGS_PASSED_IS("apply", !=, 2);
   ref f = argv[0];
 
-  std::cout << argv[1] << std::endl;
   if (lambda *fnc = ref_cast<lambda>(f); fnc != nullptr) {
-    fnc = fnc->copy();
-
     std::vector<ref> args;
     ref c = argv[1];
     int i = 0;
-    for (ref c = argv[1]; !c.rest().is_nil(); c = c.rest()) {
+    for (ref c = argv[1]; !c.is_nil(); c = c.rest()) {
       i++;
       args.push_back(c.first());
     }
+
+    if (fnc->code_type == lambda::function_binding_type) {
+      return fnc->function_binding(i, args.data(), machine);
+    }
+
+    fnc = fnc->copy();
     fnc->prime_args(i, args.data());
     return machine->eval_lambda(fnc);
   } else {
     throw cedar::make_exception("(apply ...) to '", f,
                                 "' failed because it's not a function");
   }
+}
+
+cedar_binding(cedar_rand) {
+  double r = static_cast<double>(rand()) / static_cast<double>(RAND_MAX);
+  return r;
 }
 
 cedar_binding(cedar_is_seq) {
@@ -502,6 +526,22 @@ cedar_binding(cedar_seq) {
 cedar_binding(cedar_new_lazy_seq) {
   ERROR_IF_ARGS_PASSED_IS("lazy-seq", !=, 1);
   return new lazy_seq(argv[0], machine);
+}
+
+cedar_binding(cedar_vars) {
+  ERROR_IF_ARGS_PASSED_IS("vars", !=, 1);
+  ref lst = nullptr;
+
+  if (auto *inst = ref_cast<user_type_instance>(argv[0]); inst != nullptr) {
+    dict *d = ref_cast<dict>(inst->m_fields);
+    if (d == nullptr)
+      throw cedar::make_exception("error in (vars x). dict undefined");
+    return d->keys();
+
+  } else {
+    throw cedar::make_exception(
+        "(vars x) requires x to be an instance of a class. given ", argv[0]);
+  }
 }
 
 void init_binding(cedar::vm::machine *m) {
@@ -553,6 +593,8 @@ void init_binding(cedar::vm::machine *m) {
 
   m->bind("cedar/keyword", cedar_keyword);
   m->bind("cedar/refcount", cedar_refcount);
+
+  m->bind("cedar/objcount", cedar_objcount);
   m->bind("read-string", cedar_readstring);
   m->bind("read", cedar_read);
 
@@ -574,6 +616,12 @@ void init_binding(cedar::vm::machine *m) {
 
   m->bind("lazy-seq", cedar_new_lazy_seq);
 
+  m->bind("bytes", cedar_newbytes);
+
+  m->bind("cedar/rand", cedar_rand);
+
+
+  m->bind("vars", cedar_vars);
 
 #define BIND_CONSTANT(name, val) m->bind(new_obj<symbol>(#name), val)
 

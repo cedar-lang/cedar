@@ -22,13 +22,14 @@
 ; SOFTWARE.
 
 
+;; set the initial namespace to "core"
+(def *ns* "core")
 
 (def t 't)
 (def true 'true)
 (def false nil)
 
 (def not (fn (x) (if x nil t)))
-
 (def or (fn (x y) (if x x y)))
 (def and (fn (x y) (if x y x)))
 
@@ -43,14 +44,19 @@
 (def keyword? (fn (v) (= (type-of v) :keyword)))
 
 
+
+(def cdr/println println)
+
+(def debug
+  (fn (& args)
+    (println "DEBUG:" (apply str args))))
+
 (def map-1
   (fn (f l)
     (if (not (nil? l))
       (cons (f (first l))
             (map-1 f (rest l))))))
 
-
-(def apply (fn (f args) (eval (cons f args))))
 
 ;;;;
 ;;;; MACRO EXPANDER
@@ -66,57 +72,59 @@
 ;;
 ;;;;
 
-
-;; by default, quasiquote expand does nothing
 (def qq/expand (fn (x) x))
 
 
+(def *macros* {})
+;; defmacro takes the arguments, the args and the body and stores
+;; it into the macros dict for later evaluation
+(def defmacro
+  (fn (id args body)
+    (let* ((expander (eval (list 'fn (cedar/symbol (str "macro/" id)) args (qq/expand body)))))
+      (set *macros* id expander)
+      expander)))
 
-(let ((*macros* {}))
-  ;; defmacro takes the arguments, the args and the body and stores
-  ;; it into the macros dict for later evaluation
-  (def defmacro
-    (fn (id args body)
-      (let ((expander (eval (list 'fn args (qq/expand body)))))
-        (set *macros* id expander)
-        expander)))
+;; list-specialize does special things to lists. like checks for . notation
+;; on dictionaries, because you cannot create a macro for '.'
+;; this will be replaced with a real implementation once cond is defined
+(def macro/list-specialize
+  (fn (l) l))
 
-  ;; list-specialize does special things to lists. like checks for . notation
-  ;; on dictionaries, because you cannot create a macro for '.'
-  ;; this will be replaced with a real implementation once cond is defined
-  (def macro/list-specialize
-    (fn (l) l))
 
-  ;; macroexpand takes an expression as a value and returns the
-  ;; value representation of the recursively expanded macro
-  (def macroexpand
-    (fn (raw-expr)
-      (let ((expr (qq/expand raw-expr)))
-        (do
-          ;; only lists need to be macro expanded, cause they're calls.
-          ;; so if it's not a list, just return the bare expression
-          (if (not (list? expr))
+(def macroexpand-1
+  (fn (expr)
+    (do
+      ;; only lists need to be macro expanded, cause they're calls.
+      ;; so if it's not a list, just return the bare expression
+      (if (not (list? expr))
+        expr
+        (do (def expr (macro/list-specialize expr))
+          (if (= (first expr) 'quote)
             expr
-            (do (def expr (macro/list-specialize expr))
-              (if (= (first expr) 'quote)
-                expr
-                (let ((form (first expr))
-                      (args (map-1 macroexpand (rest expr)))
-                      (mac (get *macros* (first expr) nil)))
-                  (if (nil? mac)
-                    (cons form args)
-                    (let ((ex (apply mac (map-1 (fn (x) (list 'quote x)) args))))
-                      (if (seq? ex)
-                        (if (= (cedar/hash ex) (cedar/hash expr))
-                          expr
-                          (macroexpand ex))
-                        ex))))))))))))
+            (let* ((form (first expr))
+                   (args (map-1 macroexpand-1 (rest expr)))
+                   (mac (get *macros* (first expr) nil)))
+              (if (nil? mac)
+                (cons form args)
 
+                (do
+                  ;; expand the macro by evaluating it with the arguments
+                  (let* ((ex (apply mac args)))
+                    (if (seq? ex)
+                      (if (= (cedar/hash ex) (cedar/hash expr))
+                        expr
+                        (macroexpand-1 ex))
+                      ex)))))))))))
+;; macroexpand takes an expression as a value and returns the
+;; value representation of the recursively expanded macro
+(def macroexpand
+  (fn (raw-expr)
+    (macroexpand-1 raw-expr)))
 
 
 (defmacro defn (name args & body)
   (list 'def name
-        (list 'fn args (cons 'do body))))
+        (list 'fn name args (cons 'do body))))
 
 (defn inc (n) (+ n 1))
 (defn dec (n) (- n 1))
@@ -139,24 +147,20 @@
 
 (def symbol cedar/symbol)
 
-(let ((gensym-id 0))
+(let* ((gensym-id 0))
   (defn gensyms (s)
       (do (def gensym-id (inc gensym-id))
           (symbol (str s gensym-id))))
   (defn gensym () (gensyms "G__")))
 
 
-(defmacro not (x)
-  (list 'if x 'nil 't))
-
-
 (defmacro or (x y)
-  (let ((sym (gensyms "OR-")))
-    (list 'let (list (list sym x)) (list 'if sym sym y))))
+  (let* ((sym (gensyms "OR-")))
+    (list 'let* (list (list sym x)) (list 'if sym sym y))))
 
 (defmacro and (x y)
-  (let ((sym (gensyms "AND-")))
-    (list 'let (list (list sym x)) (list 'if sym y sym))))
+  (let* ((sym (gensyms "AND-")))
+    (list 'let* (list (list sym x)) (list 'if sym y sym))))
 
 
 
@@ -166,34 +170,13 @@
 (def next rest)
 
 
-(defmacro cond* (clauses)
- (when clauses
-   (let ((cl (first clauses)))
-     (list 'if (first cl)
-               (second cl)
-               (macroexpand (list 'cond (rest clauses)))))))
-
-
-
 (defmacro cond (& a)
-  (let ((c (first a))
-        (e (second a))
-        (r (rest (rest a))))
+  (let* ((c (first a))
+         (e (second a))
+         (r (rest (rest a))))
     (list 'if c e
         (when r (cons 'cond r)))))
 
-
-
-(defmacro class
-  (name args fields)
-  (macroexpand
-    (list 'defn name args
-       (list 'let
-             '((this {}))
-           (list 'set 'this :type-of (cedar/keyword name))
-           (cons 'do
-                 (map-1 (fn (f) (list 'set 'this (list 'quote (first f)) (second f))) fields))
-         'this))))
 
 
 (defmacro % (a f b) (list f b a))
@@ -204,11 +187,15 @@
 ;;     (def (id x) x) => defines the id function
 ;; why have this *and* the defn macro? Why not.
 (defmacro def (& args)
-  (let ((name (first args))
-        (val  (second args)))
+  (let* ((name (first args))
+         (val  (second args)))
     (if (list? name)
-      (list 'def (first name) (list 'fn (rest name) val))
+      (list 'def (first name) (list 'fn (first name) (rest name) val))
       (list 'def name val))))
+
+
+(def (not x)
+  (if x nil true))
 
 (def (atom? n)
   (cond (nil? n)     true
@@ -228,16 +215,19 @@
   (cons (list 'get obj (list 'quote key)) (cons obj args)))
 
 
+
+
 (def (internal/dot-expansion l)
-  (let ((key (second l))
-        (obj (first (rest (rest l))))
-        (args (rest (rest (rest l)))))
+  (let* ((key (second l))
+         (obj (first (rest (rest l))))
+         (args (rest (rest (rest l)))))
     (cons (list 'get obj key) (cons obj args))))
 
 
 (def (macro/list-specialize l)
-  (let ((frst (first l)))
-    (cond (= frst (symbol ".")) (macroexpand (cons 'dot (rest l)))
+  (let* ((frst (first l)))
+    (cond (= frst (symbol ".")) (cons 'dot (rest l))
+          (= frst 'quasiquote) (qq/expand l)
           :else l)))
 
 
@@ -254,7 +244,7 @@
 
 
 (def (zip-lists ls)
-  (let ((c (map-1 first ls)))
+  (let* ((c (map-1 first ls)))
     (cond (every? nil? c) nil
           :else (cons (map-1 first ls) (zip-lists (map-1 rest ls))))))
 
@@ -294,9 +284,22 @@
 
 
 (def (count coll)
-  (count* 0 coll))
+  (cond (vector? coll) (size coll)
+        :else (count* 0 coll)))
 ;;;;
 
+
+(defn inc (n) (+ n 1))
+(defn dec (n) (- n 1))
+
+
+(def (even? x)
+  (if (number? x)
+    (= 0 (bit-and x 0x01))
+    (throw "even? needs a number")))
+
+(def (odd? x)
+  (not (even? x)))
 
 (def reduce foldl)
 
@@ -341,7 +344,6 @@
 (def (append & lists)
   (reduce append-1 (first lists) (rest lists)))
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (def qq/transform-quasiquote-arg nil)
 (def qq/transform nil)
@@ -349,7 +351,7 @@
 
 (def (qq/transform form)
   (if (seq? form)
-    (let ((car (first form)))
+    (let* ((car (first form)))
         (cond (= car 'unquote)          (list 'list (cadr form))
               (= car 'unquote-splicing) (cadr form)
               :otherwise                (list 'list (qq/transform-quasiquote-arg form))))
@@ -363,7 +365,7 @@
 
 
 (def (qq/transform-quasiquote-arg-list argument)
-  (let ((car (first argument)))
+  (let* ((car (first argument)))
     (cond (= car 'unquote)          (cadr argument)
           (= car 'unquote-splicing) (throw "UNQUOTE-SPLICING UNIMPLEMENTED HERE")
           :else            (cons 'append (qq/transform-compound argument)))))
@@ -373,10 +375,223 @@
   (cond (list? argument) (qq/transform-quasiquote-arg-list argument)
         :otherwise       (list 'quote argument)))
 
+
+(def *qq-c* 0)
+
 (def (qq/expand form)
-  (if (atom? form)
-    form
-    (let ((expanded (cons (qq/expand (first form)) (qq/expand (rest form)))))
-      (if (= (first expanded) 'quasiquote)
-        (qq/transform-quasiquote-arg (second expanded))
-        expanded))))
+  (do (def *qq-c* (inc *qq-c*))
+      (cond (= form nil) nil
+            (atom? form) form
+            (= (first form) 'quasiquote) (qq/transform-quasiquote-arg (second form))
+            :else (let* ((expanded (cons (qq/expand (first form)) (qq/expand (rest form)))))
+                    (if (= (first expanded) 'quasiquote)
+                      (qq/transform-quasiquote-arg (second expanded))
+                      expanded)))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;; QUASIQUOTE IS VALID NOW ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(def (drop n l)
+  (cond (= n 0) l
+        (nil? l) nil
+        :else (drop (dec n) (rest l))))
+
+(def (take n l)
+  (cond (= n 0) nil
+        (nil? l) nil
+        :else (cons (first l) (take (dec n) (rest l)))))
+
+(def (partition n coll)
+  (do
+    (let* ((p (take n coll)))
+      (cond (nil? p) nil
+            (= n (count p)) (cons p (partition n (drop n coll)))
+            :else (list p)))))
+
+
+(defmacro let (defs & body)
+  (do
+    (if (odd? (count defs))
+       (throw "error in 'let' syntax. defs vector must be even lengthed")
+       `(let* ,(partition 2 defs) ,@body))))
+
+
+
+;; since setting dict entries with keys as idents is
+;; so common, this macro automatically quotes the key
+;; identifier so you dont have to think about it.
+(defmacro setq (coll name val)
+  `(set ,coll (quote ,name) ,val))
+
+;; define a macro for use inside classes to clean up
+;; the (set self 'name val) form. Cause it's ugly.
+(defmacro set-self (name val)
+  `(set self (quote ,name) ,val))
+
+(defmacro get-self (name & r)
+  `(get self (quote ,name) ,@r))
+
+
+
+
+
+(defmacro class (name & fields)
+  `(do
+      ,(if (not (symbol? name)) (throw (str "Invalid class name: " name)))
+      ;; define the name as a global class
+      (def ,name (cedar/make-class ',name))
+      ;; map over each of the fields, expand them
+      ;; and convert the defs as class fields
+      (do ,@(map (fn (mexpr)
+                   (if (not (list? mexpr)) (throw (str "invalid class field: " mexpr))
+                      (let [expr (macroexpand mexpr)]
+                        (cond (= 'def (first expr))
+                              `(cedar/register-class-field ,name
+                                                           ',(first (rest expr))
+                                                           ,(first (rest (rest expr))))
+                              (= :extends (first expr)) `(do ,@(map (fn (c)
+                                                                        `(cedar/register-class-parent ,name ,c))
+                                                                    (rest expr)))
+                              :else (throw (str "Invalid class field: " mexpr))))))
+                 fields))))
+
+
+
+;; the stream class is a basic io class
+;; it offers .write and .read
+(class stream
+  (def write nil)
+  (def read nil))
+
+
+(class file-descriptor (:extends stream)
+  (def fd nil)
+  ;; constructor that
+  (def (new self fd_arg)
+    (set-self fd fd_arg))
+  (def (write self s)
+    (os-write self.fd s))
+  (def (read self n)
+    (os-read self.fd n))
+  (def (close self)
+    (do (os-close self.fd)
+        (set-self fd nil))))
+
+(def (fopen-flags path flags)
+  (let [fd (os-open path flags)]
+    (cond (= fd -1)  (throw (str "unable to open file '" path "'"))
+          :otherwise (new file-descriptor fd))))
+
+(def (fopen path)
+  (fopen-flags path (bit-or O_RDWR O_APPEND O_CREAT)))
+
+
+
+(def *out* (file-descriptor 0))
+(def *err* (file-descriptor 1))
+(def *in*  (file-descriptor 2))
+
+
+(def (join l s)
+  (reduce (fn (a b) (str a s b)) (str (first l)) (rest l)))
+
+(def (write stream & things)
+  (.write stream (apply str things)))
+
+;; redefine print and println in terms of
+;; *out* the stream class system
+(def (print & things)
+  (when-not (nil? things)
+    (.write *out* (join things " "))))
+
+(def (println & things)
+  (+ (apply print things)
+     (print "\n")))
+
+
+(def (print-error & things)
+  (do (.write *err* (join things " "))
+      (.write *err* "\n")))
+
+
+
+;; fifo queue data structure.
+(class queue
+  (def (new self)
+    (set-self buf []))
+
+  (def (push self v)
+    (set-self buf (cons v self.buf)))
+
+  (def (pop self)
+    (let [v (first self.buf)]
+      (set-self buf (rest self.buf))
+      (when (nil? self.buf)
+        (set-self buf []))
+      v))
+
+  (def (str self)
+    (str "<queue " self.buf ">"))
+
+  (def (empty? self)
+    (= 0 (size self.buf)))
+  ;; implement iteration methods
+  (def (first self)
+    (first self.buf))
+  (def (rest self)
+    (rest self.buf)))
+
+
+;; filo stack data structure. Push onto the top, that item
+;; is then the first to be popped off.
+(class stack
+  (def (new self)
+    (set-self buf nil))
+
+  (def (push self v)
+    (set-self buf (cons v self.buf))
+    self)
+
+  (def (pop self)
+    (let [v (first self.buf)]
+      (set-self buf (rest self.buf))
+      v))
+
+  (def (str self)
+    (str "<stack " self.buf ">"))
+
+  (def (first self)
+    (first self.buf))
+
+  (def (rest self)
+    (rest self.buf)))
+
+
+(class A
+  (def foo 30)
+  (def (str self)
+    "<A>"))
+
+(class B (:extends A)
+  (def (test self)
+    (get-self foo))
+  (def (str self)
+    "<B>"))
+
+
+;; compose two functions into a single function
+;; (f (g args...))
+(def (comp f g)
+  (fn (& xs) (f (apply g xs))))
+
+;; takes a fn f and returns a function that
+;; returns the logical not of f
+(def (complement f)
+  (fn (& args)
+    (not (apply f args))))
+
+;; takes a value x and returns a function that constantly
+;; returns that value
+(def (constantly x)
+  (fn (& args) x))
+
+

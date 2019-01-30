@@ -34,15 +34,46 @@ using namespace cedar;
 static ref the_nil = nullptr;
 
 cedar::string::string(void) {}
-cedar::string::string(cedar::runes content) { m_content = content; }
+cedar::string::string(cedar::runes content) {
+  m_content = content;
+}
 
 cedar::string::~string() {}
 
+
+struct string_char_conversion {
+  char c;
+  runes r;
+};
+
 cedar::runes string::to_string(bool human) {
+
+
+  static std::vector<string_char_conversion> mappings = {
+    {'"', "\\\""},
+    {'\b', "\\b"},
+    {'\n', "\\n"},
+    {'\t', "\\t"},
+    {'\r', "\\r"},
+    {'\\', "\\"},
+  };
+
+
+  auto get_char_runes = [&] (char c) -> runes {
+    runes str;
+    for (auto & m : mappings) {
+      if (m.c == c) return m.r;
+    }
+    str += c;
+    return str;
+  };
+
   cedar::runes str;
   if (!human) {
     str += "\"";
-    str += m_content;
+    for (auto & c : m_content) {
+      str += get_char_runes(c);
+    }
     str += "\"";
   } else {
     auto it = m_content.begin();
@@ -52,6 +83,9 @@ cedar::runes string::to_string(bool human) {
         switch (*it++) {
           case '\\':
             c = '\\';
+            break;
+          case 'b':
+            c = '\b';
             break;
           case 'n':
             c = '\n';
@@ -68,10 +102,6 @@ cedar::runes string::to_string(bool human) {
           case 'f':
             c = '\f';
             break;
-          case '\'':
-            c = '\'';
-            break;
-            // all other escapes
           default:
             c = '?';
             break;
@@ -110,7 +140,7 @@ ref string::get(ref ind) {
     i64 i = ind.to_int();
     if (i >= m_content.size() || i < 0) return nullptr;
     cedar::runes c;
-    c += m_content;
+    c += m_content[i];
     return new string(c);
   } else {
     throw cedar::make_exception("unable to index into string by a non-number");

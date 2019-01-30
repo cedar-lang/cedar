@@ -75,7 +75,7 @@ namespace cedar {
     std::shared_ptr<cedar::vm::bytecode> code;
     std::shared_ptr<closure> closure = nullptr;
 
-    ref defining_expr = nullptr;
+    ref name;
 
     i32 arg_index = 0;
     i32 argc = 0;

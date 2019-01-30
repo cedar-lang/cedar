@@ -97,7 +97,9 @@ namespace cedar {
 				void compile_constant(ref, bytecode &, scope_ptr, compiler_ctx*);
 				void compile_symbol(ref, bytecode &, scope_ptr, compiler_ctx*);
 				void compile_list(ref, bytecode &, scope_ptr, compiler_ctx*);
+        void compile_vector(ref, bytecode &, scope_ptr, compiler_ctx*);
 				void compile_call_arguments(ref, bytecode &, scope_ptr sc, compiler_ctx*);
+				void compile_quasiquote(ref, bytecode &, scope_ptr sc, compiler_ctx*);
 		};
 
 		// a bytecode compilation pass that takes in the compiler

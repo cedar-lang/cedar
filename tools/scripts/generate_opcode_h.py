@@ -50,6 +50,7 @@ new_op('LOAD_GLOBAL', 'imm_int', effect=1)
 new_op('SET_GLOBAL', 'imm_int', effect=0)
 
 new_op('CONS', effect=-1)
+new_op('APPEND', effect=-1)
 
 new_op('CALL', 'imm_int', effect=0)
 new_op('CALL_EXCEPTIONAL', 'imm_int', effect=0)

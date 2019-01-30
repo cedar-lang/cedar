@@ -30,11 +30,13 @@
 #include <cedar/object/indexable.h>
 #include <cedar/object/sequence.h>
 
+
 namespace cedar {
 
   class string : public sequence, public indexable {
    private:
     cedar::runes m_content;
+    // istr m_istr;
 
    public:
     string(void);

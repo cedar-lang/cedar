@@ -32,6 +32,7 @@
 
 using namespace cedar;
 
+long cedar::object_count = 0;
 
 bool object::is_pair(void) {
 	// a thing cannot be a pair if it isn't a list

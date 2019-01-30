@@ -22,10 +22,10 @@
  * SOFTWARE.
  */
 
+#include <algorithm>
 #include <array>
 #include <chrono>
 #include <ratio>
-#include <algorithm>
 
 #include <cedar/object.h>
 #include <cedar/object/dict.h>
@@ -39,6 +39,7 @@
 #include <cedar/types.h>
 #include <cedar/vm/machine.h>
 #include <cedar/vm/opcode.h>
+#include <threadpool/thread_pool.h>
 #include <unistd.h>
 #include <cedar/util.hpp>
 #include <thread>
@@ -47,13 +48,13 @@
 
 using namespace cedar;
 
+
 void init_binding(cedar::vm::machine *m);
 
 vm::machine::machine(void) : m_compiler(this) {
   true_value = cedar::new_obj<cedar::symbol>("t");
   bind(true_value, true_value);
   init_binding(this);
-
 
   cedar::runes stdsrc;
   for (unsigned int i = 0; i < src_lib_std_inc_cdr_len; i++) {
@@ -109,18 +110,67 @@ ref vm::machine::eval_file(cedar::runes path) {
 }
 
 ref vm::machine::eval_string(cedar::runes expr) {
+
+  static ref mac_ex_sym = new_obj<symbol>("macroexpand");
   cedar::reader reader;
   ref res = nullptr;
   auto top_level = reader.run(expr);
-  for (auto e : top_level) {
-    ref s = new_obj<symbol>("macroexpand");
-    ref mac = find(s);
-    if (!mac.is_nil()) {
-      ref wrapped = newlist(s, newlist(new_obj<symbol>("quote"), e));
-      e = eval(wrapped);
+
+  bool macro_expander_found = false;
+
+  ref macro_expander;
+  for (auto & e : top_level) {
+    if (!macro_expander_found) macro_expander = find(mac_ex_sym);
+    if (!macro_expander.is_nil()) macro_expander_found = true;
+
+
+    // std::cout << macroexpand(e, this) << std::endl;
+
+    if (macro_expander_found) {
+      ref wrapped =
+          newlist(macro_expander, newlist(new_obj<symbol>("quote"), e));
+      res = eval(eval(wrapped));
+    } else {
+      res = eval(e);
     }
-    res = eval(e);
   }
+  return res;
+
+  // if we have a macro expander...
+  // create a thread pool... oh no
+  thread_pool expansion_pool(8);
+  // create a vector of the valid size, to be filled in as things get expanded
+
+  int completed = 0;
+  int job_count = top_level.size();
+
+  std::vector<ref> expanded(job_count);
+
+  std::vector<std::future<ref>> jobs(job_count);
+
+  auto *self = this;
+  auto pool_job = [macro_expander, self](ref expr) {
+    ref wrapped =
+        newlist(macro_expander, newlist(new_obj<symbol>("quote"), expr));
+    ref val = self->eval(wrapped);
+    return val;
+  };
+
+  for (int i = 0; i < job_count; i++) {
+    jobs[i] = expansion_pool.enqueue(pool_job, top_level[i]);
+  }
+
+  while (completed != job_count) {
+    for (int i = 0; i < job_count; i++) {
+      // if this job is done...
+      if (jobs[i].wait_for(std::chrono::milliseconds(10)) ==
+          std::future_status::ready) {
+        completed++;
+        expanded[i] = jobs[i].get();
+      }
+    }
+  }
+
   return res;
 }
 
@@ -151,7 +201,7 @@ ref vm::machine::eval(ref obj) {
     lambda *raw_program = ref_cast<cedar::lambda>(compiled_lambda);
     ref val = eval_lambda(raw_program);
     return val;
-  } catch (std::exception & e) {
+  } catch (std::exception &e) {
     std::cerr << "Uncaught Exception: " << e.what() << std::endl;
   } catch (cedar::ref e) {
     std::cerr << "Uncaught Exception: " << e << std::endl;
@@ -161,17 +211,7 @@ ref vm::machine::eval(ref obj) {
 
 static std::mutex gil_mtx;
 
-
-
-
-
-
-
-
-
-
 ref vm::machine::eval_lambda(lambda *raw_program) {
-
   int max_sp = 0;
   // gil_mtx.lock();
   // raw_program->code->print();]
@@ -253,8 +293,6 @@ ref vm::machine::eval_lambda(lambda *raw_program) {
     printf("---------------------------------------\n");
   };
 
-
-
 #define DEFAULT_PRELUDE check_stack_size_and_resize();
 
 #ifdef VM_TRACE
@@ -319,7 +357,7 @@ instruction_name(op)); \ last_time = now;
   // followed by another opcode The performance loss by this check is minimal on
   // modern CPUs because of the l1 cache typically caching 8 bytes, so the best
   // case scenario is a cache miss 1/8 opcodes that predict the next instruction
-  //long correct_predictions = 0;
+  // long correct_predictions = 0;
 #ifdef USE_PREDICT
 #define PREDICT(pred, label) \
   do {                       \
@@ -351,6 +389,7 @@ instruction_name(op)); \ last_time = now;
     SET_LABEL(OP_LOAD_GLOBAL);
     SET_LABEL(OP_SET_GLOBAL);
     SET_LABEL(OP_CONS);
+    SET_LABEL(OP_APPEND);
     SET_LABEL(OP_CALL);
     SET_LABEL(OP_CALL_EXCEPTIONAL);
     SET_LABEL(OP_MAKE_FUNC);
@@ -457,7 +496,7 @@ loop:
     auto ind = CODE_READ(u64);
     CODE_SKIP(u64);
     // ref val = POP();
-    PROG()->closure->at(ind) = stack[sp-1];
+    PROG()->closure->at(ind) = stack[sp - 1];
     // PUSH(val);
     DISPATCH;
   }
@@ -483,13 +522,23 @@ loop:
 
   TARGET(OP_CONS) {
     PRELUDE;
-    auto list_obj = new cedar::list();
 
-    list_obj->set_first(POP());
-    list_obj->set_rest(POP());
+    auto lst = POP();
+    auto val = POP();
 
-    ref list = list_obj;
+    auto list = new cedar::list(lst, val);
     PUSH(list);
+    DISPATCH;
+  }
+
+  TARGET(OP_APPEND) {
+    PRELUDE;
+    auto a = POP();
+    auto b = POP();
+
+    ref r = append(a, b);
+
+    PUSH(r);
     DISPATCH;
   }
 
@@ -593,9 +642,8 @@ loop:
       }
     }
 
-    std::cerr << stack[new_fp] << std::endl;
-
-    errormsg = "function to be called is not a valid callable";
+    throw cedar::make_exception(
+        "function to be called is not a valid callable: ", stack[new_fp]);
     goto error;
   }
 
@@ -661,12 +709,13 @@ loop:
 
   TARGET(OP_JUMP_IF_FALSE) {
     PRELUDE;
+
+    static ref false_val = new symbol("false");
     i64 offset = CODE_READ(i64);
     CODE_SKIP(i64);
     auto val = POP();
-    if (val.is_nil()) {
+    if (val.is_nil() || val == false_val) {
       ip = PROG()->code->code + offset;
-    } else {
     }
     DISPATCH;
   }
@@ -714,7 +763,6 @@ loop:
   goto loop;
 
 end:
-
 
   return_value = POP();
   delete[] stack;

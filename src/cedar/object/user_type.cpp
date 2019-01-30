@@ -59,7 +59,8 @@ void user_type::add_field(ref k, ref v) {
 ref user_type::instantiate(int argc, ref *argv, vm::machine *m) {
   static ref new_sym = new_obj<symbol>("new");
 
-  dict *d = new dict();
+
+  /*
   for (auto &p : m_parents) {
     if (user_type *put = ref_cast<user_type>(p); put != nullptr) {
       for (auto &f : put->m_fields) {
@@ -72,12 +73,19 @@ ref user_type::instantiate(int argc, ref *argv, vm::machine *m) {
   for (auto &f : m_fields) {
     d->set(f.key, f.val);
   }
+  */
 
-  auto *instance = new user_type_instance(this, d, m);
 
-  // now we need to call the `new` function inside the instance
-  if (d->has_key(new_sym)) {
-    ref constructor = d->get(new_sym);
+  ref d = new dict();
+  ref inst = new user_type_instance(this, d, m);
+
+  auto * instance = ref_cast<user_type_instance>(inst);
+
+
+  if (instance->has_field(new_sym)) {
+
+    instance->get(new_sym);
+    ref constructor = instance->get(new_sym);
     if (lambda *fn = ref_cast<lambda>(constructor); fn != nullptr) {
       fn = fn->copy();
       // we need to cram the `self` argument into the constructor
@@ -91,10 +99,30 @@ ref user_type::instantiate(int argc, ref *argv, vm::machine *m) {
 
       fn->prime_args(argc, nargv);
       m->eval_lambda(fn);
+
+      delete[] nargv;
     }
+  } else {
   }
 
   return instance;
+}
+
+ref user_type::get_field(ref k, ref inst) {
+  for (auto &f : m_fields) {
+    if (f.key == k) {
+      return f.val;
+    }
+  }
+
+  for (auto &p : m_parents) {
+    try {
+      return ref_cast<user_type>(p)->get_field(k, inst);
+    } catch (std::exception &e) {
+      // ignore...
+    }
+  }
+  throw cedar::make_exception("unable to find key ", k, " on ", to_string());
 }
 
 u64 user_type::hash(void) {
@@ -104,7 +132,7 @@ u64 user_type::hash(void) {
   i64 mult = 1000009UL;  // prime multiplier
 
   x = 0x12345678UL;  // :>
-  for (auto &v : m_fields) {
+  for (auto & v : m_fields) {
     y = v.key.hash();
     x = (x ^ y) * mult;
     mult += (u64)(852520UL + 2);
@@ -114,7 +142,7 @@ u64 user_type::hash(void) {
     mult += (u64)(852520UL);
     x += 97531UL;
   }
-  for (auto &v : m_parents) {
+  for (auto & v : m_parents) {
     y = v.hash();
     x = (x ^ y) * mult;
     mult += (u64)(852520UL);
@@ -127,7 +155,6 @@ runes user_type::to_string(bool human) {
   runes s;
   s += "<type ";
   s += m_name;
-
   s += " ";
   char buf[30];
   sprintf(buf, "%p", this);
@@ -144,45 +171,63 @@ user_type_instance::user_type_instance(ref type, ref fields, vm::machine *vm) {
   m_vm = vm;
 }
 
-user_type_instance::~user_type_instance(void) {
-  printf("USER TYPE INSTANCE DESTROYED\n");
+user_type_instance::~user_type_instance(void) {}
+
+ref user_type_instance::get(ref k) {
+  dict *d = ref_cast<dict>(m_fields);
+  user_type *t = ref_cast<user_type>(m_type);
+  if (d->has_key(k)) {
+    return d->get(k);
+  }
+  ref val = t->get_field(k, this);
+  return val;
 }
 
-ref user_type_instance::get(ref k) { return idx_get(m_fields, k); }
+bool user_type_instance::has_field(ref k) {
+  try {
+    get(k);
+    return true;
+  } catch (std::exception &e) {
+    return false;
+  }
+}
+
 ref user_type_instance::set(ref k, ref v) { return idx_set(m_fields, k, v); }
 
 ref user_type_instance::first(void) {
   static ref first = new_obj<symbol>("first");
-  ref fnr = idx_get(m_fields, first);
+
+  ref fnr = get(first);
+
   if (lambda *fn = ref_cast<lambda>(fnr); fn != nullptr) {
     fn = fn->copy();
     ref self = this;
     fn->prime_args(1, &self);
     return m_vm->eval_lambda(fn);
   }
-  throw cedar::make_exception("calling first on class failed because it's missing first");
+  throw cedar::make_exception(
+      "calling first on class failed because it's missing first");
   return nullptr;
 }
 
 ref user_type_instance::rest(void) {
   static ref rest = new_obj<symbol>("rest");
-  ref fnr = idx_get(m_fields, rest);
+  ref fnr = get(rest);
   if (lambda *fn = ref_cast<lambda>(fnr); fn != nullptr) {
     fn = fn->copy();
     ref self = this;
     fn->prime_args(1, &self);
     return m_vm->eval_lambda(fn);
   }
-  throw cedar::make_exception("calling rest on class failed because it's missing rest");
+  throw cedar::make_exception(
+      "calling rest on class failed because it's missing rest");
   return nullptr;
 }
 
-
 runes user_type_instance::to_string(bool human) {
-  static ref rest = new_obj<symbol>("str");
-
+  static ref str = new_obj<symbol>("str");
   try {
-    ref fnr = idx_get(m_fields, rest);
+    ref fnr = get(str);
     if (lambda *fn = ref_cast<lambda>(fnr); fn != nullptr) {
       fn = fn->copy();
       ref self = this;

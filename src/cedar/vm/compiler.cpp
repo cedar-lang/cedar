@@ -25,6 +25,7 @@
 #include <cedar/object/keyword.h>
 #include <cedar/object/lambda.h>
 #include <cedar/object/list.h>
+#include <cedar/object/vector.h>
 #include <cedar/object/nil.h>
 #include <cedar/object/number.h>
 #include <cedar/object/string.h>
@@ -123,6 +124,10 @@ void vm::compiler::compile_object(ref obj, vm::bytecode &code, scope_ptr sc,
                                   compiler_ctx *ctx) {
   if (obj.is<cedar::list>()) {
     return compile_list(obj, code, sc, ctx);
+  }
+
+  if (obj.is<cedar::vector>()) {
+    return compile_vector(obj, code, sc, ctx);
   }
 
   if (obj.is_number()) {
@@ -237,14 +242,19 @@ void vm::compiler::compile_list(ref obj, vm::bytecode &code, scope_ptr sc,
     return;
   }
 
+  /*
+  if (list_is_call_to("quasiquote", obj)) {
+    std::cout << obj << std::endl;
+    return compile_quasiquote(obj.rest().first(), code, sc, ctx);
+  }
+  */
+
   if (list_is_call_to("quote", obj)) {
-    compile_constant(obj.rest().first(), code, sc, ctx);
-    return;
+    return compile_constant(obj.rest().first(), code, sc, ctx);
   }
 
-  if (list_is_call_to("lambda", obj) || list_is_call_to("fn", obj)) {
-    compile_lambda_expression(obj, code, sc, ctx);
-    return;
+  if (list_is_call_to("fn", obj)) {
+    return compile_lambda_expression(obj, code, sc, ctx);
   }
 
   if (list_is_call_to("progn", obj) || list_is_call_to("do", obj)) {
@@ -253,7 +263,7 @@ void vm::compiler::compile_list(ref obj, vm::bytecode &code, scope_ptr sc,
   }
 
   // let is a special form, not expanded by macros
-  if (list_is_call_to("let", obj)) {
+  if (list_is_call_to("let*", obj)) {
     std::vector<ref> arg_names;
     std::vector<ref> arg_vals;
 
@@ -355,6 +365,38 @@ void vm::compiler::compile_list(ref obj, vm::bytecode &code, scope_ptr sc,
   code.write((i64)argc);
 }
 
+void vm::compiler::compile_vector(ref vec_ref, vm::bytecode &code, scope_ptr sc,
+                                  compiler_ctx *ctx) {
+
+  static ref vec_sym = new symbol("vector");
+
+  std::vector<ref> elems;
+
+  vector *vec = ref_cast<vector>(vec_ref);
+
+  if (vec == nullptr) {
+    throw cedar::make_exception("compile_vector requires a vector... given ", vec_ref);
+  }
+
+
+  int size = vec->size();
+
+  for (int i = 0; i < size; i++) {
+    elems.push_back(vec->at(i));
+  }
+
+  ref expanded;
+
+  if (elems.size() > 0) {
+    expanded = new list(vec_sym, new list(elems));
+  } else {
+    expanded = new list(vec_sym, nullptr);
+  }
+
+  compile_object(expanded, code, sc, ctx);
+
+}
+
 void vm::compiler::compile_number(ref obj, vm::bytecode &code, scope_ptr,
                                   compiler_ctx *) {
   if (obj.is_flt()) {
@@ -395,7 +437,7 @@ void vm::compiler::compile_symbol(ref sym, bytecode &code, scope_ptr sc,
     }
   }
 
-  if (is_dot && not (str == ".")) {
+  if (is_dot && not(str == ".")) {
     cedar::runes obj;
     cedar::runes rest;
 
@@ -455,7 +497,7 @@ void vm::compiler::compile_symbol(ref sym, bytecode &code, scope_ptr sc,
 // expressions need to construct the closure on their call, not construction
 void vm::compiler::compile_lambda_expression(ref expr, bytecode &code,
                                              scope_ptr sc, compiler_ctx *ctx) {
-  auto amp_sym = newsymbol("&");
+  static auto amp_sym = newsymbol("&");
 
   ctx->lambda_depth++;
 
@@ -469,6 +511,19 @@ void vm::compiler::compile_lambda_expression(ref expr, bytecode &code,
 
   auto args = expr.rest().first();
 
+  ref name = nullptr;
+  if (!args.is<list>() && !args.is_nil()) {
+    if (args.is<symbol>()) {
+      name = args;
+    } else {
+      throw cedar::make_exception("unknown name option on lambda literal: ",
+                                  args);
+    }
+    expr = expr.rest();
+    args = expr.rest().first();
+  }
+
+  // std::cout << "(fn " << name << " " << args << " " << ")\n";
   i32 argc = 0;
   i32 arg_index = ctx->closure_size;
   bool vararg = false;
@@ -522,9 +577,50 @@ void vm::compiler::compile_lambda_expression(ref expr, bytecode &code,
   new_lambda->vararg = vararg;
   new_lambda->argc = argc;
   new_lambda->arg_index = arg_index;
-  new_lambda->defining_expr = expr;
+  new_lambda->name = name;
 
   const int const_ind = code.push_const(new_lambda);
   code.write((uint8_t)OP_MAKE_FUNC);
   code.write((uint64_t)const_ind);
+}
+
+void vm::compiler::compile_quasiquote(ref obj, vm::bytecode &bc,
+                                      vm::scope_ptr sc, vm::compiler_ctx *ctx) {
+  // std::cout << obj << std::endl;
+  if (obj.is_nil()) {
+    bc.write((u8)OP_NIL);
+    bc.write((u8)OP_CONS);
+    return;
+  }
+
+  if (list_is_call_to("unquote", obj)) {
+    compile_object(obj.rest().first(), bc, sc, ctx);
+    bc.write((u8)OP_CONS);
+    return;
+  }
+  if (list_is_call_to("unquote-splicing", obj)) {
+    compile_object(obj.rest().first(), bc, sc, ctx);
+    bc.write((u8)OP_APPEND);
+    return;
+  }
+
+  if (obj.is<list>()) {
+    ref first = obj.first();
+    ref rest = obj.rest();
+
+    if (rest.is_nil()) {
+      bc.write((u8)OP_NIL);
+    } else {
+      compile_quasiquote(rest, bc, sc, ctx);
+    }
+    compile_quasiquote(first, bc, sc, ctx);
+    return;
+  }
+
+  auto ind = bc.push_const(obj);
+  bc.write((u8)OP_CONST);
+  bc.write((u64)ind);
+  bc.write((u8)OP_CONS);
+
+  return;
 }

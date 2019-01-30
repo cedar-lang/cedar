@@ -125,4 +125,13 @@ namespace cedar {
     l.set_first(first);
     return l;
   }
+
+
+
+  inline ref append(ref l1, ref l2) {
+    if (l1.is_nil()) {
+      return l2;
+    }
+    return new list(l1.first(), append(l1.rest(), l2));
+  }
 }  // namespace cedar

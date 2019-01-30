@@ -62,12 +62,16 @@ namespace cedar {
     ~user_type();
     void add_parent(ref);
     void add_field(ref, ref);
+    ref get_field(ref k, ref inst);
     ref instantiate(int argc, ref *argv, vm::machine *);
     inline const char *object_type_name(void) { return m_cname; };
     u64 hash(void);
     runes to_string(bool human = false);
   };
 
+
+
+  // user_type_instance is an instantiation of a user type
   class user_type_instance : public indexable, public sequence {
    public:
     // user_type
@@ -84,6 +88,7 @@ namespace cedar {
     ~user_type_instance(void);
 
     ref get(ref);
+    bool has_field(ref);
     ref set(ref, ref);
     inline ref append(ref v) { return this; }
     inline i64 size(void) { return 0; }

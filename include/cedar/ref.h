@@ -432,11 +432,7 @@ namespace cedar {
 			inline bool operator>=(ref other) const {
 				return compare(other) >= 0;
 			}
-			inline bool operator==(ref other) const {
-				if (!is_number())
-					return (typeid(m_obj).hash_code() == typeid(other.m_obj).hash_code()) && other.hash() == const_cast<ref&>(*this).hash();
-				return compare(other) == 0;
-			}
+			bool operator==(ref other) const;
 
 			inline bool operator!=(ref other) {
 				return !operator==(other);
