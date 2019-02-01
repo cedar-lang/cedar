@@ -114,7 +114,7 @@ ref cedar::vm::bytecode_pass(ref obj, vm::compiler *c) {
   // build a lambda around the code
   auto lambda = cedar::new_obj<cedar::lambda>(code);
 
-  ref_cast<cedar::lambda>(lambda)->closure = nullptr;
+  ref_cast<cedar::lambda>(lambda)->m_closure = nullptr;
   return lambda;
 }
 
@@ -223,7 +223,10 @@ void vm::compiler::compile_list(ref obj, vm::bytecode &code, scope_ptr sc,
           m_vm->global_symbol_lookup_table.end()) {
         // make space in global table
         global_ind = m_vm->global_table.size();
-        m_vm->global_table.push_back({.value = nullptr});
+
+        vm::var v;
+        v.value = nullptr;
+        m_vm->global_table.push_back(v);
 
         m_vm->global_symbol_lookup_table[hash] = global_ind;
       } else {

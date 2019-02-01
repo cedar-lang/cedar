@@ -28,6 +28,7 @@
 #include <cedar/object.h>
 #include <cedar/runes.h>
 #include <cedar/ref.h>
+#include <vector>
 
 namespace cedar {
 

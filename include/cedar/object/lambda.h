@@ -73,7 +73,7 @@ namespace cedar {
 
     lambda_type code_type = bytecode_type;
     std::shared_ptr<cedar::vm::bytecode> code;
-    std::shared_ptr<closure> closure = nullptr;
+    std::shared_ptr<closure> m_closure = nullptr;
 
     ref name;
 

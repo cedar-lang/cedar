@@ -102,7 +102,7 @@ lambda *lambda::copy(void) {
 #define COPY_FIELD(name) new_lambda->name = name
   COPY_FIELD(code_type);
   COPY_FIELD(code);
-  COPY_FIELD(closure);
+  COPY_FIELD(m_closure);
   COPY_FIELD(arg_index);
   COPY_FIELD(argc);
   COPY_FIELD(vararg);
@@ -114,7 +114,7 @@ lambda *lambda::copy(void) {
 // as would be expected for whatever calling convention this lambda has
 // ie: for varargs
 void lambda::prime_args(int a_argc, ref *a_argv) {
-  this->closure = std::make_shared<cedar::closure>(argc, closure, arg_index);
+  this->m_closure = std::make_shared<cedar::closure>(argc, m_closure, arg_index);
 
   if (a_argc != 0 && a_argv != nullptr) {
     // here we need to setup some variables which will be derived
@@ -147,7 +147,7 @@ void lambda::prime_args(int a_argc, ref *a_argv) {
 
     // loop over the concrete list...
     for (int i = 0; i < concrete; i++) {
-      closure->at(i + arg_index) = a_argv[i];
+      m_closure->at(i + arg_index) = a_argv[i];
     }
 
     if (vararg) {
@@ -155,7 +155,7 @@ void lambda::prime_args(int a_argc, ref *a_argv) {
       for (int i = a_argc - 1; i >= argc - 1; i--) {
         valist = new_obj<list>(a_argv[i], valist);
       }
-      closure->at(arg_index + argc - 1) = valist;
+      m_closure->at(arg_index + argc - 1) = valist;
     }
   }
 }

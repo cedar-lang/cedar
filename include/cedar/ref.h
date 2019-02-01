@@ -387,6 +387,7 @@ namespace cedar {
 					FOREACH_OP(V)
 					#undef V
 				}
+        return 0.0;
 			}
 
 #undef FOREACH_OP

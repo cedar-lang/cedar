@@ -37,6 +37,8 @@
 #include <unistd.h>
 #include <thread>
 
+#include <math.h>
+
 #define GC_THREADS
 #include <gc/gc.h>
 
@@ -307,12 +309,6 @@ cedar_binding(cedar_objcount) { return cedar::object_count; }
   V(O_CREAT)                   \
   V(O_TRUNC)                   \
   V(O_EXCL)                    \
-  V(O_SHLOCK)                  \
-  V(O_EXLOCK)                  \
-  V(O_NOFOLLOW)                \
-  V(O_SYMLINK)                 \
-  V(O_EVTONLY)                 \
-  V(O_CLOEXEC)
 
 cedar_binding(cedar_os_open) {
   ERROR_IF_ARGS_PASSED_IS("os-open", !=, 2);

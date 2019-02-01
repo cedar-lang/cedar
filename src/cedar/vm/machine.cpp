@@ -484,7 +484,7 @@ loop:
   TARGET(OP_LOAD_LOCAL) {
     PRELUDE;
     auto ind = CODE_READ(u64);
-    auto val = PROG()->closure->at(ind);
+    auto val = PROG()->m_closure->at(ind);
     PUSH(val);
 
     CODE_SKIP(u64);
@@ -496,7 +496,7 @@ loop:
     auto ind = CODE_READ(u64);
     CODE_SKIP(u64);
     // ref val = POP();
-    PROG()->closure->at(ind) = stack[sp - 1];
+    PROG()->m_closure->at(ind) = stack[sp - 1];
     // PUSH(val);
     DISPATCH;
   }
@@ -659,7 +659,7 @@ loop:
 
     // inherit closures from parent, a new
     // child closure is created on call
-    fptr->closure = PROG()->closure;
+    fptr->m_closure = PROG()->m_closure;
 
     PUSH(function);
     CODE_SKIP(u64);
@@ -670,7 +670,7 @@ loop:
     PRELUDE;
     i32 ind = CODE_READ(u64);
     ref arg = stack[fp].first();
-    PROG()->closure->at(ind) = arg;
+    PROG()->m_closure->at(ind) = arg;
     stack[fp] = stack[fp].rest();
     CODE_SKIP(u64);
     DISPATCH;
@@ -741,7 +741,7 @@ loop:
                             argument list */
 
     for (int i = 0; i < argc; i++) {
-      PROG()->closure->at(i + PROG()->arg_index) = stack[abp + i];
+      PROG()->m_closure->at(i + PROG()->arg_index) = stack[abp + i];
       stack[abp + i] = nullptr;
     }
     ip = PROG()->code->code;
