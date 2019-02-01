@@ -22,25 +22,50 @@
  * SOFTWARE.
  */
 
-#pragma once
+#include <cedar/importutil.h>
 
-#include <cedar/runes.h>
+static apathy::Path path_resolve_file(apathy::Path p) {
+  if (p.exists()) {
+    if (p.is_directory()) {
+      return p.append("main.cdr");
+    }
+    return p;
+  }
 
-namespace cedar {
+  auto filename = p.filename();
+  auto dir = p.directory();
+  dir.append(filename + ".cdr");
+  return dir;
+}
 
-  class object_type {
-    cedar::runes m_name;
-    int m_index;
+std::string cedar::path_resolve(std::string search, apathy::Path base) {
+  apathy::Path sp = search;
+  if (sp.is_absolute()) {
+    return path_resolve_file(sp.sanitize()).string();
+  }
 
-   public:
-    object_type(cedar::runes name);
+  while (true) {
+    auto c = base;
+    sp = c.append(sp);
+    auto res = path_resolve_file(sp.absolute().sanitize());
+    if (res.exists()) {
+      return res.string();
+    }
 
-    const cedar::runes & name(void);
-    const int & index(void);
+    c = base;
+    // if the file didn't exist, walk up the directory tree...
+    if (auto p = path_resolve_file(c.append("cdr_pkgs").append(sp));
+        p.exists()) {
+      return p.string();
+    }
 
-  };
+    base = base.up();
+    if (base == "/") break;
+  }
 
-  extern object_type *list_type;
-
-
-}  // namespace cedar
+  return path_resolve_file(apathy::Path("/usr/local/lib/")
+                               .append(search)
+                               .absolute()
+                               .sanitize())
+      .string();
+}

@@ -22,50 +22,32 @@
  * SOFTWARE.
  */
 
-#pragma once
 
-#include <cedar/object.h>
-#include <cedar/object/indexable.h>
-#include <cedar/object/lambda.h>
-#include <cedar/object/sequence.h>
-#include <cedar/ref.h>
-#include <cedar/runes.h>
-#include <cedar/vm/machine.h>
-#include <stack>
+#include <cedar/objtype.h>
+#include <cedar/object/dict.h>
 
-namespace cedar {
+using namespace cedar;
 
-  struct call_frame {
-    ref fn = nullptr;
-    std::shared_ptr<closure> closure = nullptr;
-    long fp;
-  };
 
-  class fiber : virtual public object {
-   private:
-    void sync(void);
+cedar::type::type(cedar::runes name) {
+  m_name = name;
+}
 
-   public:
-    std::stack<call_frame> calls;
-    long sp = 0;
-    long fp = 0;
-    uint8_t *ip;
+cedar::type::~type(void) {
+}
 
-    // allow quick access to values at the top of the stack
-    // (updated after a fiber sync)
-    lambda *current_lambda = nullptr;
-    std::weak_ptr<closure> current_closure;
+type *object_type;
+type *number_type;
+type *dict_type;
+type *fiber_type;
+type *keyword_type;
+type *lambda_type;
+type *list_type;
+type *vector_type;
+type *string_type;
+type *symbol_type;
 
-    vm::machine *m_vm;
 
-    fiber(vm::machine *);
-    ~fiber(void);
+void cedar::type_init(void) {
 
-    inline const char *object_type_name(void) { return "fiber"; };
-    u64 hash(void);
-
-   protected:
-    cedar::runes to_string(bool human = false);
-  };
-
-}  // namespace cedar
+}

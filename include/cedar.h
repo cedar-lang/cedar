@@ -31,10 +31,11 @@
 #ifndef CEDAR_HH
 #define CEDAR_HH
 
+#include "cedar/importutil.h"
 #include "cedar/version.h"
 #include "cedar/types.h"
+#include "cedar/objtype.h"
 #include "cedar/parser.h"
-#include "cedar/object_types.h"
 #include "cedar/passes.h"
 #include "cedar/memory.h"
 #include "cedar/object.h"
@@ -57,13 +58,11 @@
 #include "cedar/object/lambda.h"
 #include "cedar/object/dict.h"
 #include "cedar/object/sequence.h"
-#include "cedar/object/typeobject.h"
 #include "cedar/object/bytes.h"
 #include "cedar/object/indexable.h"
 #include "cedar/object/lazy_seq.h"
 #include "cedar/object/number.h"
 #include "cedar/object/vector.h"
-#include "cedar/object/fiber.h"
 #include "cedar/object/string.h"
 #include "cedar/lib/linenoise.h"
 

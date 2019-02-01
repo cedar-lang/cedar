@@ -300,19 +300,6 @@ void vm::compiler::compile_list(ref obj, vm::bytecode &code, scope_ptr sc,
     return compile_object(expr, code, sc, ctx);
   }
 
-  if (list_is_call_to("catch*", obj)) {
-    // catch* has the form (catch* thrower catcher)
-    // and the way it works is it pushes a handler to the stack,
-    // then compiles the thrower with the knowledge that it's inside
-    // a catch block and therefor
-    ref thrower = obj.rest().first();
-    ref catcher = obj.rest().rest().first();
-    compile_object(catcher, code, sc, ctx);
-    ctx->inside_catch = true;
-    compile_object(thrower, code, sc, ctx);
-    ctx->inside_catch = false;
-    return;
-  }
 
   if (list_is_call_to("eval", obj)) {
     compile_object(obj.rest().first(), code, sc, ctx);

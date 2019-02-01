@@ -28,6 +28,8 @@
 #include <cedar/object.h>
 #include <cedar/object/string.h>
 #include <cedar/util.hpp>
+#include <vector>
+
 
 using namespace cedar;
 

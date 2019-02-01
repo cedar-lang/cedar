@@ -12,7 +12,8 @@ include_directories(/usr/local/include)
 
 set (CMAKE_CXX_STANDARD 17)
 
-set(CMAKE_CXX_FLAGS_DEBUG "-g -O0 -DBUILD_MODE=Debug")
+
+set(CMAKE_CXX_FLAGS_DEBUG "-g -O1 -DBUILD_MODE=Debug")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3 -g -DBUILD_MODE=Release")
 
 

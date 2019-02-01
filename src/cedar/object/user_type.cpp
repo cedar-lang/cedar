@@ -22,7 +22,8 @@
  * SOFTWARE.
  */
 
-#include <cedar.h>
+#include <cedar/object/symbol.h>
+#include <cedar/object/lambda.h>
 #include <cedar/object/user_type.h>
 #include <stdlib.h>
 #include <string.h>
@@ -44,7 +45,11 @@ user_type::user_type(runes name) {
 
 user_type::~user_type() { delete m_cname; }
 
-void user_type::add_parent(ref p) { m_parents.push_back(p); }
+void user_type::add_parent(ref p) {
+  if (p != this) {
+    m_parents.push_back(p);
+  }
+}
 
 void user_type::add_field(ref k, ref v) {
   for (auto &f : m_fields) {
@@ -58,6 +63,8 @@ void user_type::add_field(ref k, ref v) {
 
 ref user_type::instantiate(int argc, ref *argv, vm::machine *m) {
   static ref new_sym = new_obj<symbol>("new");
+
+  static ref __class__ = new_obj<symbol>("__class__");
 
 
   /*
@@ -77,7 +84,9 @@ ref user_type::instantiate(int argc, ref *argv, vm::machine *m) {
 
 
   ref d = new dict();
+
   ref inst = new user_type_instance(this, d, m);
+  idx_set(inst, __class__, this);
 
   auto * instance = ref_cast<user_type_instance>(inst);
 

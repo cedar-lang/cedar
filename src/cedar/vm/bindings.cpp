@@ -544,6 +544,44 @@ cedar_binding(cedar_vars) {
   }
 }
 
+cedar_binding(cedar_catch) {
+  ERROR_IF_ARGS_PASSED_IS("catch", !=, 2);
+  ref exceptional = argv[0];
+  ref handler = argv[1];
+
+  auto handle = [&](ref e) {
+    if (lambda *fn = ref_cast<lambda>(handler); fn != nullptr) {
+      fn = fn->copy();
+      int ac = 1;
+      ref *av = &e;
+
+      fn->prime_args(ac, av);
+      return machine->eval_lambda(fn);
+    } else {
+      throw make_exception("catch requires a lambda as a handler");
+    }
+  };
+
+  try {
+
+    if (lambda *fn = ref_cast<lambda>(exceptional); fn != nullptr) {
+      fn = fn->copy();
+      fn->prime_args(0, nullptr);
+      return machine->eval_lambda(fn);
+    } else {
+      throw make_exception("catch requires a lambda as a first argument");
+    }
+
+  } catch (ref e) {
+    return handle(e);
+  } catch (std::exception &c_exception) {
+    ref e = new_obj<string>(runes(c_exception.what()));
+    return handle(e);
+  }
+
+  return nullptr;
+}
+
 void init_binding(cedar::vm::machine *m) {
   m->bind("list", cedar_newlist);
   m->bind("dict", cedar_newdict);
@@ -620,8 +658,9 @@ void init_binding(cedar::vm::machine *m) {
 
   m->bind("cedar/rand", cedar_rand);
 
-
   m->bind("vars", cedar_vars);
+
+  m->bind("catch*", cedar_catch);
 
 #define BIND_CONSTANT(name, val) m->bind(new_obj<symbol>(#name), val)
 

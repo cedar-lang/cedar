@@ -34,6 +34,9 @@
 (def and (fn (x y) (if x y x)))
 
 
+(def not= (fn not= (a b) (not (= a b))))
+
+
 (def nil? (fn (v) (= v nil)))
 (def list? (fn (v) (= (type-of v) :list)))
 (def dict? (fn (v) (= (type-of v) :dict)))
@@ -131,8 +134,8 @@
 
 
 
-(defmacro catch (expr id body)
-  (list 'catch* (list (list 'fn nil expr)) (list 'fn (list id) body)))
+(defmacro catch (id expr body)
+  (list 'catch* (list 'fn nil expr) (list 'fn (list id) body)))
 
 
 (defmacro when
@@ -208,9 +211,6 @@
 
 
 
-
-
-
 (defmacro dot (key obj & args)
   (cons (list 'get obj (list 'quote key)) (cons obj args)))
 
@@ -275,7 +275,7 @@
 
 (def (filter pred coll)
   (foldr (fn (x r) (if (pred x) (cons x r) r))
-         () coll))
+         nil coll))
 
 ;;;;
 (def (count* c xs)
@@ -379,14 +379,13 @@
 (def *qq-c* 0)
 
 (def (qq/expand form)
-  (do (def *qq-c* (inc *qq-c*))
-      (cond (= form nil) nil
-            (atom? form) form
-            (= (first form) 'quasiquote) (qq/transform-quasiquote-arg (second form))
-            :else (let* ((expanded (cons (qq/expand (first form)) (qq/expand (rest form)))))
-                    (if (= (first expanded) 'quasiquote)
-                      (qq/transform-quasiquote-arg (second expanded))
-                      expanded)))))
+    (cond (= form nil) nil
+          (atom? form) form
+          (= (first form) 'quasiquote) (qq/transform-quasiquote-arg (second form))
+          :else (let* ((expanded (cons (qq/expand (first form)) (qq/expand (rest form)))))
+                  (if (= (first expanded) 'quasiquote)
+                    (qq/transform-quasiquote-arg (second expanded))
+                    expanded))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;; QUASIQUOTE IS VALID NOW ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -416,6 +415,7 @@
 
 
 
+
 ;; since setting dict entries with keys as idents is
 ;; so common, this macro automatically quotes the key
 ;; identifier so you dont have to think about it.
@@ -424,35 +424,55 @@
 
 ;; define a macro for use inside classes to clean up
 ;; the (set self 'name val) form. Cause it's ugly.
-(defmacro set-self (name val)
+(defmacro sets (name val)
   `(set self (quote ,name) ,val))
 
-(defmacro get-self (name & r)
+(defmacro gets (name & r)
   `(get self (quote ,name) ,@r))
 
 
 
 
 
+;; the object class is not defined yet, but it should resolve.
+;; it should be nil until defined correctly
+(def object nil)
+
+
 (defmacro class (name & fields)
-  `(do
+  `(let [object-defined (not (nil? object))]
       ,(if (not (symbol? name)) (throw (str "Invalid class name: " name)))
       ;; define the name as a global class
       (def ,name (cedar/make-class ',name))
+
       ;; map over each of the fields, expand them
       ;; and convert the defs as class fields
       (do ,@(map (fn (mexpr)
-                   (if (not (list? mexpr)) (throw (str "invalid class field: " mexpr))
-                      (let [expr (macroexpand mexpr)]
-                        (cond (= 'def (first expr))
-                              `(cedar/register-class-field ,name
-                                                           ',(first (rest expr))
-                                                           ,(first (rest (rest expr))))
-                              (= :extends (first expr)) `(do ,@(map (fn (c)
-                                                                        `(cedar/register-class-parent ,name ,c))
-                                                                    (rest expr)))
-                              :else (throw (str "Invalid class field: " mexpr))))))
-                 fields))))
+                   (let [expr (macroexpand mexpr)]
+                     (cond (= 'def (first expr))
+                           `(cedar/register-class-field ,name
+                                                        ',(first (rest expr))
+                                                        ,(first (rest (rest expr))))
+                           (vector? expr) `(do ,@(map (fn (c) `(cedar/register-class-parent ,name ,c))
+                                                      expr))
+                           :else (throw (str "Invalid class field: " mexpr)))))
+                 fields))
+
+      ;; all classes inherit from `object` iff object is defined
+      ;; but only as the last class it extends.
+      (when object-defined
+        (cedar/register-class-parent ,name object))))
+
+
+(class object
+  (def (str self)
+    (str "<instance of " (gets __class__) ">"))
+  (def (first self)
+    (throw (str "'first' unimplemented on "
+                (gets __class__))))
+  (def (first self)
+    (throw (str "'rest' unimplemented on "
+                (gets __class__)))))
 
 
 
@@ -463,18 +483,18 @@
   (def read nil))
 
 
-(class file-descriptor (:extends stream)
+(class file-descriptor [stream]
   (def fd nil)
   ;; constructor that
   (def (new self fd_arg)
-    (set-self fd fd_arg))
+    (sets fd fd_arg))
   (def (write self s)
     (os-write self.fd s))
   (def (read self n)
     (os-read self.fd n))
   (def (close self)
     (do (os-close self.fd)
-        (set-self fd nil))))
+        (sets fd nil))))
 
 (def (fopen-flags path flags)
   (let [fd (os-open path flags)]
@@ -484,6 +504,30 @@
 (def (fopen path)
   (fopen-flags path (bit-or O_RDWR O_APPEND O_CREAT)))
 
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; Base Exceptions
+
+(class exception
+  ;; the exception's message defaults to an empty string
+  ;; to be filled in later
+  (def what "")
+  (def (new self m)
+    (sets what m))
+  (def (str self)
+    (gets what)))
+
+
+(class assertion-error [exception])
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+
+(defmacro assert (stmt)
+  `(if ,stmt true (throw (assertion-error (str "Assertion Failed: " `,stmt)))))
 
 
 (def *out* (file-descriptor 0))
@@ -517,16 +561,16 @@
 ;; fifo queue data structure.
 (class queue
   (def (new self)
-    (set-self buf []))
+    (sets buf []))
 
   (def (push self v)
-    (set-self buf (cons v self.buf)))
+    (sets buf (cons v self.buf)))
 
   (def (pop self)
     (let [v (first self.buf)]
-      (set-self buf (rest self.buf))
+      (sets buf (rest self.buf))
       (when (nil? self.buf)
-        (set-self buf []))
+        (sets buf []))
       v))
 
   (def (str self)
@@ -545,15 +589,15 @@
 ;; is then the first to be popped off.
 (class stack
   (def (new self)
-    (set-self buf nil))
+    (sets buf nil))
 
   (def (push self v)
-    (set-self buf (cons v self.buf))
+    (sets buf (cons v self.buf))
     self)
 
   (def (pop self)
     (let [v (first self.buf)]
-      (set-self buf (rest self.buf))
+      (sets buf (rest self.buf))
       v))
 
   (def (str self)
@@ -567,15 +611,10 @@
 
 
 (class A
-  (def foo 30)
-  (def (str self)
-    "<A>"))
-
-(class B (:extends A)
-  (def (test self)
-    (get-self foo))
-  (def (str self)
-    "<B>"))
+  (def (str self) "<A>"))
+(class B
+  (def (str self) "<B>"))
+(class C [A B])
 
 
 ;; compose two functions into a single function
@@ -593,5 +632,4 @@
 ;; returns that value
 (def (constantly x)
   (fn (& args) x))
-
 

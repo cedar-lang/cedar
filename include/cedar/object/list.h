@@ -26,10 +26,10 @@
 
 #include <cedar/object.h>
 
-#include <cedar/object_types.h>
 #include <cedar/object/sequence.h>
 #include <cedar/ref.h>
 #include <cedar/runes.h>
+#include <vector>
 
 namespace cedar {
 

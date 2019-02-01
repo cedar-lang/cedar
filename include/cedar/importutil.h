@@ -22,14 +22,12 @@
  * SOFTWARE.
  */
 
+
 #pragma once
 
-#include <cedar/object.h>
-#include <cedar/ref.h>
-#include <cedar/runes.h>
+#include <apathy.h>
+#include <string>
 
 namespace cedar {
-  class typeobject : public object {
-    cedar::runes name;
-  };
-};  // namespace cedar
+  std::string path_resolve(std::string, apathy::Path base = apathy::Path::cwd());
+};

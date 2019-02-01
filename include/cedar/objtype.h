@@ -22,39 +22,65 @@
  * SOFTWARE.
  */
 
-#include <cedar/object/fiber.h>
+#pragma once
 
-using namespace cedar;
+#ifndef _OBJTYPE_H
+#define _OBJTYPE_H
 
-fiber::fiber(vm::machine *v) {
-  m_vm = v;
-}
 
-fiber::~fiber(void) {}
+#include <cedar/object.h>
+#include <cedar/runes.h>
+#include <vector>
+#include <functional>
 
-// a hash of a fiber is just the address of the fiber
-// because a fiber will never be equal to another.
-u64 fiber::hash(void) {
-  return (u64)this;
-}
+#include <cedar/ref.h>
 
-void fiber::sync(void) {
-  if (calls.size() != 0) {
-    current_closure = calls.top().closure;
-    current_lambda = calls.top().fn.reinterpret<lambda*>();
-  } else {
-    current_lambda = nullptr;
+namespace cedar {
+
+  namespace vm {
+    class machine;
   }
-}
+
+  // fwd declare
+  class dict;
+
+  class type {
+    public:
 
 
-cedar::runes fiber::to_string(bool human) {
+      using method = std::function<ref(int, ref*, vm::machine*)>;
 
-  cedar::runes str;
-  str += "<fiber ";
-  char addr_buf[30];
-  std::sprintf(addr_buf, "%p", (void *)this);
-  str += addr_buf;
-  str += ">";
-  return str;
-}
+
+      dict *m_fields = nullptr;
+      std::vector<type*> m_parents;
+      cedar::runes m_name;
+
+      method f_first;
+      method f_rest;
+
+      method f_str;
+      method f_new;
+
+      type(cedar::runes);
+      ~type(void);
+
+  };
+
+
+#define FOR_EACH_OBJECT_TYPE(V) \
+  V(object) \
+
+  extern type *object_type;
+  extern type *number_type;
+  extern type *dict_type;
+  extern type *keyword_type;
+  extern type *lambda_type;
+  extern type *list_type;
+  extern type *vector_type;
+  extern type *string_type;
+  extern type *symbol_type;
+
+  void type_init(void);
+};
+
+#endif

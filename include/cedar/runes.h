@@ -24,12 +24,7 @@
 
 #pragma once
 
-#include <cstdint>
-#include <iterator>
 #include <string>
-#include <utf8.h>
-
-#include <vector>
 
 namespace cedar {
 

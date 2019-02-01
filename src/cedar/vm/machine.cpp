@@ -43,15 +43,19 @@
 #include <unistd.h>
 #include <cedar/util.hpp>
 #include <thread>
+#include <cedar/objtype.h>
 
 #include "../../lib/std.inc.h"
 
 using namespace cedar;
 
-
 void init_binding(cedar::vm::machine *m);
 
 vm::machine::machine(void) : m_compiler(this) {
+
+  // before creating anything, init the types
+  type_init();
+
   true_value = cedar::new_obj<cedar::symbol>("t");
   bind(true_value, true_value);
   init_binding(this);
@@ -110,7 +114,6 @@ ref vm::machine::eval_file(cedar::runes path) {
 }
 
 ref vm::machine::eval_string(cedar::runes expr) {
-
   static ref mac_ex_sym = new_obj<symbol>("macroexpand");
   cedar::reader reader;
   ref res = nullptr;
@@ -119,10 +122,9 @@ ref vm::machine::eval_string(cedar::runes expr) {
   bool macro_expander_found = false;
 
   ref macro_expander;
-  for (auto & e : top_level) {
+  for (auto &e : top_level) {
     if (!macro_expander_found) macro_expander = find(mac_ex_sym);
     if (!macro_expander.is_nil()) macro_expander_found = true;
-
 
     // std::cout << macroexpand(e, this) << std::endl;
 
@@ -212,6 +214,11 @@ ref vm::machine::eval(ref obj) {
 static std::mutex gil_mtx;
 
 ref vm::machine::eval_lambda(lambda *raw_program) {
+
+
+
+
+
   int max_sp = 0;
   // gil_mtx.lock();
   // raw_program->code->print();]
@@ -293,7 +300,8 @@ ref vm::machine::eval_lambda(lambda *raw_program) {
     printf("---------------------------------------\n");
   };
 
-#define DEFAULT_PRELUDE check_stack_size_and_resize();
+#define DEFAULT_PRELUDE \
+  check_stack_size_and_resize();
 
 #ifdef VM_TRACE
 
@@ -426,20 +434,11 @@ instruction_name(op)); \ last_time = now;
 
 loop:
 
-  // printf("preds: %ld\n", correct_predictions);
-  // TODO: every n instructions, clean up the stack
-  //       by setting all references above the sp to null
-  //       also tweak this value intelligently
-
   // read the opcode from the instruction pointer
   op = *ip;
 
   ip++;
   goto *threaded_labels[op];
-
-  // gil_mtx.unlock();
-  // let other threads do things
-  // gil_mtx.lock();
 
   // OP_NOP is currently a catchall. If this instruction is
   // encountered, an error is printed and the program just exits...
@@ -456,6 +455,7 @@ loop:
     PUSH(nullptr);
     DISPATCH;
   }
+
 
   TARGET(OP_CONST) {
     PRELUDE;
@@ -580,7 +580,7 @@ loop:
 
           // if the lambda call should be a new call on the c stack, call it
           // that way
-          if (is_exceptional) {
+          if (true || is_exceptional) {
             ref ret_val = eval_lambda(new_program);
             stack[new_fp] = ret_val;
             sp = new_fp + 1;

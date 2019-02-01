@@ -29,18 +29,35 @@
 #include <cedar/object/sequence.h>
 #include <cedar/ref.h>
 #include <cedar/runes.h>
+#include <gc/gc_cpp.h>
 #include <unordered_map>
 
+#include <vector>
+
+#define DICT_DEFAULT_SIZE 10
 namespace cedar {
 
   class dict : public indexable {
    private:
-    std::unordered_map<ref, ref> table;
+    struct bucket : public gc_cleanup {
+      u64 hash = 0;
+      ref key = nullptr;
+      ref val = nullptr;
+      bucket *next = nullptr;
+    };
+
+    int m_size = 0;
+    std::vector<bucket *> m_buckets;
+
+    void rehash(int);
+
+    // find a bucket given some key
+    bucket *find_bucket(ref);
 
    public:
     dict(void);
+    dict(int);
     ~dict(void);
-
 
     inline const char *object_type_name(void) { return "dict"; };
     bool has_key(ref);
@@ -49,7 +66,7 @@ namespace cedar {
     ref set(ref, ref);
     ref keys(void);
     ref append(ref);
-    inline i64 size(void) { return table.size(); }
+    inline i64 size(void) { return m_size; }
 
    protected:
     cedar::runes to_string(bool human = false);

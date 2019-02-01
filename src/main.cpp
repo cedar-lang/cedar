@@ -22,13 +22,8 @@
  * SOFTWARE.
  */
 
-/*
- * this file is the entry point for the `cedar` command line utility, as cedar
- * is a library that can be dynamically linked into any c++ program. Because of
- * this, the primary cedar program is dynamically linked to libcedar.so,
- * wherever that might be.
- */
 
+#include <apathy.h>
 #include <cedar.h>
 #include <cedar/lib/linenoise.h>
 #include <ctype.h>
@@ -41,6 +36,7 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <uv.h>
 #include <chrono>
 #include <exception>
 #include <iostream>
@@ -49,47 +45,58 @@
 #include <string>
 #include <thread>
 #include <typeinfo>
+#include <uvw.hpp>
 
+cedar::vm::machine cvm;
 
-
-
-
-
-
+std::thread start_daemon_thread(short);
 
 using ref = cedar::ref;
-
-
-
-
-
 
 static void help(void);
 static void usage(void);
 
+
+using namespace cedar;
+
+cedar::type::method lambda_wrap(ref func) {
+  if (lambda *fn = ref_cast<lambda>(func); fn != nullptr) {
+    return [func] (int argc, ref *argv, vm::machine *m) -> ref {
+      lambda *fn = ref_cast<lambda>(func)->copy();
+      fn->prime_args(argc, argv);
+      return m->eval_lambda(fn);
+    };
+  }
+
+  throw cedar::make_exception("lambda_wrap requires a lambda object");
+}
+
+
+
 int main(int argc, char **argv) {
 
-  cedar::vm::machine vm;
 
-  vm.bind(new cedar::symbol("*cedar-version*"), new cedar::string(CEDAR_VERSION));
+
+  cvm.bind(new cedar::symbol("*cedar-version*"),
+          new cedar::string(CEDAR_VERSION));
 
   srand((unsigned int)time(nullptr));
   try {
-
     bool interactive = false;
     bool daemon = false;
 
     std::thread daemon_thread;
 
     char c;
-    while ((c = getopt(argc, argv, "id:he:")) != -1) {
+    while ((c = getopt(argc, argv, "iD:he:")) != -1) {
       switch (c) {
         case 'h':
           help();
           exit(0);
 
-        case 'd': {
+        case 'D': {
           daemon = true;
+          daemon_thread = start_daemon_thread(atoi(optarg));
           // int port = atoi(optarg);
           // daemon_thread = std::thread(cedar_daemon, ctx, port);
         } break;
@@ -101,7 +108,7 @@ int main(int argc, char **argv) {
           // TODO: implement evaluate argument
         case 'e': {
           cedar::runes expr = optarg;
-          vm.eval_string(expr);
+          cvm.eval_string(expr);
           break;
         };
         default:
@@ -111,27 +118,42 @@ int main(int argc, char **argv) {
       }
     }
 
-
-    if (optind == argc) {
+    if (optind == argc && !daemon) {
       interactive = true;
     }
-    for (int index = optind; index < argc; index++) {
-      vm.eval_file(argv[index]);
-    }
 
+    if (optind < argc) {
+      std::string path = cedar::path_resolve(argv[optind]);
+
+      cvm.bind(cedar::new_obj<cedar::symbol>("*main*"),
+              cedar::new_obj<cedar::string>(path));
+
+      // there are also args, so make that vector...
+      ref args = new cedar::vector();
+
+      optind++;
+      for (int i = optind; i < argc; i++) {
+        args = cedar::idx_append(args, new cedar::string(argv[i]));
+      }
+      cvm.bind(cedar::new_obj<cedar::symbol>("*args*"),
+              args);
+      cvm.eval_file(path);
+    }
 
 
     // the repl
-    int repl_ind = 0;
+    // int repl_ind = 0;
     if (interactive) {
-      printf("cedar lisp v%s\n", CEDAR_VERSION);
       printf("\n");
+      printf("cedar lisp v%s\n", CEDAR_VERSION);
       cedar::reader repl_reader;
 
       while (interactive) {
         char *buf = linenoise("> ");
-        if (buf == nullptr) break;
-
+        if (buf == nullptr) {
+          printf("\x1b[1A");
+          break;
+        }
         cedar::runes b = buf;
 
         if (b.size() == 0) {
@@ -142,12 +164,14 @@ int main(int argc, char **argv) {
         linenoiseHistoryAdd(buf);
         free(buf);
         try {
-          ref res = vm.eval_string(b);
+          ref res = cvm.eval_string(b);
+          /*
           cedar::runes name = "$";
           name += std::to_string(repl_ind++);
           ref binding = cedar::new_obj<cedar::symbol>(name);
           vm.bind(binding, res);
-          std::cout << name << ": " << "\x1B[33m" << res << "\x1B[0m" << std::endl;
+          */
+          std::cout << "\x1B[33m" << res << "\x1B[0m" << std::endl;
         } catch (std::exception &e) {
           std::cerr << "err: " << e.what() << std::endl;
         }
@@ -187,3 +211,75 @@ static void help(void) {
   printf("\n");
 }
 
+void daemon_thread(short port) {
+  auto loop = uvw::Loop::getDefault();
+  auto tcp = loop->resource<uvw::TCPHandle>();
+
+  tcp->on<uvw::ErrorEvent>([](const uvw::ErrorEvent &e, uvw::TCPHandle &h) {
+    //
+    std::cerr << e.what() << std::endl;
+  });
+
+  tcp->on<uvw::ListenEvent>([](const uvw::ListenEvent &, uvw::TCPHandle &srv) {
+    std::shared_ptr<uvw::TCPHandle> client =
+        srv.loop().resource<uvw::TCPHandle>();
+
+    std::string welcome = "cedar lisp v" CEDAR_VERSION "\n";
+
+    client->on<uvw::ConnectEvent>(
+        [&](const uvw::ConnectEvent &e, uvw::TCPHandle &h) {});
+
+    client->on<uvw::DataEvent>([&](const uvw::DataEvent &e, uvw::TCPHandle &h) {
+      /* data received */
+      cedar::runes str = e.data.get();
+
+      std::string headers;
+      std::string body;
+
+      try {
+        ref res = cvm.eval_string(str);
+        headers += "200 OKAY\n";
+        body += res.to_string();
+
+      } catch (std::exception &e) {
+        headers += "500 EXCEPTION\n";
+
+        body += e.what();
+      } catch (cedar::ref r) {
+        headers += "501 UNCAUGHT\n";
+
+        body += "Uncaught exception: ";
+        body += r.to_string();
+      }
+
+      std::string response;
+      response += headers;
+      response += "\n";
+      response += body;
+      response += "\n";
+
+      h.write(response.data(), response.size());
+    });
+
+    client->on<uvw::EndEvent>(
+        [](const uvw::EndEvent &e, uvw::TCPHandle &client) {
+          //
+          client.close();
+        });
+
+    srv.accept(*client);
+    client->write(welcome.data(), welcome.size());
+    client->read();
+  });
+
+  tcp->init();
+  tcp->bind("127.0.0.1", port);
+  printf("Daemon Listening on 127.0.0.1:%d\n", port);
+  tcp->listen();
+  loop->run();
+}
+
+std::thread start_daemon_thread(short port) {
+  auto th = std::thread(daemon_thread, port);
+  return th;
+}

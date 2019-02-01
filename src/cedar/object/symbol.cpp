@@ -32,6 +32,8 @@
 #include <cedar/memory.h>
 #include <cedar/util.hpp>
 
+#include <vector>
+
 using namespace cedar;
 
 

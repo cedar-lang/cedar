@@ -31,7 +31,7 @@
 #include <locale>
 #include <sstream>
 #include <iostream>
-
+#include <utf8.h>
 #include <cedar/runes.h>
 
 

@@ -50,6 +50,10 @@ namespace cedar {
 
   extern long object_count;
 
+  // forward declare the type object and the dict type
+  class type;
+  class dict;
+
   class object : public gc_cleanup, public with_meta {
    public:
 
@@ -58,15 +62,14 @@ namespace cedar {
     // references to this particular object on the heap
     u32 refcount = 0;
 
+    type *m_type;
+    dict *m_attrs;
+
 
     virtual u64 hash(void) = 0;
 
-    object() {
-      object_count++;
-    }
-    ~object() {
-      object_count--;
-    };
+    object();
+    ~object();
 
     virtual const char *object_type_name(void) = 0;
 

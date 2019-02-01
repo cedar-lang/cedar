@@ -32,12 +32,14 @@
 #include <cedar/memory.h>
 #include <cedar/util.hpp>
 
+#include <vector>
+
 using namespace cedar;
 
 
 // WARNING: the symbol table is interned, and therefor is not Garbage Collected or refcounted.
 // This is because there is no real way to check if something is refering to a symbol or not...
-std::vector<cedar::runes> cedar::keyword_table = {U":nil"};
+std::vector<cedar::runes> cedar::keyword_table = {};
 
 static int find_or_insert_symbol_table(cedar::runes sym) {
   for (size_t i = 0; i < keyword_table.size(); i++) {

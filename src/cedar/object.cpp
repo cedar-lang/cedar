@@ -42,3 +42,13 @@ bool object::is_pair(void) {
 	if (rest.is<list>()) return false;
 	return true;
 }
+
+
+// the object constructor and destructor keeps
+// track of how many objects are allocated
+object::object(void) {
+  object_count++;
+}
+object::~object(void) {
+  object_count--;
+}

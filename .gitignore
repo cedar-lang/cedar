@@ -7,3 +7,5 @@ test/test
 test/*.o
 bin
 cmake-build-debug
+*.h.pch
+*.h.gch
