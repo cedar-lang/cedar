@@ -265,6 +265,79 @@ void vm::compiler::compile_list(ref obj, vm::bytecode &code, scope_ptr sc,
     return;
   }
 
+
+
+
+  // dot special form
+  if (list_is_call_to(".", obj)) {
+    ref curr = obj.rest();
+
+    // load in the first item in the dot
+    compile_object(curr.first(), code, sc, ctx);
+
+    curr = curr.rest();
+
+    while (!curr.is_nil()) {
+      ref a = curr.first();
+
+      if (a.is<symbol>()) {
+        // compile getattr
+        auto *s = a.as<symbol>();
+        int id = s->id;
+
+        code.write((u8) OP_GET_ATTR);
+        code.write((i64) id);
+
+      } else if (a.is<list>()) {
+        // compile calls
+        ref method_ref = a.first();
+        ref args = a.rest();
+
+        // duplicate the top of the stack
+        code.write((u8)OP_DUP);
+        code.write((i64) 1);
+
+        if (!method_ref.is<symbol>()) {
+          throw cedar::make_exception("invalid syntax in dot special form: ", obj, " method call '", method_ref ,"' must be a symbol");
+        }
+
+        int id = method_ref.as<symbol>()->id;
+        code.write((u8)OP_GET_ATTR);
+        code.write((i64) id);
+
+        code.write((u8)OP_SWAP);
+
+
+        int argc = 1;
+
+        while (!args.is_nil()) {
+          argc++;
+          compile_object(args.first(), code, sc, ctx);
+          args = args.rest();
+        }
+
+        code.write((uint8_t)OP_CALL);
+        code.write((i64)argc);
+      } else {
+        throw cedar::make_exception("invalid syntax in dot special form: ", obj);
+      }
+      curr = curr.rest();
+    }
+    return;
+  }
+
+
+  if (list_is_call_to("cons", obj)) {
+    auto args = obj.rest();
+    auto a = args.first();
+    auto b = args.rest().first();
+
+    compile_object(b, code, sc, ctx);
+    compile_object(a, code, sc, ctx);
+    code.write((u8)OP_CONS);
+    return;
+  }
+
   // let is a special form, not expanded by macros
   if (list_is_call_to("let*", obj)) {
     std::vector<ref> arg_names;
@@ -358,7 +431,8 @@ void vm::compiler::compile_list(ref obj, vm::bytecode &code, scope_ptr sc,
 void vm::compiler::compile_vector(ref vec_ref, vm::bytecode &code, scope_ptr sc,
                                   compiler_ctx *ctx) {
 
-  static ref vec_sym = new symbol("vector");
+  // load the vector constructor
+  static ref vec_sym = new symbol("Vector");
 
   std::vector<ref> elems;
 

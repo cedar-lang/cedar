@@ -32,6 +32,41 @@
 
 using namespace cedar;
 
+
+type *ref::type(void) {
+  if (is_nil()) {
+    return nil_type;
+  }
+  if (is_number()) {
+    return number_type;
+  }
+  return m_obj->m_type;
+}
+
+ref ref::getattr(ref k) {
+  if (is_nil()) {
+    return nil_type->get_field(k);
+  }
+
+  if (is_number()) {
+    return number_type->get_field(k);
+  }
+
+  return m_obj->getattr(k);
+}
+
+void ref::setattr(ref k, ref v) {
+  if (is_nil()) {
+    return;
+  }
+
+  if (is_number()) {
+    throw cedar::make_exception("numbers have no attributes, so setattr fails");
+  }
+
+  return m_obj->setattr(k, v);
+}
+
 void cedar::ref::retain(void) {
   if (is_obj() && m_obj != nullptr) {
     m_obj->refcount++;

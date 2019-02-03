@@ -25,7 +25,10 @@
 #define OP_JUMP                     0x12
 #define OP_JUMP_IF_FALSE            0x13
 #define OP_RECUR                    0x14
-#define OP_EVAL                     0x15
+#define OP_DUP                      0x15
+#define OP_SWAP                     0x16
+#define OP_GET_ATTR                 0x17
+#define OP_EVAL                     0x18
 
 /* Instruction opcode foreach macro for code generation */
 /* Arg order: (name, bytecode, type, stack effect */
@@ -51,6 +54,9 @@
   V(JUMP, OP_JUMP, imm_int, 0) \
   V(JUMP_IF_FALSE, OP_JUMP_IF_FALSE, imm_int, 0) \
   V(RECUR, OP_RECUR, imm_int, 0) \
+  V(DUP, OP_DUP, imm_int, 1) \
+  V(SWAP, OP_SWAP, no_arg, 0) \
+  V(GET_ATTR, OP_GET_ATTR, imm_int, 0) \
   V(EVAL, OP_EVAL, no_arg, 0)
 
 #endif

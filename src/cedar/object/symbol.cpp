@@ -31,6 +31,7 @@
 #include <cedar/object/symbol.h>
 #include <cedar/memory.h>
 #include <cedar/util.hpp>
+#include <cedar/objtype.h>
 
 #include <vector>
 
@@ -46,6 +47,10 @@ struct symbol_table_entry {
 
 std::vector<symbol_table_entry> symbol_table;
 
+cedar::runes cedar::get_symbol_id_runes(int i) {
+  return symbol_table[i].sym;
+}
+
 static int find_or_insert_symbol_table(cedar::runes sym) {
   u64 hash = std::hash<cedar::runes>()(sym);
   for (size_t i = 0; i < symbol_table.size(); i++) {
@@ -57,8 +62,16 @@ static int find_or_insert_symbol_table(cedar::runes sym) {
   return symbol_table.size() - 1;
 }
 
-cedar::symbol::symbol(void) {}
+
+i32 cedar::get_symbol_intern_id(cedar::runes s) {
+  return find_or_insert_symbol_table(s);
+}
+
+cedar::symbol::symbol(void) {
+  m_type = symbol_type;
+}
 cedar::symbol::symbol(cedar::runes content) {
+  m_type = symbol_type;
   id = find_or_insert_symbol_table(content);
 }
 

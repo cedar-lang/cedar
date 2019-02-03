@@ -34,12 +34,15 @@
 #include <atomic>
 #include <cstdint>
 #include <new>
-#include <map>
-#include <cedar/with_meta.h>
+#include <unordered_map>
+#include <cedar/vm/binding.h>
 
 #define GC_OPERATOR_NEW_ARRAY
 #include <gc/gc.h>
+
+#define GC_OPERATOR_NEW_ARRAY
 #include <gc/gc_cpp.h>
+
 
 
 namespace cedar {
@@ -54,24 +57,66 @@ namespace cedar {
   class type;
   class dict;
 
-  class object : public gc_cleanup, public with_meta {
+  namespace vm { class machine; };
+
+
+
+  class attr_map {
+    public:
+      struct bucket {
+        int key;
+        ref val;
+        bucket *next = nullptr;
+      };
+
+      ~attr_map(void);
+
+      bucket **m_buckets = nullptr;
+
+      void init(void);
+
+
+      bool has(int);
+
+      bucket *buck(int);
+      ref at(int);
+      void set(int, ref);
+      int size(void);
+      void rehash(int);
+  };
+
+
+  class object : virtual public gc_cleanup {
    public:
 
     // object_type *type = nullptr;
     // refcount is used by the `ref` class to determine how many things hold
     // references to this particular object on the heap
-    u32 refcount = 0;
-
+    u16 refcount = 0;
     type *m_type;
-    dict *m_attrs;
+
+    attr_map m_attrs;
 
 
-    virtual u64 hash(void) = 0;
+    ref getattr_fast(int);
+    void setattr_fast(int, ref);
+
+    ref getattr(ref);
+    void setattr(ref, ref);
+    void setattr(runes, bound_function);
+
+
+    // self call an attr with some symbol id
+    // and sets the bool pointer to true if it
+    // succeeded
+    ref self_call(int, bool*);
+
+    virtual u64 hash(void);
 
     object();
     ~object();
 
-    virtual const char *object_type_name(void) = 0;
+    virtual const char *object_type_name(void);
 
     bool is_pair(void);
 
@@ -82,7 +127,7 @@ namespace cedar {
     friend ref;
 
 
-    virtual cedar::runes to_string(bool human = false) = 0;
+    virtual cedar::runes to_string(bool human = false);
 
     /*
      * type_name

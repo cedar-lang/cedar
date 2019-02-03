@@ -56,7 +56,6 @@ using ref = cedar::ref;
 static void help(void);
 static void usage(void);
 
-
 using namespace cedar;
 
 cedar::type::method lambda_wrap(ref func) {
@@ -71,10 +70,7 @@ cedar::type::method lambda_wrap(ref func) {
   throw cedar::make_exception("lambda_wrap requires a lambda object");
 }
 
-
-
 int main(int argc, char **argv) {
-
 
 
   cvm.bind(new cedar::symbol("*cedar-version*"),
@@ -142,7 +138,7 @@ int main(int argc, char **argv) {
 
 
     // the repl
-    // int repl_ind = 0;
+    int repl_ind = 0;
     if (interactive) {
       printf("\n");
       printf("cedar lisp v%s\n", CEDAR_VERSION);
@@ -165,13 +161,11 @@ int main(int argc, char **argv) {
         free(buf);
         try {
           ref res = cvm.eval_string(b);
-          /*
           cedar::runes name = "$";
           name += std::to_string(repl_ind++);
           ref binding = cedar::new_obj<cedar::symbol>(name);
-          vm.bind(binding, res);
-          */
-          std::cout << "\x1B[33m" << res << "\x1B[0m" << std::endl;
+          cvm.bind(binding, res);
+          std::cout << name << ": " << "\x1B[33m" << res << "\x1B[0m" << std::endl;
         } catch (std::exception &e) {
           std::cerr << "err: " << e.what() << std::endl;
         }

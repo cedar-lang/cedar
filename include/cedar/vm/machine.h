@@ -34,6 +34,7 @@
 #include <map>
 #include <tuple>
 #include <vector>
+#include <mutex>
 
 namespace cedar {
 
@@ -68,6 +69,8 @@ namespace cedar {
       // with it, we must have a mapping from hash values to indexes
       std::map<u64, i64> global_symbol_lookup_table;
 
+      // a mutex lock around the reading and writing of global variables
+      std::mutex globals_lock;
 
       ref true_value;
       machine(void);
@@ -87,5 +90,11 @@ namespace cedar {
       ref eval_file(cedar::runes);
       ref eval_string(cedar::runes);
     };
+
+
+    ref call_function(lambda *fn, int argc, ref *argv);
+
   }  // namespace vm
+
+  extern vm::machine *primary_machine;
 }  // namespace cedar

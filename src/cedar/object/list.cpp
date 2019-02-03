@@ -30,16 +30,20 @@
 using namespace cedar;
 
 list::list(void) {
+  m_type = list_type;
   m_first = nullptr;
   m_rest = nullptr;
 }
 
 list::list(ref first, ref rest) {
+  m_type = list_type;
   m_first = first;
   m_rest = rest;
 }
 
 list::list(std::vector<ref> items) {
+  m_type = list_type;
+
   if (items.size() == 0) return;
 
   ref sac = new_obj<list>();

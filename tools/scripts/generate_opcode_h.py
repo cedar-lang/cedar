@@ -72,6 +72,11 @@ new_op('RECUR', 'imm_int', effect=0)
 
 
 
+new_op('DUP', 'imm_int', effect=1)
+new_op('SWAP', effect=0)
+
+new_op('GET_ATTR', 'imm_int', effect=0);
+
 new_op('EVAL', effect=0)
 
 def main(outfile):

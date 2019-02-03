@@ -30,6 +30,7 @@
 
 #include <cedar/object.h>
 #include <cedar/runes.h>
+#include <cedar/object/lambda.h>
 #include <vector>
 #include <functional>
 
@@ -41,28 +42,35 @@ namespace cedar {
     class machine;
   }
 
-  // fwd declare
-  class dict;
+  class type;
 
-  class type {
+  class type : public object {
     public:
 
 
       using method = std::function<ref(int, ref*, vm::machine*)>;
-
-
-      dict *m_fields = nullptr;
       std::vector<type*> m_parents;
       cedar::runes m_name;
 
-      method f_first;
-      method f_rest;
 
-      method f_str;
-      method f_new;
+      attr_map m_fields;
+      void set_field(ref, ref);
+      void set_field(cedar::runes, bound_function);
+      ref get_field(ref);
+      ref get_field_fast(int);
+
 
       type(cedar::runes);
       ~type(void);
+
+      inline const char *object_type_name(void) {
+        return "type";
+      }
+
+      inline u64 hash(void) {
+        // types are only equal if they are the same type object in memory
+        return (u64)this;
+      }
 
   };
 
@@ -70,16 +78,21 @@ namespace cedar {
 #define FOR_EACH_OBJECT_TYPE(V) \
   V(object) \
 
+
+  extern type *type_type;
   extern type *object_type;
-  extern type *number_type;
-  extern type *dict_type;
-  extern type *keyword_type;
-  extern type *lambda_type;
   extern type *list_type;
-  extern type *vector_type;
+
+  extern type *nil_type;
+  extern type *number_type;
   extern type *string_type;
+
+  extern type *vector_type;
+  extern type *dict_type;
+
   extern type *symbol_type;
 
+  // initialize all the builtin types
   void type_init(void);
 };
 

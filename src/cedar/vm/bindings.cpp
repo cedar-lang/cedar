@@ -387,6 +387,13 @@ cedar_binding(cedar_binary_shift_right) {
   return res;
 }
 
+
+cedar_binding(cedar_binary_shift_right_logic) {
+  ERROR_IF_ARGS_PASSED_IS("bit-shift-right-logic", !=, 2);
+  i64 res = ((u64)argv[0].to_int()) >> (u64)argv[1].to_int();
+  return res;
+}
+
 cedar_binding(cedar_newvector) {
   ref v = new_obj<vector>();
   for (int i = 0; i < argc; i++) v = idx_append(v, argv[i]);
@@ -603,8 +610,8 @@ void init_binding(cedar::vm::machine *m) {
   m->bind("cedar/hash", cedar_hash);
   m->bind("cedar/id", cedar_id);
 
-  m->bind("first", cedar_first);
-  m->bind("rest", cedar_rest);
+  m->bind("first*", cedar_first);
+  m->bind("rest*", cedar_rest);
   m->bind("cons", cedar_cons);
 
   m->bind("<", cedar_lt);
@@ -617,6 +624,7 @@ void init_binding(cedar::vm::machine *m) {
   m->bind("bit-xor", cedar_binary_xor);
   m->bind("bit-shift-left", cedar_binary_shift_left);
   m->bind("bit-shift-right", cedar_binary_shift_right);
+  m->bind("bit-shift-right-logic", cedar_binary_shift_right_logic);
 
   m->bind("os-open", cedar_os_open);
   m->bind("os-write", cedar_os_write);
@@ -657,6 +665,26 @@ void init_binding(cedar::vm::machine *m) {
   m->bind("vars", cedar_vars);
 
   m->bind("catch*", cedar_catch);
+
+
+
+  m->bind("ex/type", bind_lambda(argc, argv, machine) {
+    return argv[0]->m_type;
+  });
+
+
+  m->bind("getattr*", bind_lambda(argc, argv, machine) {
+    return argv[0].getattr(argv[1]);
+  });
+  m->bind("setattr*", bind_lambda(argc, argv, machine) {
+    argv[0].setattr(argv[1], argv[2]);
+    return argv[2];
+  });
+
+  m->bind("type", bind_lambda(argc, argv, machine) {
+        ERROR_IF_ARGS_PASSED_IS("type", !=, 1);
+        return argv[0].type();
+    });
 
 #define BIND_CONSTANT(name, val) m->bind(new_obj<symbol>(#name), val)
 

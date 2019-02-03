@@ -40,6 +40,8 @@
 #include <cedar/types.h>
 
 namespace cedar {
+
+  class type;
 	class object;
 
 
@@ -308,6 +310,11 @@ namespace cedar {
 				if (is_nil()) return "nil";
 				return get_object_type_name(m_obj);
 			}
+
+
+      type *type(void);
+      ref getattr(ref);
+      void setattr(ref, ref);
 
 
 			/*

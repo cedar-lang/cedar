@@ -199,9 +199,9 @@ token lexer::lex() {
       c = next();
       buf += c;
       if (c == '.') {
-        if (has_decimal)
-          throw make_exception("invalid number syntax: '", buf,
-                               "' too many decimal points");
+        if (has_decimal) {
+          return token(tok_symbol, buf);
+        }
         has_decimal = true;
       }
     }
@@ -308,7 +308,7 @@ ref reader::parse_expr(void) {
     case tok_number:
       return parse_number();
     case tok_left_curly:
-      return parse_special_grouping_as_call("dict", tok_right_curly);
+      return parse_special_grouping_as_call("Dict", tok_right_curly);
     case tok_left_bracket:
       return parse_vector();
     case tok_left_paren:

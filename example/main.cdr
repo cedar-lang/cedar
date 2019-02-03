@@ -2,7 +2,6 @@
 (def range-step (fn (a b step)
                   (if (< a b) (cons a (range-step (+ a step) b step)))))
 
-
 (def (range a b)
     (if (< a b) (cons a (range-step (+ 1 a) b 1))))
 
@@ -12,6 +11,11 @@
          i
          (reduce f (f i (first xs)) (rest xs))))
 
+
+
+(def (fact n)
+  (cond (<= n 1) 1
+        :else (* n (fact (dec n)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -39,20 +43,21 @@
 
 
 
-(class lazy-seq
+(deftype lazy-seq
   ;; the function that will be called eventually
   (def func nil)
   ;; if the lazy sequence has been evaluated yet
   (def evaluated nil)
   ;; the value stored in the list. will be filled
   ;; when .seq is called
-  (def value :lazy-not-evaluated)
+  (def value nil)
   ;; constructor. Takes the function that will be
   ;; evaluated on .seq
-  (def (new self f) (set self 'func f))
+  (def (new self f)
+      (setattr self func f))
   ;; implementations of first and rest
-  (def (first self) (first (.seq self)))
-  (def (rest self) (rest (.seq self)))
+  (def (first self) (first* (. self (seq))))
+  (def (rest self) (rest* (. self (seq))))
   ;; the seq function "steps" this lazy sequence.
   ;; this means it checks if it's been evaluated
   ;; yet, and if it needs to, evaluates the function
@@ -61,9 +66,9 @@
   ;; in calling the function again and it returns
   ;; the value it had cached
   (def (seq self)
-    (if self.evaluated self.value
-      (do (set self 'evaluated t)
-          (set self 'value (self.func)))))
+    (if (. self evaluated) (. self value)
+      (do (setattr self evaluated t)
+          (setattr self value ((. self func))))))
   ;; convert the lazy list into a string.
   ;; WARNING: this will consume the *entire*
   ;; list
@@ -71,7 +76,8 @@
     (str "(" (join self " ") ")")))
 
 (defmacro lazily (& expr)
-  `(new lazy-seq (fn () (do ,@expr))))
+  `(lazy-seq (fn () (do ,@expr))))
+
 
 
 
@@ -79,42 +85,42 @@
   (lazily (cons start (walk (inc start)))))
 
 
-;; TODO: add this to the stdlib
-(def (contains? coll k)
-  (cond (nil? coll) nil
-        (= (first coll) k) true
-        :otherwise (recur (rest coll) k)))
-
-;; TODO: add to stdlib
-(def (contains-where? coll pred)
-  (cond (nil? coll) nil
-        (pred (first coll)) true
-        :otherwise (recur (rest coll) pred)))
-
-;; TODO: add all flavours to stdlib
-(def (contains-number? coll)
-  (contains-where? coll number?))
-
 
 (def (hexchar x)
   (get "0123456789ABCDEF" (bit-and x 0x0F)))
 
+(def (trim-zeros s)
+  (if (= (first s) "0")
+    (trim-zeros (rest s))
+    s))
 (def (hex x)
-  (when (number? x)
-    (cond (= 0 x) ""
-          :else (str (hex (bit-shift-right x 4))
-                     (hexchar (bit-and 0x0F x))))))
+  (let [s "" i 0]
+    (while (< i 16)
+      (def s (str (hexchar (bit-and x 0x0F)) s))
+      (def x (bit-shift-right x 4))
+      (def i (inc i)))
+    (trim-zeros s)))
+
+;; (when (number? x)
+;;     (if (< 0 x) (def x (* x -1)))
+;;     (cond (= 0 x) ""
+;;           :else (str (hex (bit-shift-right-logic x 4))
+;;                      (hexchar (bit-and 0x0F x))))))
 
 
 
 
-(class c-extension
-  (def name "ext")
-  (def c-files nil)
-  (def (new self name c-files)
-    (do
-      (sets name name)
-      (sets c-files c-files))))
+(def (vmap func v)
+  (do
+    (when (not (vector? v)) (throw "vmap requires a vector"))
+    (let [len (count v)
+          i 0]
+      (while (< i len)
+        (def v (set v i (func (get v i))))
+        (def i (inc i)))
+      v)))
+
+
 
 
 (def (vrange n)
@@ -179,6 +185,8 @@
 
 
 
+
+
 (def A [[1 2 3]
         [4 5 6]
         [7 8 9]])
@@ -186,4 +194,21 @@
 (def B [[1 0 0]
         [0 1 0]
         [0 0 1]])
+
+
+(defmacro test (t & body)
+  `(let [] ,t ,@body))
+
+
+
+
+(deftype Base
+  (def (str self)
+    (String "BASE"))
+  (def (repr self)
+    (String "BASE" (gets foo nil))))
+
+(deftype Foo [Base]
+  (def (new self v)
+    (setattr self foo v)))
 

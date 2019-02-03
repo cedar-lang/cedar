@@ -30,6 +30,7 @@
 #include <cedar/ref.h>
 #include <cedar/runes.h>
 #include <vector>
+#include <cedar/objtype.h>
 
 namespace cedar {
 
@@ -40,13 +41,12 @@ namespace cedar {
   // It's also known as `cons` in some lisps, and you use `cons`
   // to construct a lisp
   class list : public sequence {
-   private:
-    // a list stores two references, the car/cdr in old lisp
-    // they will default to the `nil` singleton object
+   public:
+
     ref m_first = nullptr;
     ref m_rest = nullptr;
 
-   public:
+
     list(void);
     list(ref, ref);
     list(std::vector<ref>);

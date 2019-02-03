@@ -50,7 +50,11 @@ namespace cedar {
 			cedar::runes to_string(bool human = false);
 	};
 
+  i32 get_symbol_intern_id(cedar::runes);
+
   inline ref newsymbol(cedar::runes r) {
     return new symbol(r);
   }
+
+  cedar::runes get_symbol_id_runes(int);
 }

@@ -32,7 +32,8 @@
 namespace cedar {namespace vm { class machine; }}
 
 namespace cedar {
-	typedef ref (*bound_function)(int argc, cedar::ref *argv, cedar::vm::machine*);
+  using bound_function = std::function<ref(int, ref*, vm::machine*)>;
+	// typedef ref (*bound_function)(int argc, cedar::ref *argv, cedar::vm::machine*);
 	// using bound_function = std::function<cedar::ref(cedar::ref, cedar::vm::machine*)>;
 }
 
@@ -44,3 +45,5 @@ namespace cedar {
 #define cedar_init_sig() void cedar_module_init(void)
 #define cedar_init() cedar_init_sig() asm ("$CDR-INIT$"); cedar_init_sig()
 
+
+#define bind_lambda(argc, argv, machine) [=] (int argc, cedar::ref *argv, vm::machine *machine) -> cedar::ref

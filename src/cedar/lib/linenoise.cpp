@@ -959,11 +959,13 @@ static int linenoiseEdit(int stdin_fd, int stdout_fd, char *buf, size_t buflen,
         } else if (c == '"' && buf[l.pos] == '"') {
           linenoiseEditMoveRight(&l);
         } else {
+          /*
           if ((c == '(' || c == '"' || c == '{' || c == '[') && l.pos != 0 &&
               buf[l.pos - 1] != '\'' && buf[l.pos - 1] != '`' &&
               buf[l.pos - 1] != '@' && buf[l.pos - 1] != ',' &&
               buf[l.pos - 1] != '(' && buf[l.pos - 1] != ' ')
             linenoiseEditInsert(&l, ' ');
+            */
           int res = linenoiseEditInsert(&l, c);
           if (c == '(') {
             linenoiseEditInsert(&l, ')');

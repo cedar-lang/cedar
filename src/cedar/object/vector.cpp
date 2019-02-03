@@ -39,10 +39,12 @@ using namespace cedar;
 
 
 cedar::vector::vector(immer::flex_vector<ref> v) {
+  m_type = vector_type;
   items = v;
 }
 
 cedar::vector::vector(void) {
+  m_type = vector_type;
 }
 
 cedar::vector::~vector(void) {

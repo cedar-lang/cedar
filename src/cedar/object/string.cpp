@@ -27,6 +27,7 @@
 #include <cedar/memory.h>
 #include <cedar/object.h>
 #include <cedar/object/string.h>
+#include <cedar/objtype.h>
 #include <cedar/util.hpp>
 #include <vector>
 
@@ -35,8 +36,11 @@ using namespace cedar;
 
 static ref the_nil = nullptr;
 
-cedar::string::string(void) {}
+cedar::string::string(void) {
+  m_type = string_type;
+}
 cedar::string::string(cedar::runes content) {
+  m_type = string_type;
   m_content = content;
 }
 

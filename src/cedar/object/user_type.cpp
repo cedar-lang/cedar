@@ -235,15 +235,13 @@ ref user_type_instance::rest(void) {
 
 runes user_type_instance::to_string(bool human) {
   static ref str = new_obj<symbol>("str");
-  try {
-    ref fnr = get(str);
-    if (lambda *fn = ref_cast<lambda>(fnr); fn != nullptr) {
-      fn = fn->copy();
-      ref self = this;
-      fn->prime_args(1, &self);
-      return m_vm->eval_lambda(fn).to_string(true);
-    }
-  } catch (...) {
+  ref fnr = get(str);
+  if (lambda *fn = ref_cast<lambda>(fnr); fn != nullptr) {
+    fn = fn->copy();
+    ref self = this;
+    fn->prime_args(1, &self);
+    ref s = m_vm->eval_lambda(fn);
+    return s.to_string(true);
   }
   runes s;
   s += "<";

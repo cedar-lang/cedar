@@ -74,7 +74,7 @@ cedar::runes lambda::to_string(bool human) {
     if (code_type == bytecode_type) {
       std::sprintf(addr_buf, "%p", (void *)code.get());
     } else if (code_type == function_binding_type) {
-      std::sprintf(addr_buf, "binding %p", (void *)function_binding);
+      std::sprintf(addr_buf, "binding %p", &function_binding);
     }
 
     str += "<lambda ";
@@ -91,7 +91,7 @@ cedar::runes lambda::to_string(bool human) {
 u64 lambda::hash(void) {
   return reinterpret_cast<u64>(code_type == bytecode_type
                                    ? (void *)code.get()
-                                   : (void *)function_binding);
+                                   : &function_binding);
 }
 
 lambda *lambda::copy(void) {

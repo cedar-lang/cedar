@@ -34,25 +34,39 @@
 #include <cedar/object/string.h>
 #include <cedar/object/symbol.h>
 #include <cedar/object/user_type.h>
+#include <cedar/objtype.h>
 #include <cedar/parser.h>
 #include <cedar/ref.h>
 #include <cedar/types.h>
 #include <cedar/vm/machine.h>
 #include <cedar/vm/opcode.h>
-#include <threadpool/thread_pool.h>
 #include <unistd.h>
 #include <cedar/util.hpp>
 #include <thread>
-#include <cedar/objtype.h>
+
+#include <gc/gc.h>
 
 #include "../../lib/std.inc.h"
 
 using namespace cedar;
 
+vm::machine *cedar::primary_machine = nullptr;
+
+ref vm::call_function(lambda *fn, int argc, ref *argv) {
+  if (fn->code_type == lambda::function_binding_type) {
+    return fn->function_binding(argc, argv, primary_machine);
+  }
+
+  fn = fn->copy();
+  fn->prime_args(argc, argv);
+  return primary_machine->eval_lambda(fn);
+}
+
+
 void init_binding(cedar::vm::machine *m);
 
 vm::machine::machine(void) : m_compiler(this) {
-
+  primary_machine = this;
   // before creating anything, init the types
   type_init();
 
@@ -65,6 +79,7 @@ vm::machine::machine(void) : m_compiler(this) {
     stdsrc.push_back(src_lib_std_inc_cdr[i]);
   }
   eval_string(stdsrc);
+
 }
 
 vm::machine::~machine() {
@@ -72,6 +87,7 @@ vm::machine::~machine() {
 }
 
 void vm::machine::bind(ref symbol, ref value) {
+  std::lock_guard<std::mutex> lck(globals_lock);
   u64 hash = symbol.hash();
 
   i64 global_ind = 0;
@@ -97,6 +113,7 @@ void vm::machine::bind(runes name, bound_function f) {
 }
 
 ref vm::machine::find(ref &symbol) {
+  std::lock_guard<std::mutex> lck(globals_lock);
   u64 hash = symbol.hash();
 
   if (global_symbol_lookup_table.find(hash) ==
@@ -137,45 +154,7 @@ ref vm::machine::eval_string(cedar::runes expr) {
     }
   }
   return res;
-
-  // if we have a macro expander...
-  // create a thread pool... oh no
-  thread_pool expansion_pool(8);
-  // create a vector of the valid size, to be filled in as things get expanded
-
-  int completed = 0;
-  int job_count = top_level.size();
-
-  std::vector<ref> expanded(job_count);
-
-  std::vector<std::future<ref>> jobs(job_count);
-
-  auto *self = this;
-  auto pool_job = [macro_expander, self](ref expr) {
-    ref wrapped =
-        newlist(macro_expander, newlist(new_obj<symbol>("quote"), expr));
-    ref val = self->eval(wrapped);
-    return val;
-  };
-
-  for (int i = 0; i < job_count; i++) {
-    jobs[i] = expansion_pool.enqueue(pool_job, top_level[i]);
-  }
-
-  while (completed != job_count) {
-    for (int i = 0; i < job_count; i++) {
-      // if this job is done...
-      if (jobs[i].wait_for(std::chrono::milliseconds(10)) ==
-          std::future_status::ready) {
-        completed++;
-        expanded[i] = jobs[i].get();
-      }
-    }
-  }
-
-  return res;
 }
-
 // #define VM_TRACE
 // #define VM_TRACE_INTERACTIVE
 // #define VM_TRACE_INTERACTIVE_AUTO
@@ -215,9 +194,7 @@ static std::mutex gil_mtx;
 
 ref vm::machine::eval_lambda(lambda *raw_program) {
 
-
-
-
+  // GC_gcollect();
 
   int max_sp = 0;
   // gil_mtx.lock();
@@ -300,8 +277,7 @@ ref vm::machine::eval_lambda(lambda *raw_program) {
     printf("---------------------------------------\n");
   };
 
-#define DEFAULT_PRELUDE \
-  check_stack_size_and_resize();
+#define DEFAULT_PRELUDE check_stack_size_and_resize();
 
 #ifdef VM_TRACE
 
@@ -408,6 +384,9 @@ instruction_name(op)); \ last_time = now;
     SET_LABEL(OP_JUMP_IF_FALSE);
     SET_LABEL(OP_JUMP);
     SET_LABEL(OP_RECUR);
+    SET_LABEL(OP_DUP);
+    SET_LABEL(OP_GET_ATTR);
+    SET_LABEL(OP_SWAP);
     SET_LABEL(OP_EVAL);
     created_thread_labels = true;
   }
@@ -455,7 +434,6 @@ loop:
     PUSH(nullptr);
     DISPATCH;
   }
-
 
   TARGET(OP_CONST) {
     PRELUDE;
@@ -526,8 +504,7 @@ loop:
     auto lst = POP();
     auto val = POP();
 
-    auto list = new cedar::list(lst, val);
-    PUSH(list);
+    PUSH(val.cons(lst));
     DISPATCH;
   }
 
@@ -555,91 +532,86 @@ loop:
                             argument list */
 
     ref catcher = nullptr;
-    bool is_exceptional = op == OP_CALL_EXCEPTIONAL;
-    if (is_exceptional) {
-      catcher = stack[new_fp - 1];
-      if (!catcher.is<lambda>()) {
-        throw cedar::make_exception("exception catcher is not a lambda: ",
-                                    catcher);
+
+    if (stack[new_fp].is<lambda>()) {
+      auto *new_program = stack[new_fp].reinterpret<cedar::lambda *>();
+
+      if (new_program == nullptr) {
+        errormsg = "Function to be run in call returned nullptr";
       }
-    }
 
-    try {
-      if (stack[new_fp].is<lambda>()) {
-        auto *new_program = stack[new_fp].reinterpret<cedar::lambda *>();
+      if (new_program->code_type == lambda::bytecode_type) {
+        new_program = new_program->copy();
 
-        if (new_program == nullptr) {
-          errormsg = "Function to be run in call returned nullptr";
-          goto error;
-        }
+        new_program->prime_args(argc, stack + abp);
 
-        if (new_program->code_type == lambda::bytecode_type) {
-          new_program = new_program->copy();
-
-          new_program->prime_args(argc, stack + abp);
-
-          // if the lambda call should be a new call on the c stack, call it
-          // that way
-          if (true || is_exceptional) {
-            ref ret_val = eval_lambda(new_program);
-            stack[new_fp] = ret_val;
-            sp = new_fp + 1;
-            DISPATCH;
-          }
-
-          // otherwise, call it using the builtin frame pointer and stack
-          // pointer logic.
-          callheight++;
-          sp = abp;
-          PUSH_PTR(ip);
-          PUSH_PTR(fp);
-          fp = new_fp;
-          stack_size_required = new_program->code->stack_size;
-          ip = new_program->code->code;
-          stack[fp] = new_program;
-          program = new_program;
-          DISPATCH;
-        } else if (new_program->code_type == lambda::function_binding_type) {
-          // gil_mtx.unlock();
-          ref val = new_program->function_binding(argc, argv, this);
-          // gil_mtx.lock();
-          sp = abp - 1;
-
-          /* delete all the arguments from the stack by setting them to nullptr
-           */
-          for (int i = 0; i < argc; i++) {
-            stack[abp + i] = nullptr;
-          }
-          PUSH(val);
+        // if the lambda call should be a new call on the c stack, call it
+        // that way
+        if (true) {
+          ref ret_val = eval_lambda(new_program);
+          stack[new_fp] = ret_val;
+          sp = new_fp + 1;
           DISPATCH;
         }
-      } else if (stack[new_fp].is<user_type>()) {
-        user_type *cls = stack[new_fp].reinterpret<user_type *>();
-        ref instance = cls->instantiate(argc, stack + abp, this);
-        PUSH(instance);
+
+        // otherwise, call it using the builtin frame pointer and stack
+        // pointer logic.
+        callheight++;
+        sp = abp;
+        PUSH_PTR(ip);
+        PUSH_PTR(fp);
+        fp = new_fp;
+        stack_size_required = new_program->code->stack_size;
+        ip = new_program->code->code;
+        stack[fp] = new_program;
+        program = new_program;
+        DISPATCH;
+      } else if (new_program->code_type == lambda::function_binding_type) {
+        // gil_mtx.unlock();
+        ref val = new_program->function_binding(argc, argv, this);
+        // gil_mtx.lock();
+        sp = abp - 1;
+
+        /* delete all the arguments from the stack by setting them to nullptr
+         */
+        for (int i = 0; i < argc; i++) {
+          stack[abp + i] = nullptr;
+        }
+        PUSH(val);
         DISPATCH;
       }
-    } catch (ref e) {
-      if (is_exceptional) {
-        lambda *c = ref_cast<lambda>(catcher);
-        c = c->copy();
-        c->prime_args(1, &e);
-        PUSH(eval_lambda(c));
-        DISPATCH;
-      } else {
-        throw;
+    } else if (stack[new_fp].is<user_type>()) {
+      user_type *cls = stack[new_fp].reinterpret<user_type *>();
+      ref instance = cls->instantiate(argc, stack + abp, this);
+      PUSH(instance);
+      DISPATCH;
+    } else if (stack[new_fp].is<type>()) {
+
+      static int __alloc__id = get_symbol_intern_id("__alloc__");
+      static int new_id = get_symbol_intern_id("new");
+      // if the function to be called was a type, we need to make an instance
+      type *cls = stack[new_fp].as<type>();
+      ref alloc_func_ref = cls->getattr_fast(__alloc__id);
+
+      // allocate the instance
+      ref inst = vm::call_function(alloc_func_ref.as<lambda>(), 0, stack + new_fp);
+
+      stack[new_fp] = inst;
+
+
+      ref new_func_ref = inst->getattr_fast(new_id);
+      if (!new_func_ref.is<lambda>()) {
+        throw cedar::make_exception("`new` method for ", ref{cls}, " is not a function");
       }
-    } catch (std::exception &c_exception) {
-      if (is_exceptional) {
-        ref e = new_obj<string>(runes(c_exception.what()));
-        lambda *c = ref_cast<lambda>(catcher);
-        c = c->copy();
-        c->prime_args(1, &e);
-        PUSH(eval_lambda(c));
-        DISPATCH;
-      } else {
-        throw;
-      }
+
+
+      lambda *new_func = new_func_ref.as<lambda>();
+
+      // call the new function on the object
+      vm::call_function(new_func, argc+1, stack + new_fp);
+
+      sp = new_fp + 1;
+      DISPATCH;
     }
 
     throw cedar::make_exception(
@@ -747,6 +719,44 @@ loop:
     ip = PROG()->code->code;
 
     sp = fp + 3;
+    DISPATCH;
+  }
+
+  TARGET(OP_GET_ATTR) {
+    PRELUDE;
+    i64 id = CODE_READ(i64);
+    CODE_SKIP(i64);
+    auto val = POP();
+    // create a stack allocated symbol
+    symbol s;
+    // set it's id
+    s.id = id;
+    // make sure the refcount doesnt try to free it :)
+    s.refcount = 100;
+    // actually getattr
+    auto attr = val.getattr(&s);
+    // push the value
+    PUSH(attr);
+    DISPATCH;
+  }
+
+  TARGET(OP_DUP) {
+    PRELUDE;
+    i64 off = CODE_READ(i64);
+    auto val = stack[sp-off];
+    CODE_SKIP(i64);
+    PUSH(val);
+    DISPATCH;
+  }
+
+
+  // swap the two top values on the stack
+  TARGET(OP_SWAP) {
+    PRELUDE;
+    auto a = POP();
+    auto b = POP();
+    PUSH(a);
+    PUSH(b);
     DISPATCH;
   }
 

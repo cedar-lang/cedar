@@ -31,16 +31,21 @@
 #include <cedar/object/symbol.h>
 #include <cedar/ref.h>
 #include <cedar/util.hpp>
+#include <cedar/objtype.h>
 #include <functional>
 #include <string>
 
 using namespace cedar;
 
 cedar::dict::dict(void) {
+  m_type = dict_type;
   m_buckets = std::vector<bucket *>(DICT_DEFAULT_SIZE);
 }
 
-cedar::dict::dict(int size) { m_buckets = std::vector<bucket *>(size); }
+cedar::dict::dict(int size) {
+  m_type = dict_type;
+  m_buckets = std::vector<bucket *>(size);
+}
 
 cedar::dict::~dict(void) {
   for (bucket *b : m_buckets) {
