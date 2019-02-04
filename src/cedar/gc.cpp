@@ -35,3 +35,11 @@ void operator delete(void* ptr) _NOEXCEPT {
 void operator delete[](void* ptr) _NOEXCEPT {
 	GC_FREE(ptr);
 }
+
+
+void operator delete(void* ptr, std::size_t) _NOEXCEPT {
+	GC_FREE(ptr);
+}
+void operator delete[](void* ptr, std::size_t) _NOEXCEPT {
+	GC_FREE(ptr);
+}
