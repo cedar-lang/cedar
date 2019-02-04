@@ -683,7 +683,7 @@ void init_binding(cedar::vm::machine *m) {
 
   m->bind("type", bind_lambda(argc, argv, machine) {
         ERROR_IF_ARGS_PASSED_IS("type", !=, 1);
-        return argv[0].type();
+        return argv[0].get_type();
     });
 
 #define BIND_CONSTANT(name, val) m->bind(new_obj<symbol>(#name), val)

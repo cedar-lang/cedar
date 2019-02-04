@@ -312,7 +312,7 @@ namespace cedar {
 			}
 
 
-      type *type(void);
+      type *get_type(void);
       ref getattr(ref);
       void setattr(ref, ref);
 

@@ -90,7 +90,7 @@ static cedar_binding(type_str_lambda) {
 static cedar_binding(obj_str_lambda) {
   cedar::runes s;
   s += "<object of '";
-  s += argv[0].type()->m_name;
+  s += argv[0].get_type()->m_name;
   s += "' at ";
   char buf[20];
   sprintf(buf, "%p", argv[0].as<object>());

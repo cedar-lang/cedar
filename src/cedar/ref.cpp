@@ -33,7 +33,7 @@
 using namespace cedar;
 
 
-type *ref::type(void) {
+type *ref::get_type(void) {
   if (is_nil()) {
     return nil_type;
   }
