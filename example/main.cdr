@@ -159,8 +159,10 @@
   (let [p  (first _ps)
         ps (rest _ps)]
     (lazily (cons p (sieve (lazy-filter (prime-filter p) ps))))))
-(def (primes) (sieve (walk 2)))
 
+
+
+(def primes (sieve (walk 2)))
 
 (def (apply-to f)
   (fn (args)
