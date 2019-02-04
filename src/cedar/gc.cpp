@@ -14,22 +14,13 @@ struct gc_startup {
 static gc_startup init;
 
 
-/*
-
-
-
-void obj_finalizer(void *obj, void *x) {
-  printf("%p finalized\n", obj);
-}
 
 void* operator new(size_t size) {
   void *obj = GC_MALLOC(size);
-  GC_register_finalizer(obj, obj_finalizer, NULL, 0, 0);
 	return obj;
 }
 void* operator new[](size_t size) {
   void *obj = GC_MALLOC(size);
-  GC_register_finalizer(obj, obj_finalizer, NULL, 0, 0);
 	return obj;
 }
 
@@ -44,4 +35,3 @@ void operator delete(void* ptr) _NOEXCEPT {
 void operator delete[](void* ptr) _NOEXCEPT {
 	GC_FREE(ptr);
 }
-*/

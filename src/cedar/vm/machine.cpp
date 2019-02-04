@@ -155,9 +155,12 @@ ref vm::machine::eval_string(cedar::runes expr) {
   }
   return res;
 }
+
+
 // #define VM_TRACE
 // #define VM_TRACE_INTERACTIVE
 // #define VM_TRACE_INTERACTIVE_AUTO
+
 #define USE_PREDICT
 
 #ifdef VM_TRACE
@@ -187,6 +190,8 @@ ref vm::machine::eval(ref obj) {
   } catch (cedar::ref e) {
     std::cerr << "Uncaught Exception: " << e << std::endl;
   }
+
+  std::cerr << "Exception thrown when evaluating '" << obj << "'" << std::endl;
   return nullptr;
 }
 
@@ -243,7 +248,7 @@ ref vm::machine::eval_lambda(lambda *raw_program) {
     max_sp = std::max((int)sp, max_sp);
 
     if ((i64)sp >= (i64)stacksize - stack_size_required) {
-      auto new_size = stacksize + stack_size_required * 4;
+      auto new_size = stacksize * 2;
       auto *new_stack = new ref[new_size];
       for (i64 i = 0; i < (i64)sp; i++) {
         new_stack[i] = stack[i];
@@ -375,7 +380,6 @@ instruction_name(op)); \ last_time = now;
     SET_LABEL(OP_CONS);
     SET_LABEL(OP_APPEND);
     SET_LABEL(OP_CALL);
-    SET_LABEL(OP_CALL_EXCEPTIONAL);
     SET_LABEL(OP_MAKE_FUNC);
     SET_LABEL(OP_ARG_POP);
     SET_LABEL(OP_RETURN);
@@ -519,8 +523,7 @@ loop:
     DISPATCH;
   }
 
-  TARGET(OP_CALL)
-  TARGET(OP_CALL_EXCEPTIONAL) {
+  TARGET(OP_CALL) {
     PRELUDE;
     i64 argc = CODE_READ(i64);
     ref *argv = stack + sp - argc;
@@ -547,7 +550,7 @@ loop:
 
         // if the lambda call should be a new call on the c stack, call it
         // that way
-        if (true) {
+        if (false) {
           ref ret_val = eval_lambda(new_program);
           stack[new_fp] = ret_val;
           sp = new_fp + 1;

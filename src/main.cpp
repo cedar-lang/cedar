@@ -47,6 +47,8 @@
 #include <typeinfo>
 #include <uvw.hpp>
 
+#include <gc/gc.h>
+
 cedar::vm::machine cvm;
 
 std::thread start_daemon_thread(short);
@@ -145,7 +147,9 @@ int main(int argc, char **argv) {
       cedar::reader repl_reader;
 
       while (interactive) {
-        char *buf = linenoise("> ");
+        std::string ps1;
+        ps1 += "> ";
+        char *buf = linenoise(ps1.data());
         if (buf == nullptr) {
           printf("\x1b[1A");
           break;
