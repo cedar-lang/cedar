@@ -74,7 +74,7 @@ namespace cedar {
 				}
 
 
-				void print(void);
+				void print(u8 *ip = nullptr);
 
 
 				ref& get_const(int);

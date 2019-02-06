@@ -29,6 +29,7 @@
 #include <cedar/object.h>
 #include <cedar/object/lambda.h>
 #include <cedar/object/list.h>
+#include <cedar/objtype.h>
 #include <cedar/vm/instruction.h>
 
 using namespace cedar;
@@ -54,44 +55,29 @@ ref &cedar::closure::at(int i) {
 
 /////////////////////////////////////////////////////
 
-cedar::lambda::lambda() { code = std::make_shared<cedar::vm::bytecode>(); }
+cedar::lambda::lambda() {
+  m_type = cedar::lambda_type;
+  code = std::make_shared<cedar::vm::bytecode>();
+}
 
 cedar::lambda::lambda(std::shared_ptr<vm::bytecode> bc) {
+  m_type = cedar::lambda_type;
   code_type = bytecode_type;
   code = bc;
 }
 
 cedar::lambda::lambda(bound_function func) {
+  m_type = cedar::lambda_type;
   code_type = function_binding_type;
   function_binding = func;
 }
 
 cedar::lambda::~lambda() {}
 
-cedar::runes lambda::to_string(bool human) {
-  cedar::runes str;
-    char addr_buf[30];
-    if (code_type == bytecode_type) {
-      std::sprintf(addr_buf, "%p", (void *)code.get());
-    } else if (code_type == function_binding_type) {
-      std::sprintf(addr_buf, "binding %p", &function_binding);
-    }
-
-    str += "<lambda ";
-
-    if (!name.is_nil()) {
-      str += name.to_string(false);
-      str += " ";
-    }
-    str += addr_buf;
-    str += ">";
-  return str;
-}
 
 u64 lambda::hash(void) {
-  return reinterpret_cast<u64>(code_type == bytecode_type
-                                   ? (void *)code.get()
-                                   : &function_binding);
+  return reinterpret_cast<u64>(code_type == bytecode_type ? (void *)code.get()
+                                                          : &function_binding);
 }
 
 lambda *lambda::copy(void) {
@@ -99,6 +85,8 @@ lambda *lambda::copy(void) {
   *new_lambda = *this;
   new_lambda->refcount = 0;
   return new_lambda;
+
+
 #define COPY_FIELD(name) new_lambda->name = name
   COPY_FIELD(code_type);
   COPY_FIELD(code);
@@ -114,7 +102,9 @@ lambda *lambda::copy(void) {
 // as would be expected for whatever calling convention this lambda has
 // ie: for varargs
 void lambda::prime_args(int a_argc, ref *a_argv) {
-  this->m_closure = std::make_shared<cedar::closure>(argc, m_closure, arg_index);
+  this->m_closure =
+      std::make_shared<cedar::closure>(argc, m_closure, arg_index);
+
 
   if (a_argc != 0 && a_argv != nullptr) {
     // here we need to setup some variables which will be derived
@@ -135,15 +125,16 @@ void lambda::prime_args(int a_argc, ref *a_argv) {
       if (concrete > a_argc) {
         throw cedar::make_exception(
             "invalid arg count passed to function. given: ", a_argc,
-            " expected: ", argc, " - " , this->to_string());
+            " expected: ", argc, " - ", this->to_string());
       }
     } else {
       if (a_argc != argc) {
         throw cedar::make_exception(
             "invalid arg count passed to function. given: ", a_argc,
-            " expected: ", argc, " - " , this->to_string());
+            " expected: ", argc, " - ", this->to_string());
       }
     }
+
 
     // loop over the concrete list...
     for (int i = 0; i < concrete; i++) {

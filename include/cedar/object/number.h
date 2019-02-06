@@ -29,7 +29,6 @@
 
 #include <cedar/object.h>
 
-#include <cedar/object/sequence.h>
 #include <cedar/runes.h>
 #include <cedar/ref.h>
 

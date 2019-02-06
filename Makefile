@@ -5,17 +5,19 @@ BUILDMODE=Release
 
 BINDIR = bin
 
-default: src/lib/std.inc.h
+
+
+debug:
 	@mkdir -p $(BINDIR)
-	@cd $(BINDIR); cmake -G "Ninja" -DCMAKE_BUILD_TYPE=Debug ../; ninja
+	@cd $(BINDIR); cmake -G "Ninja"  -DCORE_DIR=$(shell pwd)/core -DCMAKE_BUILD_TYPE=Debug ../; ninja
 
-
-release: src/lib/std.inc.h
+release:
 	@mkdir -p $(BINDIR)
-	@cd $(BINDIR); cmake -G "Ninja" -DCMAKE_BUILD_TYPE=Release ../; ninja
+	@cd $(BINDIR); cmake -G "Ninja" -DCORE_DIR=$(shell pwd)/core -DCMAKE_BUILD_TYPE=Release ../; ninja
 
-src/lib/std.inc.h: ./src/lib/std.inc.cdr
-	xxd -i src/lib/std.inc.cdr > src/lib/std.inc.h
+default:
+	@mkdir -p $(BINDIR)
+	@cd $(BINDIR); cmake -G "Ninja" -DCORE_DIR=/usr/local/lib/cedar/core -DCMAKE_BUILD_TYPE=Debug ../; ninja
 
 gen:
 	@python3 tools/scripts/generate_cedar_h.py
@@ -23,7 +25,10 @@ gen:
 	@python3 tools/scripts/generate_opcode_h.py
 
 install:
-	@cd $(BINDIR); ninja install
+	cd $(BINDIR); ninja install
+	mkdir -p /usr/local/lib/cedar
+	@rm -rf /usr/local/lib/cedar/core
+	cp -r core /usr/local/lib/cedar/
 
 clean:
 	rm -rf $(BINDIR)

@@ -94,7 +94,7 @@
     (trim-zeros (rest s))
     s))
 (def (hex x)
-  (let [s "" i 0]
+  (let (s "" i 0)
     (while (< i 16)
       (def s (str (hexchar (bit-and x 0x0F)) s))
       (def x (bit-shift-right x 4))
@@ -113,8 +113,8 @@
 (def (vmap func v)
   (do
     (when (not (vector? v)) (throw "vmap requires a vector"))
-    (let [len (count v)
-          i 0]
+    (let (len (count v)
+          i 0)
       (while (< i len)
         (def v (set v i (func (get v i))))
         (def i (inc i)))
@@ -124,17 +124,17 @@
 
 
 (def (vrange n)
-  (let [i 0
-        v []]
+  (let (i 0
+        v [])
     (if (< i n)
       (recur (inc i) (cons i v))
       v)))
 
 (def (memoize f)
-  (let [mem {}
-        not-found-sym (gensym)]
+  (let (mem {}
+        not-found-sym (gensym))
     (fn (& args)
-      (let [r (get mem args not-found-sym)]
+      (let (r (get mem args not-found-sym))
         (if (= r not-found-sym)
           (set mem args (apply f args))
           r)))))
@@ -143,8 +143,8 @@
 
 (def (lazy-filter pred coll)
   (if (nil? coll) nil
-    (let [f (first coll)
-          r (rest coll)]
+    (let (f (first coll)
+          r (rest coll))
       (if (pred f)
         (lazily (cons f (lazy-filter pred r)))
         (lazy-filter pred r)))))
@@ -156,8 +156,8 @@
   (fn (x) (not= (mod x p) 0)))
 
 (def (sieve _ps)
-  (let [p  (first _ps)
-        ps (rest _ps)]
+  (let (p  (first _ps)
+        ps (rest _ps))
     (lazily (cons p (sieve (lazy-filter (prime-filter p) ps))))))
 
 
@@ -168,6 +168,8 @@
   (fn (args)
     (apply f args)))
 
+
+;; A little matrix multiply routine and friends
 (def (transpose s)
   (apply vector (map (fn (x) (apply vector x))
                      (apply zip s))))
@@ -186,9 +188,6 @@
   (apply vector (map (apply-to vector) (matmul-1 a b))))
 
 
-
-
-
 (def A [[1 2 3]
         [4 5 6]
         [7 8 9]])
@@ -198,19 +197,52 @@
         [0 0 1]])
 
 
-(defmacro test (t & body)
-  `(let [] ,t ,@body))
+(deftype MultiMethod
+  ;; constructor for the MultiMethod map wrapper
+  (def (new self)
+    ;; by default, the :default method is simply id
+    ;; TODO: decide if this is a bad idea or not
+    (do (. self methods := {:default (fn (& x) (throw "multimethod unable to find key"))})))
+  ;; add a method handler
+  (def (set-method self key method)
+    (do (set (. self methods) key method)))
+  (def (get-method self dispatch-val)
+    (catch e
+      (get (. self methods) dispatch-val)
+      (get (. self methods) :default))))
+
+
+(defmacro defmulti (name dispatch-func)
+  `(let* ((mm (MultiMethod))
+          (func ,dispatch-func))
+      ;; define the multimethod globally
+      (defn ,name (& args)
+          (apply (. mm (get-method (apply func args))) args))
+      (. ,name set-method := (fn (self dispatch-val method)
+                               (. mm (set-method dispatch-val method))))))
+         
+
+
+(defmacro defmethod (multifn dispatch-val & fn-tail)
+  `(. ,multifn (set-method ,dispatch-val (fn ,@fn-tail))))
 
 
 
 
-(deftype Base
-  (def (str self)
-    (String "BASE"))
-  (def (repr self)
-    (String "BASE" (gets foo nil))))
 
-(deftype Foo [Base]
-  (def (new self v)
-    (setattr self foo v)))
+;; define a multi method that takes any
+;; object and switches over it's type
+(defmulti parse-ast (fn (obj) (type obj)))
 
+
+(defmethod parse-ast List (obj)
+  {:op :call
+   :func (first obj)
+   :args (apply vector (map parse-ast (rest obj)))})
+
+(defmethod parse-ast Vector (obj)
+  {:op :vector
+   :elements (apply vector (map parse-ast obj))})
+
+(defmethod parse-ast :default (obj) {:op :const
+                                     :val obj})

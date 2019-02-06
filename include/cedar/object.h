@@ -37,10 +37,8 @@
 #include <unordered_map>
 #include <cedar/vm/binding.h>
 
-#define GC_OPERATOR_NEW_ARRAY
 #include <gc/gc.h>
 
-#define GC_OPERATOR_NEW_ARRAY
 #include <gc/gc_cpp.h>
 
 
@@ -85,8 +83,7 @@ namespace cedar {
       void rehash(int);
   };
 
-
-  class object : virtual public gc_cleanup {
+  class object : public gc {
    public:
 
     // object_type *type = nullptr;
@@ -114,7 +111,7 @@ namespace cedar {
     virtual u64 hash(void);
 
     object();
-    ~object();
+    virtual ~object();
 
     virtual const char *object_type_name(void);
 

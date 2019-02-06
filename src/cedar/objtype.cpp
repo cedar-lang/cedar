@@ -25,6 +25,7 @@
 #include <cedar/object/dict.h>
 #include <cedar/objtype.h>
 
+#include <cedar/object/keyword.h>
 #include <cedar/object/list.h>
 #include <cedar/object/string.h>
 #include <cedar/object/symbol.h>
@@ -75,7 +76,7 @@ void type::set_field(cedar::runes k, bound_function val) {
 ////////////////////////////////////////////////////////////
 
 static cedar_binding(type_str_lambda) {
-  type *self = argv[0].reinterpret<type *>();
+  type *self = argv[0].stat_cast<type *>();
   cedar::runes s;
   s += "<type '";
   s += self->m_name;
@@ -138,12 +139,11 @@ static void type_init_default_bindings(type *t) {
                return val;
              }));
 
-  t->setattr(
-      "__alloc__", bind_lambda(argc, argv, machine) {
-        auto *o = new object();
-        o->m_type = t;
-        return o;
-      });
+  t->setattr("__alloc__", bind_lambda(argc, argv, machine) {
+    auto *o = new object();
+    o->m_type = t;
+    return o;
+  });
 }
 
 //
@@ -157,11 +157,6 @@ static void type_init_default_bindings(type *t) {
 // initialize the `type` type. The type that all types hold
 type *cedar::type_type;
 static void init_type_type(void) {
-  type_type = new type("Type");
-  // the only type we need to explicitly set the m_type on is the type_type.
-  // because when it's constructed, it's not defined yet and no type is added
-  type_type->m_type = type_type;
-
   // bind defaults
   type_init_default_bindings(type_type);
 
@@ -248,7 +243,6 @@ static void init_type_type(void) {
 
 type *cedar::object_type;
 static void init_object_type() {
-  object_type = new type("Object");
   // default fields for str and repr
   object_type->set_field("str", obj_str_lambda);
   object_type->set_field("repr", obj_str_lambda);
@@ -276,7 +270,6 @@ static void init_object_type() {
 //
 type *cedar::list_type;
 static void init_list_type() {
-  list_type = new type("List");
   // bind defaults
   type_init_default_bindings(list_type);
 
@@ -325,7 +318,7 @@ static void init_list_type() {
   });
 
   list_type->setattr("__alloc__",
-                       bind_lambda(argc, argv, machine) { return new list(); });
+                     bind_lambda(argc, argv, machine) { return new list(); });
 
   primary_machine->bind(new symbol("List"), list_type);
 }  // init_list_type
@@ -340,12 +333,11 @@ static void init_list_type() {
 
 type *cedar::nil_type;
 static void init_nil_type() {
-  nil_type = new type("Nil");
   // bind defaults
   type_init_default_bindings(nil_type);
 
   nil_type->setattr("__alloc__",
-                      bind_lambda(argc, argv, machine) { return nullptr; });
+                    bind_lambda(argc, argv, machine) { return nullptr; });
 
   // constructor for Nil does nothing.
   nil_type->set_field("new",
@@ -372,12 +364,11 @@ static void init_nil_type() {
 
 type *cedar::number_type;
 static void init_number_type() {
-  number_type = new type("Number");
   // bind defaults
   type_init_default_bindings(number_type);
 
   number_type->setattr("__alloc__",
-                         bind_lambda(argc, argv, machine) { return 0; });
+                       bind_lambda(argc, argv, machine) { return 0; });
 
   number_type->set_field("new", bind_lambda(argc, argv, machine) {
     if (argc == 2) {
@@ -398,7 +389,6 @@ static void init_number_type() {
 
 type *cedar::string_type;
 static void init_string_type() {
-  string_type = new type("String");
   // bind defaults
   type_init_default_bindings(string_type);
 
@@ -453,7 +443,6 @@ static void init_string_type() {
 
 type *cedar::vector_type;
 static void init_vector_type() {
-  vector_type = new type("Vector");
   // bind defaults
   type_init_default_bindings(vector_type);
 
@@ -507,12 +496,11 @@ static void init_vector_type() {
 
 type *cedar::dict_type;
 static void init_dict_type() {
-  dict_type = new type("Dict");
   // bind defaults
   type_init_default_bindings(dict_type);
 
   dict_type->setattr("__alloc__",
-                       bind_lambda(argc, argv, machine) { return new dict(); });
+                     bind_lambda(argc, argv, machine) { return new dict(); });
 
   dict_type->set_field("new", bind_lambda(argc, argv, machine) {
     auto *self = argv[0].as<dict>();
@@ -547,7 +535,6 @@ static void init_dict_type() {
 
 type *cedar::symbol_type;
 static void init_symbol_type() {
-  symbol_type = new type("Symbol");
   // bind defaults
   type_init_default_bindings(symbol_type);
 
@@ -565,14 +552,71 @@ static void init_symbol_type() {
   primary_machine->bind(new symbol("Symbol"), symbol_type);
 }  // init_symbol_type
 
+//
+//
+//
+/////////////////////////////////////////////////////////////
+//
+//
+//
+
+type *cedar::keyword_type;
+static void init_keyword_type() {
+  // bind defaults
+  type_init_default_bindings(keyword_type);
+
+  keyword_type->setattr(
+      "__alloc__", bind_lambda(argc, argv, machine) { return new keyword(); });
+
+  keyword_type->set_field(
+      "new", check_arity("new", 2, bind_lambda(argc, argv, machine) {
+        auto *self = argv[0].as<keyword>();
+        cedar::runes s = argv[1].to_string(true);
+        self->set_content(s);
+        return nullptr;
+      }));
+
+  primary_machine->bind(new symbol("Keyword"), keyword_type);
+}  // init_keyword_type
+
+//
+//
+//
+/////////////////////////////////////////////////////////////
+//
+//
+//
+
+type *cedar::lambda_type;
+static void init_lambda_type() {
+  // bind defaults
+  type_init_default_bindings(lambda_type);
+
+  lambda_type->setattr(
+      "__alloc__", bind_lambda(argc, argv, machine) { return new lambda(); });
+
+  lambda_type->set_field("new", bind_lambda(argc, argv, machine) {
+    throw cedar::make_exception("explicit construction of lambda undefined");
+    return nullptr;
+  });
+
+  primary_machine->bind(new symbol("Lambda"), lambda_type);
+}  // init_lambda_type
+
 void cedar::type_init(void) {
-  init_type_type();
-  init_object_type();
-  init_list_type();
-  init_nil_type();
-  init_number_type();
-  init_string_type();
-  init_vector_type();
-  init_dict_type();
-  init_symbol_type();
+
+  // allocate all the builtin type names and variables
+#define BUILTIN_TYPE(name, str) \
+  name ## _type = new type(str);  \
+  name ## _type->m_type = type_type;
+
+#include <cedar/builtin_types.h>
+#undef BUILTIN_TYPE
+
+
+// call all of the initialize functions for each type
+#define BUILTIN_TYPE(name, str) init_##name##_type();
+#include <cedar/builtin_types.h>
+#undef BUILTIN_TYPE
+
 }

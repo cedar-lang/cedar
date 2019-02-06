@@ -26,8 +26,8 @@
 
 #include <cedar/object.h>
 
-#include <cedar/object/sequence.h>
 #include <cedar/ref.h>
+#include <cedar/object/sequence.h>
 #include <cedar/runes.h>
 #include <vector>
 #include <cedar/objtype.h>
@@ -37,9 +37,6 @@ namespace cedar {
   // the `list` type is the most common sequence used in cedar
   // it is what gets read by the reader when the sequence (..)
   // is encountered.
-  //
-  // It's also known as `cons` in some lisps, and you use `cons`
-  // to construct a lisp
   class list : public sequence {
    public:
 

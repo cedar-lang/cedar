@@ -93,7 +93,7 @@ namespace cedar {
 
 
 			inline ~ref() {
-				release();
+				// release();
 			}
 
 			inline ref() {
@@ -273,6 +273,11 @@ namespace cedar {
 					return reinterpret_cast<T>(m_obj);
 				}
 
+			template<typename T>
+				inline T stat_cast(void) const {
+					return static_cast<T>(m_obj);
+				}
+
 			/*
 			 * is<T>
 			 *
@@ -312,9 +317,13 @@ namespace cedar {
 			}
 
 
-      type *get_type(void);
+      type *get_type(void) const;
       ref getattr(ref);
       void setattr(ref, ref);
+
+      bool isa(type *) const;
+
+      bool is_seq(void);
 
 
 			/*

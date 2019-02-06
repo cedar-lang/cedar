@@ -45,10 +45,66 @@
 #include <thread>
 
 #include <gc/gc.h>
-
-#include "../../lib/std.inc.h"
-
+#include <unordered_map>
 using namespace cedar;
+
+static std::unordered_map<int, ref> macros;
+
+bool vm::is_macro(int id) {
+  if (macros.count(id)) {
+    return true;
+  }
+  return false;
+}
+
+lambda *vm::get_macro(int id) {
+  lambda *mac = ref_cast<lambda>(macros.at(id));
+  return mac;
+}
+
+void vm::set_macro(int id, ref mac) {
+  if (ref_cast<lambda>(mac) == nullptr) {
+    throw cedar::make_exception("unable to add macro ", get_symbol_id_runes(id),
+                                " to non-lambda ", mac);
+  }
+  macros[id] = mac;
+}
+
+ref vm::macroexpand_1(ref obj) {
+  if (obj.is<list>()) {
+    // loop till the macroexpand doesnt change the object
+    ref first = obj.first();
+    symbol *s = ref_cast<symbol>(first);
+    if (s != nullptr) {
+      int sid = s->id;
+      if (vm::is_macro(sid)) {
+        lambda *mac = vm::get_macro(sid);
+        int argc = 0;
+        std::vector<ref> argv;
+
+        ref args = obj.rest();
+
+        while (!args.is_nil()) {
+          argv.push_back(args.first());
+          argc++;
+          args = args.rest();
+        }
+
+        ref expanded = call_function(mac, argc, argv.data());
+
+        /*
+        std::cout << "->  " << obj << std::endl;
+        std::cout << "<-  " << expanded << std::endl;
+        std::cout << std::endl;
+        */
+
+        return expanded;
+      }
+    }
+  }
+
+  return obj;
+}
 
 vm::machine *cedar::primary_machine = nullptr;
 
@@ -62,7 +118,6 @@ ref vm::call_function(lambda *fn, int argc, ref *argv) {
   return primary_machine->eval_lambda(fn);
 }
 
-
 void init_binding(cedar::vm::machine *m);
 
 vm::machine::machine(void) : m_compiler(this) {
@@ -73,18 +128,9 @@ vm::machine::machine(void) : m_compiler(this) {
   true_value = cedar::new_obj<cedar::symbol>("t");
   bind(true_value, true_value);
   init_binding(this);
-
-  cedar::runes stdsrc;
-  for (unsigned int i = 0; i < src_lib_std_inc_cdr_len; i++) {
-    stdsrc.push_back(src_lib_std_inc_cdr[i]);
-  }
-  eval_string(stdsrc);
-
 }
 
-vm::machine::~machine() {
-  // delete[] stack;
-}
+vm::machine::~machine() {}
 
 void vm::machine::bind(ref symbol, ref value) {
   std::lock_guard<std::mutex> lck(globals_lock);
@@ -126,36 +172,29 @@ ref vm::machine::find(ref &symbol) {
 }
 
 ref vm::machine::eval_file(cedar::runes path) {
+  ref file_star = new symbol("*file*");
+
   cedar::runes src = cedar::util::read_file(path);
-  return this->eval_string(src);
+
+  ref path_obj = new string(path);
+
+  bind(file_star, path_obj);
+
+  ref val = this->eval_string(std::move(src));
+
+  return val;
 }
 
 ref vm::machine::eval_string(cedar::runes expr) {
-  static ref mac_ex_sym = new_obj<symbol>("macroexpand");
   cedar::reader reader;
   ref res = nullptr;
   auto top_level = reader.run(expr);
 
-  bool macro_expander_found = false;
-
-  ref macro_expander;
   for (auto &e : top_level) {
-    if (!macro_expander_found) macro_expander = find(mac_ex_sym);
-    if (!macro_expander.is_nil()) macro_expander_found = true;
-
-    // std::cout << macroexpand(e, this) << std::endl;
-
-    if (macro_expander_found) {
-      ref wrapped =
-          newlist(macro_expander, newlist(new_obj<symbol>("quote"), e));
-      res = eval(eval(wrapped));
-    } else {
-      res = eval(e);
-    }
+    res = eval(e);
   }
   return res;
 }
-
 
 // #define VM_TRACE
 // #define VM_TRACE_INTERACTIVE
@@ -192,19 +231,16 @@ ref vm::machine::eval(ref obj) {
   }
 
   std::cerr << "Exception thrown when evaluating '" << obj << "'" << std::endl;
+  std::cerr << std::endl;
   return nullptr;
 }
 
 static std::mutex gil_mtx;
 
 ref vm::machine::eval_lambda(lambda *raw_program) {
-
   // GC_gcollect();
 
   int max_sp = 0;
-  // gil_mtx.lock();
-  // raw_program->code->print();]
-  //
 
   if (raw_program == nullptr) {
     throw cedar::make_exception("eval_lambda passed null reference to lambda");
@@ -232,7 +268,7 @@ ref vm::machine::eval_lambda(lambda *raw_program) {
 
   cedar::runes errormsg;
 
-#define PROG() program.reinterpret<cedar::lambda *>()
+#define PROG() program.stat_cast<cedar::lambda *>()
 #define PUSH(val) (stack[sp++] = (val))
 #define PUSH_PTR(ptr) (stack[sp++].store_ptr((void *)(ptr)))
 #define POP() (stack[--sp])
@@ -276,7 +312,12 @@ ref vm::machine::eval_lambda(lambda *raw_program) {
         printf("       ");
       }
       printf("%04lx ", i);
-      std::cerr << stack[i];
+      std::string val = stack[i].to_string(false);
+      if (val.size() > 40) {
+        val.erase(40, val.size());
+        val += "...";
+      }
+      std::cerr << val;
       std::cerr << std::endl;
     }
     printf("---------------------------------------\n");
@@ -313,7 +354,7 @@ ref vm::machine::eval_lambda(lambda *raw_program) {
 #ifdef VM_TRACE_INTERACTIVE
     print_stack();
 #ifdef VM_TRACE_INTERACTIVE_AUTO
-    usleep(10000);
+    usleep(1000);
 #else
     std::cout << "Press Enter to Continue ";
     std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
@@ -390,7 +431,9 @@ instruction_name(op)); \ last_time = now;
     SET_LABEL(OP_RECUR);
     SET_LABEL(OP_DUP);
     SET_LABEL(OP_GET_ATTR);
+    SET_LABEL(OP_SET_ATTR);
     SET_LABEL(OP_SWAP);
+    SET_LABEL(OP_DEF_MACRO);
     SET_LABEL(OP_EVAL);
     created_thread_labels = true;
   }
@@ -416,6 +459,15 @@ instruction_name(op)); \ last_time = now;
   PUSH(nullptr);
 
 loop:
+
+
+  /*
+  printf("\033[2J");
+  printf("\033[2H");
+  PROG()->code->print(ip);
+  usleep(10000);
+  */
+
 
   // read the opcode from the instruction pointer
   op = *ip;
@@ -536,7 +588,9 @@ loop:
 
     ref catcher = nullptr;
 
-    if (stack[new_fp].is<lambda>()) {
+    type *fn_type = stack[new_fp].get_type();
+
+    if (stack[new_fp].isa(lambda_type)) {
       auto *new_program = stack[new_fp].reinterpret<cedar::lambda *>();
 
       if (new_program == nullptr) {
@@ -589,7 +643,6 @@ loop:
       PUSH(instance);
       DISPATCH;
     } else if (stack[new_fp].is<type>()) {
-
       static int __alloc__id = get_symbol_intern_id("__alloc__");
       static int new_id = get_symbol_intern_id("new");
       // if the function to be called was a type, we need to make an instance
@@ -597,26 +650,34 @@ loop:
       ref alloc_func_ref = cls->getattr_fast(__alloc__id);
 
       // allocate the instance
-      ref inst = vm::call_function(alloc_func_ref.as<lambda>(), 0, stack + new_fp);
+      ref inst =
+          vm::call_function(alloc_func_ref.as<lambda>(), 0, stack + new_fp);
 
       stack[new_fp] = inst;
 
-
       ref new_func_ref = inst->getattr_fast(new_id);
       if (!new_func_ref.is<lambda>()) {
-        throw cedar::make_exception("`new` method for ", ref{cls}, " is not a function");
+        throw cedar::make_exception("`new` method for ", ref{cls},
+                                    " is not a function");
       }
-
 
       lambda *new_func = new_func_ref.as<lambda>();
 
       // call the new function on the object
-      vm::call_function(new_func, argc+1, stack + new_fp);
+      vm::call_function(new_func, argc + 1, stack + new_fp);
 
+      sp = new_fp + 1;
+      DISPATCH;
+    } else if (fn_type == number_type || fn_type == keyword_type) {
+      ref key = stack[new_fp];
+      ref coll = stack[abp];
+
+      stack[new_fp] = idx_get(coll, key);
       sp = new_fp + 1;
       DISPATCH;
     }
 
+    print_stack();
     throw cedar::make_exception(
         "function to be called is not a valid callable: ", stack[new_fp]);
     goto error;
@@ -743,15 +804,33 @@ loop:
     DISPATCH;
   }
 
-  TARGET(OP_DUP) {
+  TARGET(OP_SET_ATTR) {
     PRELUDE;
-    i64 off = CODE_READ(i64);
-    auto val = stack[sp-off];
+    i64 id = CODE_READ(i64);
     CODE_SKIP(i64);
+    auto val = POP();
+    auto obj = POP();
+    // create a stack allocated symbol
+    symbol s;
+    // set it's id
+    s.id = id;
+    // make sure the refcount doesnt try to free it :)
+    s.refcount = 100;
+    // actually getattr
+    obj.setattr(&s, val);
+    // push the value
     PUSH(val);
     DISPATCH;
   }
 
+  TARGET(OP_DUP) {
+    PRELUDE;
+    i64 off = CODE_READ(i64);
+    auto val = stack[sp - off];
+    CODE_SKIP(i64);
+    PUSH(val);
+    DISPATCH;
+  }
 
   // swap the two top values on the stack
   TARGET(OP_SWAP) {
@@ -760,6 +839,18 @@ loop:
     auto b = POP();
     PUSH(a);
     PUSH(b);
+    DISPATCH;
+  }
+
+  TARGET(OP_DEF_MACRO) {
+    PRELUDE;
+    auto func = POP();
+    int id = CODE_READ(i64);
+    CODE_SKIP(i64);
+    set_macro(id, func);
+    auto s = new symbol();
+    s->id = id;
+    PUSH(id);
     DISPATCH;
   }
 

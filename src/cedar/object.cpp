@@ -46,7 +46,7 @@ bool object::is_pair(void) {
   list *lst = this->as<list>();
   ref rest = lst->rest();
   if (rest.is_nil()) return false;
-  if (rest.is<list>()) return false;
+  if (rest.get_type() == list_type) return false;
   return true;
 }
 
@@ -63,7 +63,6 @@ object::~object(void) {
 }
 
 ref object::getattr_fast(int i) {
-
   static int __class__ID = get_symbol_intern_id("__class__");
   static int __refcount__ID = get_symbol_intern_id("__rc__");
   static int __addr__ID = get_symbol_intern_id("__addr__");
@@ -76,26 +75,25 @@ ref object::getattr_fast(int i) {
     return refcount;
   }
 
-
   if (i == __addr__ID) {
     return (i64)this;
   }
 
-
-
-
-  if (auto * b = m_attrs.buck(i); b != nullptr) {
+  if (auto *b = m_attrs.buck(i); b != nullptr) {
     return b->val;
   }
 
-  if (auto * b = m_type->m_fields.buck(i); b != nullptr) {
+
+  ref val = nullptr;
+  if (auto *b = m_type->m_fields.buck(i); b != nullptr) {
     return b->val;
   }
   for (auto *t : m_type->m_parents) {
-    if (auto * b = t->m_fields.buck(i); b != nullptr) {
+    if (auto *b = t->m_fields.buck(i); b != nullptr) {
       return b->val;
     }
   }
+
   return object_type->get_field_fast(i);
 }
 
@@ -128,10 +126,10 @@ ref object::self_call(int id, bool *valid) {
   if (auto *l = ref_cast<lambda>(fn); l != nullptr) {
     ref self = this;
     ref res = vm::call_function(l, 1, &self);
-    *valid = true;
+    if (valid != nullptr) *valid = true;
     return res;
   }
-  *valid = false;
+  if (valid != nullptr) *valid = false;
   return nullptr;
 }
 
@@ -159,25 +157,17 @@ cedar::runes object::to_string(bool human) {
   return s;
 }
 
-
 u64 object::hash(void) {
   static int hash_id = get_symbol_intern_id("hash");
   bool valid;
   ref res = self_call(hash_id, &valid);
-  if (valid)
-    return res.to_int();
+  if (valid) return res.to_int();
 
-  throw cedar::make_exception("Unable to hash unknown object of type ", m_type->to_string());
+  throw cedar::make_exception("Unable to hash unknown object of type ",
+                              m_type->to_string());
 }
 
-
-const char *object::object_type_name(void) {
-  return "object";
-};
-
-
-
-
+const char *object::object_type_name(void) { return "object"; };
 
 // attr_map functions
 static constexpr u8 attr_map_size = 8;
@@ -219,9 +209,9 @@ ref attr_map::at(int i) {
     }
     b = b->next;
   }
-  throw cedar::make_exception("attribute '", get_symbol_id_runes(i) ,"' not found");
+  throw cedar::make_exception("attribute '", get_symbol_id_runes(i),
+                              "' not found");
 };
-
 
 bool attr_map::has(int i) {
   init();
@@ -235,7 +225,6 @@ bool attr_map::has(int i) {
   }
   return false;
 };
-
 
 attr_map::bucket *attr_map::buck(int i) {
   init();
@@ -254,7 +243,6 @@ void attr_map::set(int k, ref v) {
   init();
 
   int ind = k & (attr_map_size - 1);
-
 
   bucket *b = m_buckets[ind];
 

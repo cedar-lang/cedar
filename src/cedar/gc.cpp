@@ -6,8 +6,6 @@
 struct gc_startup {
   gc_startup() {
     GC_INIT();
-    // GC_enable_incremental();
-    // GC_allow_register_threads();
   }
 };
 
@@ -30,16 +28,16 @@ void* operator new[](size_t size) {
 #endif
 
 void operator delete(void* ptr) _NOEXCEPT {
-	GC_FREE(ptr);
+	// GC_FREE(ptr);
 }
 void operator delete[](void* ptr) _NOEXCEPT {
-	GC_FREE(ptr);
+	// GC_FREE(ptr);
 }
 
 
 void operator delete(void* ptr, std::size_t) _NOEXCEPT {
-	GC_FREE(ptr);
+	// GC_FREE(ptr);
 }
 void operator delete[](void* ptr, std::size_t) _NOEXCEPT {
-	GC_FREE(ptr);
+	// GC_FREE(ptr);
 }

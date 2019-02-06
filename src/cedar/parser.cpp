@@ -129,6 +129,7 @@ token lexer::lex() {
     }
     return token(tok_hash_modifier, tok);
   }
+  if (c == '\\') return token(tok_backslash, "\\");
 
   if (c == '(') return token(tok_left_paren, "(");
 
@@ -313,6 +314,8 @@ ref reader::parse_expr(void) {
       return parse_vector();
     case tok_left_paren:
       return parse_list();
+    case tok_backslash:
+      return parse_backslash_lambda();
     case tok_backquote:
       return parse_special_syntax(U"quasiquote");
     case tok_quote:
@@ -466,4 +469,23 @@ ref reader::parse_special_grouping_as_call(cedar::runes name,
   next();
 
   return list_obj;
+}
+
+
+/////////////////////////////////////////////////////
+ref reader::parse_backslash_lambda(void) {
+  std::vector<ref> items;
+  // skip over the backslash
+  next();
+
+  ref args = parse_expr();
+
+  if (!args.isa(list_type))
+    args = newlist(args);
+
+  ref body = parse_expr();
+
+  ref func = newlist(new symbol("fn"), args, body);
+
+  return func;
 }

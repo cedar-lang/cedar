@@ -82,7 +82,7 @@ void vm::bytecode::finalize(void) {
 
 
 
-void vm::bytecode::print(void) {
+void vm::bytecode::print(u8 *ip) {
 	auto ins = decode_bytecode(this);
 	int path_width = 5;
 	for (auto i : ins) {
@@ -124,7 +124,18 @@ void vm::bytecode::print(void) {
 	for (int i = 0; i < icount; i++) {
 		std::string is = ins[i].to_string(0);
 		while (is.size() < 35) is += ' ';
+
+    bool is_current = false;
+
+    ins[i].address += (u64)code;
+    if (ins[i].address == (u64)ip) {
+      is_current = true;
+    }
+
+    if (is_current) {printf("\x1b[32m");} else {
+      printf("\x1b[90m");
+    }
 		std::cout << is << " " << paths[i] << std::endl;
+    if (is_current) printf("\x1b[0m");
 	}
-	std::cout << std::endl;
 }

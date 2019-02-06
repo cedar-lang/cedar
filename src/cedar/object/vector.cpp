@@ -114,5 +114,5 @@ ref vector::rest(void) {
 }
 
 ref vector::cons(ref f) {
-  return new vector(items.push_back(f));
+  return new vector(items.push_front(f));
 }

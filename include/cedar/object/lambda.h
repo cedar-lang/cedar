@@ -96,8 +96,5 @@ namespace cedar {
     // prime_args configures the lambda with a closure and loads it
     // with the arguments according to that lambda's calling conv
     void prime_args(int argc = 0, ref *argv = nullptr);
-
-   protected:
-    cedar::runes to_string(bool human = false);
   };
 }  // namespace cedar

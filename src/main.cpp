@@ -22,7 +22,6 @@
  * SOFTWARE.
  */
 
-
 #include <apathy.h>
 #include <cedar.h>
 #include <cedar/lib/linenoise.h>
@@ -47,7 +46,10 @@
 #include <typeinfo>
 #include <uvw.hpp>
 
+#define GC_THREADS
 #include <gc/gc.h>
+
+#include <cedar/util.hpp>
 
 cedar::vm::machine cvm;
 
@@ -62,7 +64,7 @@ using namespace cedar;
 
 cedar::type::method lambda_wrap(ref func) {
   if (lambda *fn = ref_cast<lambda>(func); fn != nullptr) {
-    return [func] (int argc, ref *argv, vm::machine *m) -> ref {
+    return [func](int argc, ref *argv, vm::machine *m) -> ref {
       lambda *fn = ref_cast<lambda>(func)->copy();
       fn->prime_args(argc, argv);
       return m->eval_lambda(fn);
@@ -72,13 +74,32 @@ cedar::type::method lambda_wrap(ref func) {
   throw cedar::make_exception("lambda_wrap requires a lambda object");
 }
 
+#ifndef CORE_DIR
+#define CORE_DIR "/usr/local/lib/cedar/core"
+#endif
+
 int main(int argc, char **argv) {
-
-
   cvm.bind(new cedar::symbol("*cedar-version*"),
-          new cedar::string(CEDAR_VERSION));
+           new cedar::string(CEDAR_VERSION));
 
   srand((unsigned int)time(nullptr));
+
+  /*
+
+  cvm.bind(cedar::new_obj<cedar::symbol>("*cwd*"),
+           cedar::new_obj<cedar::string>(apathy::Path::cwd().string()));
+           */
+
+  auto core_path = apathy::Path(CORE_DIR);
+  core_path.append("core.cdr");
+
+  cedar::runes core_entry =
+      path_resolve(core_path.string(), apathy::Path::cwd());
+
+    cvm.eval_file(core_entry);
+
+
+
   try {
     bool interactive = false;
     bool daemon = false;
@@ -93,10 +114,8 @@ int main(int argc, char **argv) {
           exit(0);
 
         case 'D': {
-          daemon = true;
-          daemon_thread = start_daemon_thread(atoi(optarg));
-          // int port = atoi(optarg);
-          // daemon_thread = std::thread(cedar_daemon, ctx, port);
+          // daemon = true;
+          // daemon_thread = start_daemon_thread(atoi(optarg));
         } break;
 
         case 'i':
@@ -107,6 +126,7 @@ int main(int argc, char **argv) {
         case 'e': {
           cedar::runes expr = optarg;
           cvm.eval_string(expr);
+          return 0;
           break;
         };
         default:
@@ -116,6 +136,7 @@ int main(int argc, char **argv) {
       }
     }
 
+
     if (optind == argc && !daemon) {
       interactive = true;
     }
@@ -124,7 +145,10 @@ int main(int argc, char **argv) {
       std::string path = cedar::path_resolve(argv[optind]);
 
       cvm.bind(cedar::new_obj<cedar::symbol>("*main*"),
-              cedar::new_obj<cedar::string>(path));
+               cedar::new_obj<cedar::string>(path));
+
+      cvm.bind(cedar::new_obj<cedar::symbol>("*file*"),
+               cedar::new_obj<cedar::string>(path));
 
       // there are also args, so make that vector...
       ref args = new cedar::vector();
@@ -133,8 +157,7 @@ int main(int argc, char **argv) {
       for (int i = optind; i < argc; i++) {
         args = cedar::idx_append(args, new cedar::string(argv[i]));
       }
-      cvm.bind(cedar::new_obj<cedar::symbol>("*args*"),
-              args);
+      cvm.bind(cedar::new_obj<cedar::symbol>("*args*"), args);
       cvm.eval_file(path);
     }
 
@@ -142,6 +165,11 @@ int main(int argc, char **argv) {
     // the repl
     int repl_ind = 0;
     if (interactive) {
+      /*
+      cvm.bind(cedar::new_obj<cedar::symbol>("*file*"),
+               cedar::new_obj<cedar::string>(apathy::Path::cwd().string()));
+
+      */
       printf("\n");
       printf("cedar lisp v%s\n", CEDAR_VERSION);
       cedar::reader repl_reader;
@@ -164,14 +192,18 @@ int main(int argc, char **argv) {
         linenoiseHistoryAdd(buf);
         free(buf);
         try {
+          printf("\x1B[32m");
           ref res = cvm.eval_string(b);
+          printf("\x1B[0m");
+
           cedar::runes name = "$";
           name += std::to_string(repl_ind++);
           ref binding = cedar::new_obj<cedar::symbol>(name);
           cvm.bind(binding, res);
-          std::cout << name << ": " << "\x1B[33m" << res << "\x1B[0m" << std::endl;
+          std::cout << name << ": "
+                    << "\x1B[33m" << res << "\x1B[0m" << std::endl;
         } catch (std::exception &e) {
-          std::cerr << "err: " << e.what() << std::endl;
+          std::cerr << "Uncaught Exception: " << e.what() << std::endl;
         }
       }
     }

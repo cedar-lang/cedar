@@ -39,7 +39,6 @@
 
 #include <math.h>
 
-#define GC_THREADS
 #include <gc/gc.h>
 
 using namespace cedar;
@@ -115,6 +114,19 @@ cedar_binding(cedar_mod) {
   }
   return a.to_int() % b.to_int();
 }
+
+
+cedar_binding(cedar_pow) {
+  ERROR_IF_ARGS_PASSED_IS("**", !=, 2);
+  auto a = argv[0];
+  auto b = argv[1];
+
+  if (a.get_type() != number_type || b.get_type() != number_type) {
+    throw cedar::make_exception("** (pow) requires two numbers, given ", a, " and ", b);
+  }
+  return pow(a.to_float(), b.to_float());
+}
+
 
 cedar_binding(cedar_equal) {
   if (argc < 2)
@@ -585,6 +597,9 @@ cedar_binding(cedar_catch) {
   return nullptr;
 }
 
+
+type *reader_type;
+
 void init_binding(cedar::vm::machine *m) {
   m->bind("list", cedar_newlist);
   m->bind("dict", cedar_newdict);
@@ -599,6 +614,7 @@ void init_binding(cedar::vm::machine *m) {
   m->bind("*", cedar_mul);
   m->bind("/", cedar_div);
   m->bind("mod", cedar_mod);
+  m->bind("**", cedar_pow);
 
   m->bind("=", cedar_equal);
   m->bind("eq", cedar_equal);
@@ -686,6 +702,46 @@ void init_binding(cedar::vm::machine *m) {
         return argv[0].get_type();
     });
 
+
+  m->bind("panic", bind_lambda(argc, argv, machine) {
+        ERROR_IF_ARGS_PASSED_IS("panic", !=, 1);
+
+        std::cerr << "PANIC: " << argv[0].to_string(true) << std::endl;
+        exit(-1);
+        return nullptr;
+    });
+
+
+
+
+  m->bind("macroexpand-1", bind_lambda(argc, argv, machine) {
+        ERROR_IF_ARGS_PASSED_IS("macroexpand-1", !=, 1);
+        ref obj = argv[0];
+        return vm::macroexpand_1(obj);;
+    });
+
+
+
+
+
+
+  m->bind("resolve-source-file", bind_lambda(argc, argv, machine) {
+        ERROR_IF_ARGS_PASSED_IS("resolve-source-file", !=, 2);
+        ref p = argv[0];
+        if (p.get_type() != string_type) {
+          throw cedar::make_exception("resolve-source-file requires string path");
+        }
+        ref b = argv[1];
+        if (b.get_type() != string_type) {
+          throw cedar::make_exception("resolve-source-file requires string base hint");
+        }
+        cedar::runes path_hint = p.as<string>()->get_content();
+        apathy::Path base = b.as<string>()->get_content();
+
+        return new string(path_resolve(path_hint, base));
+
+      });
+
 #define BIND_CONSTANT(name, val) m->bind(new_obj<symbol>(#name), val)
 
   BIND_CONSTANT(S_IRWXU, 700);  /* RWX mask for owner */
@@ -707,4 +763,69 @@ void init_binding(cedar::vm::machine *m) {
 #define V(opt) m->bind(new_obj<symbol>(#opt), opt);
   FOREACH_OPEN_OPTION(V);
 #undef V
+
+
+
+
+
+
+  reader_type = new type("Reader");
+
+  class reader_obj : public object {
+    public:
+
+      bool read = false;
+      cedar::reader m_reader;
+      std::vector<ref> m_parsed;
+      unsigned long index = 0;
+      inline reader_obj() {
+        m_type = reader_type;
+      }
+  };
+
+  reader_type->setattr("__alloc__", bind_lambda(argc, argv, machine) {
+        return new reader_obj();
+      });
+
+
+  reader_type->set_field("new", bind_lambda(argc, argv, machine) {
+        if (argc != 2 || argv[1].get_type() != string_type) throw cedar::make_exception("Reader/new requires a string argument");
+
+
+        reader_obj *self = argv[0].as<reader_obj>();
+        string *s = argv[1].as<string>();
+
+        cedar::runes r = s->get_content();
+
+        self->m_parsed = self->m_reader.run(r);
+
+        return nullptr;
+      });
+
+
+  reader_type->set_field("rest", bind_lambda(argc, argv, machine) {
+        reader_obj *self = argv[0].as<reader_obj>();
+
+        if (self->index >= self->m_parsed.size()-1) {
+          return nullptr;
+        }
+
+        auto *next = new reader_obj();
+        next->m_parsed = self->m_parsed;
+        next->index = self->index + 1;
+        return next;
+      });
+
+  reader_type->set_field("first", bind_lambda(argc, argv, machine) {
+        reader_obj *self = argv[0].reinterpret<reader_obj*>();
+
+        auto *next = new reader_obj();
+        next->m_reader = self->m_reader;
+        if (self->index >= self->m_parsed.size()) {
+          return nullptr;
+        }
+        return self->m_parsed[self->index];
+      });
+
+  m->bind(new symbol("Reader"), reader_type);
 }

@@ -33,6 +33,7 @@
 
 #include "cedar/importutil.h"
 #include "cedar/version.h"
+#include "cedar/builtin_types.h"
 #include "cedar/types.h"
 #include "cedar/objtype.h"
 #include "cedar/parser.h"

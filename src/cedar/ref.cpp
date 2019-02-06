@@ -23,6 +23,7 @@
  */
 
 #include <cedar/object.h>
+#include <cedar/objtype.h>
 #include <cedar/object/list.h>
 #include <cedar/object/nil.h>
 #include <cedar/object/number.h>
@@ -33,7 +34,7 @@
 using namespace cedar;
 
 
-type *ref::get_type(void) {
+type *ref::get_type(void) const {
   if (is_nil()) {
     return nil_type;
   }
@@ -67,6 +68,26 @@ void ref::setattr(ref k, ref v) {
   return m_obj->setattr(k, v);
 }
 
+bool ref::isa(type *t) const {
+  return t == get_type();
+}
+
+
+bool ref::is_seq(void) {
+  static ref fst = new symbol("first");
+  static ref rst = new symbol("rest");
+
+  try {
+    getattr(fst);
+    getattr(rst);
+    return true;
+  } catch (...) {
+    return false;
+  }
+
+  return false;
+}
+
 void cedar::ref::retain(void) {
   if (is_obj() && m_obj != nullptr) {
     m_obj->refcount++;
@@ -74,25 +95,44 @@ void cedar::ref::retain(void) {
 }
 
 void cedar::ref::release(void) {
+  /*
   if (is_obj() && m_obj != nullptr) {
     m_obj->refcount--;
     if (m_obj->refcount == 0) {
-      delete m_obj;
+      // delete m_obj;
     }
-    m_obj = nullptr;
   }
+  clear_type_flags();
+  flags[FLAG_OBJ] = 1;
+  m_obj = nullptr;
+  */
 }
 
 ref cedar::ref::first() const {
   if (!is_obj())
     throw cedar::make_exception("unable to get first of non-object reference");
+
   if (m_obj == nullptr) return nullptr;
-  if (auto *seq = ref_cast<sequence>(m_obj); seq != nullptr) {
-    return seq->first();
-  }
-  throw cedar::make_exception("unable to get first of non-sequence reference");
+
+  if (m_obj->m_type == list_type) return dynamic_cast<list*>(m_obj)->m_first;
+
+  return self_call(*this, "first");
 }
 
+
+ref cedar::ref::rest() const {
+  if (!is_obj())
+    throw cedar::make_exception("unable to get rest of non-object reference");
+
+  if (m_obj == nullptr) return nullptr;
+
+  if (m_obj->m_type == list_type) return dynamic_cast<list*>(m_obj)->m_rest;
+
+  return self_call(*this, "rest");
+}
+
+
+/*
 ref cedar::ref::rest() const {
   if (!is_obj())
     throw cedar::make_exception("unable to get rest of non-object reference");
@@ -102,6 +142,7 @@ ref cedar::ref::rest() const {
   }
   throw cedar::make_exception("unable to get rest of non-sequence reference");
 }
+*/
 
 ref cedar::ref::cons(ref v) {
   if (is_obj()) {
@@ -125,6 +166,10 @@ void cedar::ref::set_rest(ref val) {
   if (m_obj == nullptr) return;
   return dynamic_cast<sequence *>(m_obj)->set_rest(val);
 }
+
+
+
+
 
 cedar::runes ref::to_string(bool human) {
   if (is_ptr()) {
@@ -155,6 +200,10 @@ cedar::runes ref::to_string(bool human) {
   return m_obj->to_string(human);
 }
 
+
+
+
+
 const std::type_info &cedar::get_number_typeid(void) {
   return typeid(cedar::number);
 }
@@ -174,12 +223,6 @@ uint64_t cedar::ref::symbol_hash(void) {
 bool cedar::ref::is_nil(void) const {
   if (is_obj()) {
     if (m_obj == nullptr) return true;
-    if (is<cedar::nil>()) return true;
-    /*
-if (auto *list = ref_cast<cedar::list>(*this); list != nullptr) {
-if (list->first().is_nil() && list->rest().is_nil()) return true;
-}
-    */
   }
   return false;
 }
@@ -188,7 +231,10 @@ const char *cedar::get_object_type_name(object *obj) {
   return obj->object_type_name();
 }
 
-u64 cedar::get_object_hash(object *obj) { return obj->hash(); }
+u64 cedar::get_object_hash(object *obj) {
+  if (obj == nullptr) return 0;
+  return obj->hash();
+}
 
 bool cedar::ref::operator==(ref other) const {
   if (!is_number()) {

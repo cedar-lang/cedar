@@ -29,7 +29,7 @@
 #include <cedar/vm/binding.h>
 #include <cedar/vm/bytecode.h>
 #include <cedar/vm/compiler.h>
-
+#include <cedar/object.h>
 #include <cstdio>
 #include <map>
 #include <tuple>
@@ -40,6 +40,13 @@ namespace cedar {
 
   class lambda;
   namespace vm {
+
+    // check if an id is a macro or not
+    bool is_macro(int);
+    lambda *get_macro(int);
+    void set_macro(int, ref);
+
+    ref macroexpand_1(ref);
 
     // a "var" is a storage cell in the machine. It allows
     // storage of values, docs, etc...

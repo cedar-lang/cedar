@@ -1,170 +1,140 @@
-
-; MIT License
-;
-; Copyright (c) 2018 Nick Wanninger
-;
-; Permission is hereby granted, free of charge, to any person obtaining a copy
-; of this software and associated documentation files (the "Software"), to deal
-; in the Software without restriction, including without limitation the rights
-; to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-; copies of the Software, and to permit persons to whom the Software is
-; furnished to do so, subject to the following conditions:
-;
-; The above copyright notice and this permission notice shall be included in
-; all copies or substantial portions of the Software.
-;
-; THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-; IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-; FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-; AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-; LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-; OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-; SOFTWARE.
-
+;; MIT License
+;;
+;; Copyright (c) 2018 Nick Wanninger
+;;
+;; Permission is hereby granted, free of charge, to any person obtaining a copy
+;; of this software and associated documentation files (the "Software"), to deal
+;; in the Software without restriction, including without limitation the rights
+;; to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+;; copies of the Software, and to permit persons to whom the Software is
+;; furnished to do so, subject to the following conditions:
+;;
+;; The above copyright notice and this permission notice shall be included in
+;; all copies or substantial portions of the Software.
+;;
+;; THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+;; IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+;; FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+;; AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+;; LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+;; OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+;; SOFTWARE.
 
 ;; set the initial namespace to "core"
-(def *ns* "core")
+(def* *ns* "core")
 
-(def t 't)
-(def true 'true)
-(def false nil)
-
-(def not (fn (x) (if x nil t)))
-(def or (fn (x y) (if x x y)))
-(def and (fn (x y) (if x y x)))
-
-
-(def not= (fn not= (a b) (not (= a b))))
-
-
-(def first first*)
-(def rest rest*)
+(defmacro* defmacro
+  (fn (name args & body)
+    (list 'defmacro* name
+          (list 'fn args
+                (cons 'do body)))))
 
 
 
-(def first
+(def* t 't)
+(def* true 'true)
+(def* false nil)
+
+(def* not (fn (x) (if x nil t)))
+(def* or (fn (x y) (if x x y)))
+(def* and (fn (x y) (if x y x)))
+
+(def* not= (fn not= (a b) (not (= a b))))
+
+
+(def* first
   (fn (x) (. x (first))))
 
-(def rest
+(def* rest
   (fn (x) (. x (rest))))
 
-(def len
+(def* len
   (fn (x)
     (. x (len))))
 
-;; nice wrapper around Vector using lowercase syntax
-;; like other lisps
-(def vector*
-  (fn (& args)
-    (apply Vector args)))
+(def* nil? (fn (v) (= (type v) Nil)))
+(def* list? (fn (v) (= (type v) List)))
+(def* string? (fn (v) (= (type v) String)))
 
 
-;; nice wrapper around List using lowercase syntax
-;; like other lisps
-(def list*
-  (fn (& args)
-    ;; since an args list is already a list instance,
-    ;; just return that
-    args))
-
-(def dict*
-  (fn (& args)
-    (apply Dict args)))
-
-(def nil? (fn (v) (= (type v) Nil)))
-(def list? (fn (v) (= (type v) List)))
-(def string? (fn (v) (= (type v) String)))
-
-
-(def dict? (fn (v) (= (type-of v) :dict)))
-(def vector? (fn (v) (= (type-of v) :vector)))
-(def number? (fn (v) (= (type-of v) :number)))
-(def symbol? (fn (v) (= (type-of v) :symbol)))
-(def keyword? (fn (v) (= (type-of v) :keyword)))
+(def* dict? (fn (v) (= (type v) Dict)))
+(def* vector? (fn (v) (= (type v) Vector)))
+(def* number? (fn (v) (= (type v) Number)))
+(def* symbol? (fn (v) (= (type v) Symbol)))
+(def* keyword? (fn (v) (= (type v) Keyword)))
 
 
 
-(def cdr/println println)
 
-(def debug
+;; define the identity function, just returns the arg
+(def* identity (fn (x) x))
+
+(def* read-string (fn (str) (Reader str)))
+
+;; a sequence is defined as an object that has a first
+;; and rest method
+;; unfortunately, the catch macro isn't defined yet, so
+;; we need to implement the exception handling with the
+;; internal catch* function
+(def* seq?
+  (fn (v)
+    (catch* (fn () (and (and (. v first) (. v rest)) true))
+        (fn (e) false))))
+
+
+
+(def* cdr/println println)
+
+;; (println "hello")
+
+(def* debug
   (fn (& args)
     (println "DEBUG:" (apply str args))))
 
-(def map-1
+(def* map-1
   (fn (f l)
     (if (not (nil? l))
       (cons (f (first l))
             (map-1 f (rest l))))))
 
 
-;;;;
-;;;; MACRO EXPANDER
-;;
-;;  The Cedar macro expander is implemented in the language itself
-;;  so unfortunately the macro expander cannot use macros in it's
-;;  code. It's build around the (macroexpand) function and the
-;;  semi-special cased defmacro form. macroexpand takes a quoted
-;;  expression, and the defmacro function takes a quoted name,
-;;  quoted list, and quoted body.
-;;  The defmacro function will do analysis on the args and the body
-;;  and store the raw args and the raw body in the macros dictionary
-;;
-;;;;
-
-(def qq/expand (fn (x) x))
 
 
-(def *macros* {})
-;; defmacro takes the arguments, the args and the body and stores
-;; it into the macros dict for later evaluation
-(def defmacro
-  (fn (id args body)
-    (let* ((expander (eval (list 'fn (cedar/symbol (str "macro/" id)) args (qq/expand body)))))
-      (set *macros* id expander)
-      expander)))
+(def* walk
+  (fn (inner outer form)
+     (if (list? form) (outer (map-1 inner form))
+        (outer form))))
 
-;; list-specialize does special things to lists. like checks for . notation
-;; on dictionaries, because you cannot create a macro for '.'
-;; this will be replaced with a real implementation once cond is defined
-(def macro/list-specialize
-  (fn (l) l))
+(def* postwalk
+  (fn (f form)
+      (walk (fn (x) (postwalk f x))
+            f
+            form)))
 
-
-(def macroexpand-1
-  (fn (expr)
-    (do
-      ;; only lists need to be macro expanded, cause they're calls.
-      ;; so if it's not a list, just return the bare expression
-      (if (not (list? expr))
-        expr
-        (do (def expr (macro/list-specialize expr))
-          (if (= (first expr) 'quote)
-            expr
-            (let* ((form (first expr))
-                   (args (map-1 macroexpand-1 (rest expr)))
-                   (mac (get *macros* (first expr) nil)))
-              (if (nil? mac)
-                (cons form args)
-
-                (do
-                  ;; expand the macro by evaluating it with the arguments
-                  (let* ((ex (apply mac args)))
-                    (if (list? ex)
-                      (if (= (cedar/hash ex) (cedar/hash expr))
-                        expr
-                        (macroexpand-1 ex))
-                      ex)))))))))))
+(def* prewalk
+  (fn (f form)
+    (walk (fn (x) (prewalk f x))
+          identity
+          (f form))))
 
 
-;; macroexpand takes an expression as a value and returns the
-;; value representation of the recursively expanded macro
-(def macroexpand
-  (fn (raw-expr)
-    (macroexpand-1 raw-expr)))
 
+;; fully macroexpand a single list.
+;; NOTE: does not walk down the tree
+(def* macroexpand
+  (fn (form)
+    (let* ((ex (macroexpand-1 form)))
+      (if (= ex form)
+        form
+        (macroexpand ex)))))
+
+
+
+(defmacro catch (id expr body)
+  (list 'catch* (list 'fn nil expr) (list 'fn (list id) body)))
 
 (defmacro defn (name args & body)
-  (list 'def name
+  (list 'def* name
         (list 'fn name args (cons 'do body))))
 
 (defn inc (n) (+ n 1))
@@ -172,13 +142,11 @@
 
 
 
-(defmacro catch (id expr body)
-  (list 'catch* (list 'fn nil expr) (list 'fn (list id) body)))
-
 
 (defmacro when
   (c & body)
   (list 'if c (cons 'do body)))
+
 
 
 (defmacro when-not
@@ -186,11 +154,11 @@
   (list 'if c nil (cons 'do body)))
 
 
-(def symbol cedar/symbol)
+(def* symbol cedar/symbol)
 
 (let* ((gensym-id 0))
   (defn gensyms (s)
-      (do (def gensym-id (inc gensym-id))
+      (do (def* gensym-id (inc gensym-id))
           (symbol (str s gensym-id))))
   (defn gensym () (gensyms "G__")))
 
@@ -208,8 +176,20 @@
 (defn second (x) (first (rest x)))
 
 
-(def next rest)
+(def* next rest)
 
+
+;; redefine the def* special form to allow a more
+;; complicated scheme-like function definition
+;; ex: (def foo :bar) => defines foo to :bar
+;;     (def (id x) x) => defines the id function
+;; why have this *and* the defn macro? Why not.
+(defmacro def (& args)
+  (let* ((name (first args))
+         (val  (second args)))
+    (if (list? name)
+      (list 'def* (first name) (list 'fn (first name) (rest name) val))
+      (list 'def* name val))))
 
 (defmacro cond (& a)
   (let* ((c (first a))
@@ -219,20 +199,6 @@
         (when r (cons 'cond r)))))
 
 
-
-(defmacro % (a f b) (list f b a))
-
-;; redefine the def special form to allow a more
-;; complicated scheme-like function definition
-;; ex: (def foo :bar) => defines foo to :bar
-;;     (def (id x) x) => defines the id function
-;; why have this *and* the defn macro? Why not.
-(defmacro def (& args)
-  (let* ((name (first args))
-         (val  (second args)))
-    (if (list? name)
-      (list 'def (first name) (list 'fn (first name) (rest name) val))
-      (list 'def name val))))
 
 (def (not x)
   (if x nil true))
@@ -246,10 +212,15 @@
         :else nil))
 
 
-(def (macro/list-specialize l)
-  (let* ((frst (first l)))
-    (cond (= frst 'quasiquote) (qq/expand l)
-          :else l)))
+
+(def car first)
+(def cdr rest)
+(def (caar x)   (car (car x)))
+(def (cadr x)   (car (cdr x)))
+(def (cdar x)   (cdr (car x)))
+(def (cddr x) (cdr (cdr x)))
+
+
 
 
 (def (every? pred coll)
@@ -324,38 +295,6 @@
 
 (def reduce foldl)
 
-(def car first)
-(def cdr rest)
-(def (caar x)   (car (car x)))
-(def (cadr x)   (car (cdr x)))
-(def (cdar x)   (cdr (car x)))
-(def (cddr x)   (cdr (cdr x)))
-(def (caaar x)  (car (car (car x))))
-(def (caadr x)  (car (car (cdr x))))
-(def (cadar x)  (car (cdr (car x))))
-(def (caddr x)  (car (cdr (cdr x))))
-(def (cdaar x)  (cdr (car (car x))))
-(def (cdadr x)  (cdr (car (cdr x))))
-(def (cddar x)  (cdr (cdr (car x))))
-(def (cdddr x)  (cdr (cdr (cdr x))))
-(def (caaaar x) (car (car (car (car x)))))
-(def (caaadr x) (car (car (car (cdr x)))))
-(def (caadar x) (car (car (cdr (car x)))))
-(def (caaddr x) (car (car (cdr (cdr x)))))
-(def (cadaar x) (car (cdr (car (car x)))))
-(def (cadadr x) (car (cdr (car (cdr x)))))
-(def (caddar x) (car (cdr (cdr (car x)))))
-(def (cadddr x) (car (cdr (cdr (cdr x)))))
-(def (cdaaar x) (cdr (car (car (car x)))))
-(def (cdaadr x) (cdr (car (car (cdr x)))))
-(def (cdadar x) (cdr (car (cdr (car x)))))
-(def (cdaddr x) (cdr (car (cdr (cdr x)))))
-(def (cddaar x) (cdr (cdr (car (car x)))))
-(def (cddadr x) (cdr (cdr (car (cdr x)))))
-(def (cdddar x) (cdr (cdr (cdr (car x)))))
-(def (cddddr x) (cdr (cdr (cdr (cdr x)))))
-
-
 (def (append-1 l1 l2)
   (if (nil? l1)
     l2
@@ -397,7 +336,6 @@
         :otherwise       (list 'quote argument)))
 
 
-(def *qq-c* 0)
 
 (def (qq/expand form)
     (cond (= form nil) nil
@@ -408,6 +346,9 @@
                     (qq/transform-quasiquote-arg (second expanded))
                     expanded))))
 
+
+(defmacro quasiquote (form)
+  (qq/transform-quasiquote-arg form))
 ;;;;;;;;;;;;;;;;;;;;;;;;;; QUASIQUOTE IS VALID NOW ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;; TODO: add this to the stdlib
@@ -427,6 +368,22 @@
   (contains-where? coll number?))
 
 
+
+(defmacro += (id n)
+  `(def ,id (+ ,id ,n)))
+(defmacro -= (id n)
+  `(def ,id (- ,id ,n)))
+(defmacro *= (id n)
+  `(def ,id (* ,id ,n)))
+(defmacro /= (id n)
+  `(def ,id (/ ,id ,n)))
+
+
+(defmacro rest= (id)
+  `(def ,id (. ,id (rest))))
+
+(defmacro first= (id)
+  `(def ,id (. ,id (first))))
 
 
 (def (drop n l)
@@ -448,9 +405,12 @@
               :else (list p))))))
 
 
+
 (defmacro let (defs & body)
-  (let* ((c (count defs)))
+  (do (when (odd? (len defs)) (throw (String "Error in let syntax. bindings must be of even length: " defs "")))
       `(let* ,(partition 2 defs) ,@body)))
+
+
 
 (defmacro while (test & body)
   `(let* ()
@@ -467,6 +427,8 @@
 
 (defmacro setattr (obj attr value)
   `(setattr* ,obj (quote ,attr) ,value))
+
+
 
 
 
@@ -495,13 +457,13 @@
 
 
 (def (deftype-expr-expand name exprs)
-  (let [res nil]
+  (let (res nil)
       (while (not (nil? exprs))
-        (let [curr (first exprs)]
+        (let (curr (macroexpand (first exprs)))
           (cond
             ;; list expressions inside a class must be defs for fields
-            (list? curr) (cond (= 'def (first curr)) (def res (cons `(. ,name (set-field (quote ,(second curr)) ,(first (rest (rest curr)))))
-                                                                  res))
+            (list? curr) (cond (= 'def* (first curr)) (def res (cons `(. ,name (set-field (quote ,(second curr)) ,(first (rest (rest curr)))))
+                                                                   res))
                                :else (throw (String "invalid list-style expression in class definition: " curr)))
 
             ;; vectors in a class definition adds superclasses
@@ -526,8 +488,6 @@
 (def (instance? ta val)
   (extends? ta (type val)))
 
-
-
 ;; the stream class is a basic io class
 ;; it offers .write and .read
 (deftype stream
@@ -549,7 +509,7 @@
         (sets fd nil))))
 
 (def (fopen-flags path flags)
-  (let [fd (os-open path flags)]
+  (let (fd (os-open path flags))
     (cond (= fd -1)  (throw (str "unable to open file '" path "'"))
           :otherwise (file-descriptor fd))))
 
@@ -630,8 +590,3 @@
 ;; returns that value
 (def (constantly x)
   (fn (& args) x))
-
-
-
-
-

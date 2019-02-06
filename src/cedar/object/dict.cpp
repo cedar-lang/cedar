@@ -97,7 +97,7 @@ cedar::runes dict::to_string(bool human) {
   int written = 0;
   for (bucket * start : m_buckets) {
     for (auto *b = start; b != nullptr; b = b->next) {
-      if (written++ > 0) str += "  ";
+      if (written++ > 0) str += " ";
       str += b->key.to_string();
       str += " ";
       str += b->val.to_string();

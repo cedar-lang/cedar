@@ -28,6 +28,7 @@
 #include <functional>
 
 #include <cedar/object.h>
+#include <cedar/objtype.h>
 #include <cedar/object/keyword.h>
 #include <cedar/memory.h>
 #include <cedar/util.hpp>
@@ -51,8 +52,11 @@ static int find_or_insert_symbol_table(cedar::runes sym) {
   return keyword_table.size() - 1;
 }
 
-cedar::keyword::keyword(void) {}
+cedar::keyword::keyword(void) {
+  m_type = keyword_type;
+}
 cedar::keyword::keyword(cedar::runes content) {
+  m_type = keyword_type;
   id = find_or_insert_symbol_table(content);
 }
 
