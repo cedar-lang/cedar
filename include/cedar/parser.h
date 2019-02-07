@@ -139,6 +139,9 @@ namespace cedar {
    public:
     explicit reader();
 
+    void lex_source(cedar::runes);
+    ref read_one(bool*);
+
     // simply read the top level expressions until a
     // tok_eof is encountered, returning the list
     std::vector<ref> run(cedar::runes);

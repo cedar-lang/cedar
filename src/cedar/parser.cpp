@@ -244,6 +244,33 @@ token lexer::lex() {
 // ----------- reader -----------
 reader::reader() {}
 
+void reader::lex_source(cedar::runes src) {
+  m_lexer = std::make_shared<cedar::lexer>(src);
+  tokens.clear();
+
+  // read all the tokens from the source code
+  token t;
+  while ((t = m_lexer->lex()).type != tok_eof) {
+    tokens.push_back(t);
+  }
+  tok = tokens[0];
+  index = 0;
+
+
+}
+
+ref reader::read_one(bool *valid) {
+  if (tok.type != tok_eof) {
+    ref obj = parse_expr();
+
+    *valid = false;
+    return obj;
+  }
+
+  *valid = false;
+  return nullptr;
+}
+
 /////////////////////////////////////////////////////
 std::vector<ref> reader::run(cedar::runes source) {
   std::vector<ref> statements;

@@ -96,9 +96,8 @@ int main(int argc, char **argv) {
   cedar::runes core_entry =
       path_resolve(core_path.string(), apathy::Path::cwd());
 
-    cvm.eval_file(core_entry);
 
-
+  cvm.eval_file(core_entry);
 
   try {
     bool interactive = false;

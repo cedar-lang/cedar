@@ -188,9 +188,14 @@ ref vm::machine::eval_file(cedar::runes path) {
 ref vm::machine::eval_string(cedar::runes expr) {
   cedar::reader reader;
   ref res = nullptr;
-  auto top_level = reader.run(expr);
 
-  for (auto &e : top_level) {
+  reader.lex_source(expr);
+  bool valid = true;
+
+  while (true) {
+    ref e = reader.read_one(&valid);
+    if (!valid) break;
+
     res = eval(e);
   }
   return res;
