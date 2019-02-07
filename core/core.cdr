@@ -591,5 +591,3 @@
 (def (constantly x)
   (fn (& args) x))
 
-
-(println "hello")
