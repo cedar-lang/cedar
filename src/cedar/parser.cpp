@@ -262,8 +262,7 @@ void reader::lex_source(cedar::runes src) {
 ref reader::read_one(bool *valid) {
   if (tok.type != tok_eof) {
     ref obj = parse_expr();
-
-    *valid = false;
+    *valid = true;
     return obj;
   }
 

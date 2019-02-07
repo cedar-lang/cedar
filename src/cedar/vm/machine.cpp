@@ -195,7 +195,6 @@ ref vm::machine::eval_string(cedar::runes expr) {
   while (true) {
     ref e = reader.read_one(&valid);
     if (!valid) break;
-
     res = eval(e);
   }
   return res;
