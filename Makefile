@@ -17,7 +17,7 @@ release:
 
 default:
 	@mkdir -p $(BINDIR)
-	@cd $(BINDIR); cmake -G "Ninja" -DCORE_DIR=/usr/local/lib/cedar/core -DCMAKE_BUILD_TYPE=Debug ../; ninja
+	@cd $(BINDIR); cmake -G "Ninja" -DCORE_DIR=/usr/local/lib/cedar/core -DCMAKE_BUILD_TYPE=Release ../; ninja
 
 gen:
 	@python3 tools/scripts/generate_cedar_h.py
