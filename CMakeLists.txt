@@ -16,6 +16,8 @@ set (CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_FLAGS_DEBUG "-g -O0 -DBUILD_MODE=Debug")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3 -g -DBUILD_MODE=Release")
 
+set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
+
 
 add_definitions(-DCORE_DIR="${CORE_DIR}")
 
@@ -33,5 +35,5 @@ set_target_properties(cedar-bin PROPERTIES OUTPUT_NAME cedar)
 target_compile_options(cedar-bin PRIVATE -Wall -Wextra -Wno-unused-parameter -Wno-strict-aliasing)
 
 
-install(TARGETS cedar-bin DESTINATION bin)
-install(TARGETS cedar-lib DESTINATION lib)
+install(TARGETS cedar-bin DESTINATION bin CONFIGURATIONS Release)
+install(TARGETS cedar-lib DESTINATION lib CONFIGURATIONS Release)
