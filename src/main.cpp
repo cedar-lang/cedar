@@ -48,6 +48,7 @@
 
 #define GC_THREADS
 #include <gc/gc.h>
+#include <cedar/thread.h>
 
 #include <cedar/util.hpp>
 
@@ -84,11 +85,8 @@ int main(int argc, char **argv) {
 
   srand((unsigned int)time(nullptr));
 
-  /*
-
   cvm.bind(cedar::new_obj<cedar::symbol>("*cwd*"),
            cedar::new_obj<cedar::string>(apathy::Path::cwd().string()));
-           */
 
   auto core_path = apathy::Path(CORE_DIR);
   core_path.append("core.cdr");
@@ -98,6 +96,17 @@ int main(int argc, char **argv) {
 
 
   cvm.eval_file(core_entry);
+
+
+  /*
+  object *c = obj_root;
+  int i = 0;
+  while (c != nullptr) {
+    std::cout << i++ << ": " << ref(c) << std::endl;
+    c = c->next;
+  }
+
+  */
 
   try {
     bool interactive = false;
@@ -143,6 +152,7 @@ int main(int argc, char **argv) {
     if (optind < argc) {
       std::string path = cedar::path_resolve(argv[optind]);
 
+
       cvm.bind(cedar::new_obj<cedar::symbol>("*main*"),
                cedar::new_obj<cedar::string>(path));
 
@@ -156,23 +166,21 @@ int main(int argc, char **argv) {
       for (int i = optind; i < argc; i++) {
         args = cedar::idx_append(args, new cedar::string(argv[i]));
       }
-      cvm.bind(cedar::new_obj<cedar::symbol>("*args*"), args);
+      cvm.bind(new symbol("*args*"), args);
       cvm.eval_file(path);
+    } else {
+      cvm.bind(new symbol("*main*"), nullptr);
     }
 
-
-    // the repl
-    int repl_ind = 0;
     if (interactive) {
-      /*
       cvm.bind(cedar::new_obj<cedar::symbol>("*file*"),
                cedar::new_obj<cedar::string>(apathy::Path::cwd().string()));
 
-      */
       printf("\n");
       printf("cedar lisp v%s\n", CEDAR_VERSION);
       cedar::reader repl_reader;
 
+      ref binding = cedar::new_obj<cedar::symbol>("$$");
       while (interactive) {
         std::string ps1;
         ps1 += "> ";
@@ -195,12 +203,8 @@ int main(int argc, char **argv) {
           ref res = cvm.eval_string(b);
           printf("\x1B[0m");
 
-          cedar::runes name = "$";
-          name += std::to_string(repl_ind++);
-          ref binding = cedar::new_obj<cedar::symbol>(name);
           cvm.bind(binding, res);
-          std::cout << name << ": "
-                    << "\x1B[33m" << res << "\x1B[0m" << std::endl;
+          std::cout << "\x1B[33m" << res << "\x1B[0m" << std::endl;
         } catch (std::exception &e) {
           std::cerr << "Uncaught Exception: " << e.what() << std::endl;
         }

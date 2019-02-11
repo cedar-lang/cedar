@@ -41,6 +41,30 @@ using namespace cedar;
 
 long cedar::object_count = 0;
 
+object *cedar::obj_root = nullptr;
+
+// the object constructor and destructor keeps
+// track of how many objects are allocated
+object::object(void) {
+  // printf("+ %ld\n", object_count);
+  m_type = object_type;
+
+  next = obj_root;
+
+  /*
+  obj_root = this;
+  */
+
+  object_count++;
+}
+object::~object(void) {
+  // printf("- %ld\n", object_count);
+  object_count--;
+}
+
+
+
+
 bool object::is_pair(void) {
   // a thing cannot be a pair if it isn't a list
   list *lst = this->as<list>();
@@ -50,29 +74,15 @@ bool object::is_pair(void) {
   return true;
 }
 
-// the object constructor and destructor keeps
-// track of how many objects are allocated
-object::object(void) {
-  // printf("+ %ld\n", object_count);
-  m_type = object_type;
-  object_count++;
-}
-object::~object(void) {
-  // printf("- %ld\n", object_count);
-  object_count--;
-}
+
+
 
 ref object::getattr_fast(int i) {
   static int __class__ID = get_symbol_intern_id("__class__");
-  static int __refcount__ID = get_symbol_intern_id("__rc__");
   static int __addr__ID = get_symbol_intern_id("__addr__");
 
   if (i == __class__ID) {
     return m_type;
-  }
-
-  if (i == __refcount__ID) {
-    return refcount;
   }
 
   if (i == __addr__ID) {

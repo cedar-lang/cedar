@@ -117,6 +117,16 @@ namespace cedar {
 						return addr;
 					}
 
+
+          inline u64 write_op(u8 op) {
+            return write((u8)op);
+          }
+          inline u64 write_op(u8 op, u64 arg) {
+            auto r = write((u8)op);
+            write((u64)arg);
+            return r;
+          }
+
 				inline uint64_t get_size() {
 					return size;
 				}

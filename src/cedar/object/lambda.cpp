@@ -83,7 +83,6 @@ u64 lambda::hash(void) {
 lambda *lambda::copy(void) {
   lambda *new_lambda = new lambda();
   *new_lambda = *this;
-  new_lambda->refcount = 0;
   return new_lambda;
 
 

@@ -57,7 +57,10 @@ ref type::get_field(ref k) {
                               m_name);
 }
 
-ref type::get_field_fast(int i) { return m_fields.at(i); }
+ref type::get_field_fast(int i) {
+  // 
+  return m_fields.at(i);
+}
 
 void type::set_field(ref k, ref val) {
   if (auto *s = ref_cast<symbol>(k); s != nullptr) {
@@ -376,6 +379,10 @@ static void init_number_type() {
     }
     return nullptr;
   });
+
+  number_type->set_field("reciprocal", bind_lambda(argc, argv, machine) {
+        return 1.0 / argv[0].to_float();
+      });
 
   primary_machine->bind(new symbol("Number"), number_type);
 }  // init_number_type

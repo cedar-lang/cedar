@@ -23,6 +23,17 @@
 ;; set the initial namespace to "core"
 (def* *ns* "core")
 
+;; first is a wrapper around calling
+;; the .first method on a type
+(def* first
+  (fn (x) (. x (first))))
+
+
+;; same for rest
+(def* rest
+  (fn (x) (. x (rest))))
+
+
 (defmacro* defmacro
   (fn (name args & body)
     (list 'defmacro* name
@@ -32,37 +43,38 @@
 
 
 (def* t 't)
-(def* true 'true)
-(def* false nil)
 
+;; have true and false resolve to themselves.
+;; there is only a reason for 'false' to exist
+;; as there are only 2 'falsy' values
+;; in cedar (nil and false)
+(def* true 'true)
+(def* false false)
+
+
+;; define dumb logical operators. These will be replaced
+;; by macros later on, but there are useful for passing
+;; into functions
 (def* not (fn (x) (if x nil t)))
 (def* or (fn (x y) (if x x y)))
 (def* and (fn (x y) (if x y x)))
 
 (def* not= (fn not= (a b) (not (= a b))))
 
-
-(def* first
-  (fn (x) (. x (first))))
-
-(def* rest
-  (fn (x) (. x (rest))))
-
 (def* len
   (fn (x)
     (. x (len))))
 
+
+
 (def* nil? (fn (v) (= (type v) Nil)))
 (def* list? (fn (v) (= (type v) List)))
 (def* string? (fn (v) (= (type v) String)))
-
-
 (def* dict? (fn (v) (= (type v) Dict)))
 (def* vector? (fn (v) (= (type v) Vector)))
 (def* number? (fn (v) (= (type v) Number)))
 (def* symbol? (fn (v) (= (type v) Symbol)))
 (def* keyword? (fn (v) (= (type v) Keyword)))
-
 
 
 
@@ -81,15 +93,6 @@
     (catch* (fn () (and (and (. v first) (. v rest)) true))
         (fn (e) false))))
 
-
-
-(def* cdr/println println)
-
-;; (println "hello")
-
-(def* debug
-  (fn (& args)
-    (println "DEBUG:" (apply str args))))
 
 (def* map-1
   (fn (f l)
@@ -128,6 +131,11 @@
         form
         (macroexpand ex)))))
 
+
+;; add the '+' operator to the string class
+;; this *could* be implemented in c++ but nah.
+(. String (add-field '+ (fn (self other)
+                          (str self other))))
 
 
 (defmacro catch (id expr body)
@@ -186,10 +194,10 @@
 ;; why have this *and* the defn macro? Why not.
 (defmacro def (& args)
   (let* ((name (first args))
-         (val  (second args)))
+         (val  (rest args)))
     (if (list? name)
-      (list 'def* (first name) (list 'fn (first name) (rest name) val))
-      (list 'def* name val))))
+      (list 'def* (first name) (list 'fn (first name) (rest name) (cons 'do val)))
+      (list 'def* name (first val)))))
 
 (defmacro cond (& a)
   (let* ((c (first a))
@@ -198,6 +206,10 @@
     (list 'if c e
         (when r (cons 'cond r)))))
 
+
+(defmacro declare (& names)
+  (cons 'do (map-1 \x (list 'def x nil)
+                   names)))
 
 
 (def (not x)
@@ -378,12 +390,6 @@
 (defmacro /= (id n)
   `(def ,id (/ ,id ,n)))
 
-
-(defmacro rest= (id)
-  `(def ,id (. ,id (rest))))
-
-(defmacro first= (id)
-  `(def ,id (. ,id (first))))
 
 
 (def (drop n l)
@@ -590,4 +596,5 @@
 ;; returns that value
 (def (constantly x)
   (fn (& args) x))
+
 

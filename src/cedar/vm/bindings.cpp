@@ -68,8 +68,9 @@ cedar_binding(cedar_is) {
 }
 
 cedar_binding(cedar_add) {
-  ref accumulator = 0;
-  for (int i = 0; i < argc; i++) {
+  if (argc == 0) return 0;
+  ref accumulator = argv[0];
+  for (int i = 1; i < argc; i++) {
     accumulator = accumulator + argv[i];
   }
   return accumulator;
@@ -79,6 +80,11 @@ cedar_binding(cedar_sub) {
   if (argc == 1) {
     return ref{-1} * argv[0];
   }
+
+  if (argc == 0) {
+    return 0;
+  }
+
   ref acc = argv[0];
   for (int i = 1; i < argc; i++) {
     acc = acc - argv[i];
@@ -87,20 +93,21 @@ cedar_binding(cedar_sub) {
 }
 
 cedar_binding(cedar_mul) {
-  ref acc = 1;
-  for (int i = 0; i < argc; i++) {
-    acc = acc * argv[i];
+  if (argc == 0) return 1;
+  ref a = argv[0];
+  for (int i = 1; i < argc; i++) {
+    a = a * argv[i];
   }
-  return acc;
+  return a;
 }
 
 cedar_binding(cedar_div) {
   if (argc == 1) {
-    return 1.0 / argv[0].to_float();
+    return self_call(argv[0], "reciprocal");
   }
-  double acc = argv[0].to_float();
+  ref acc = argv[0];
   for (int i = 1; i < argc; i++) {
-    acc = acc / argv[i].to_float();
+    acc = acc / argv[i];
   }
   return acc;
 }
@@ -168,44 +175,6 @@ cedar_binding(cedar_println) {
   return 0;
 }
 
-cedar_binding(cedar_typeof) {
-  if (argc != 1)
-    throw cedar::make_exception("(type-of ...) requires one argument, given ",
-                                argc);
-
-  if (argv[0].is<cedar::dict>()) {
-    try {
-      return idx_get(argv[0], new_obj<keyword>(":type-of"));
-    } catch (...) {
-      return new_obj<keyword>(":dict");
-    }
-  }
-  cedar::runes kw_str = ":";
-  kw_str += argv[0].object_type_name();
-  return new_obj<cedar::keyword>(kw_str);
-}
-
-cedar_binding(cedar_first) {
-  if (argc != 1)
-    throw cedar::make_exception("(first ...) requires one argument, given ",
-                                argc);
-  try {
-    return argv[0].first();
-  } catch (std::exception &e) {
-    return nullptr;
-  }
-}
-
-cedar_binding(cedar_rest) {
-  if (argc != 1)
-    throw cedar::make_exception("(rest ...) requires one argument, given ",
-                                argc);
-  try {
-    return argv[0].rest();
-  } catch (std::exception &e) {
-    return nullptr;
-  }
-}
 
 cedar_binding(cedar_cons) {
   if (argc != 2)
@@ -283,18 +252,6 @@ cedar_binding(cedar_size) {
   return idx_size(argv[0]);
 }
 
-cedar_binding(cedar_refcount) {
-  if (argc != 1)
-    throw cedar::make_exception("(refcount ...) requires one arguments, given ",
-                                argc);
-
-  if (argv[0].is_obj()) {
-    if (object *o = ref_cast<object>(argv[0]); o != nullptr) {
-      return (i64)o->refcount;
-    }
-  }
-  return 1;
-}
 
 cedar_binding(cedar_newbytes) {
   immer::flex_vector<unsigned char> buf;
@@ -620,14 +577,9 @@ void init_binding(cedar::vm::machine *m) {
   m->bind("eq", cedar_equal);
 
   m->bind("is", cedar_is);
-  m->bind("type-of", cedar_typeof);
   m->bind("print", cedar_print);
   m->bind("println", cedar_println);
   m->bind("cedar/hash", cedar_hash);
-  m->bind("cedar/id", cedar_id);
-
-  m->bind("first*", cedar_first);
-  m->bind("rest*", cedar_rest);
   m->bind("cons", cedar_cons);
 
   m->bind("<", cedar_lt);
@@ -650,7 +602,6 @@ void init_binding(cedar::vm::machine *m) {
   m->bind("os-chmod", cedar_os_chmod);
 
   m->bind("cedar/keyword", cedar_keyword);
-  m->bind("cedar/refcount", cedar_refcount);
 
   m->bind("cedar/objcount", cedar_objcount);
   m->bind("read-string", cedar_readstring);

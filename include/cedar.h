@@ -37,6 +37,7 @@
 #include "cedar/types.h"
 #include "cedar/objtype.h"
 #include "cedar/parser.h"
+#include "cedar/thread.h"
 #include "cedar/passes.h"
 #include "cedar/memory.h"
 #include "cedar/object.h"

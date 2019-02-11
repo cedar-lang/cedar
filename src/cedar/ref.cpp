@@ -31,7 +31,13 @@
 #include <cedar/object/symbol.h>
 #include <cedar/ref.h>
 
+#include <mutex>
+
 using namespace cedar;
+
+
+
+static std::mutex refcount_mutex;
 
 
 type *ref::get_type(void) const {
@@ -86,26 +92,6 @@ bool ref::is_seq(void) {
   }
 
   return false;
-}
-
-void cedar::ref::retain(void) {
-  if (is_obj() && m_obj != nullptr) {
-    m_obj->refcount++;
-  }
-}
-
-void cedar::ref::release(void) {
-  /*
-  if (is_obj() && m_obj != nullptr) {
-    m_obj->refcount--;
-    if (m_obj->refcount == 0) {
-      // delete m_obj;
-    }
-  }
-  clear_type_flags();
-  flags[FLAG_OBJ] = 1;
-  m_obj = nullptr;
-  */
 }
 
 ref cedar::ref::first() const {
@@ -236,7 +222,7 @@ u64 cedar::get_object_hash(object *obj) {
   return obj->hash();
 }
 
-bool cedar::ref::operator==(ref other) const {
+bool cedar::ref::operator==(ref other) {
   if (!is_number()) {
     bool inil = is_nil();
     bool onil = other.is_nil();
@@ -253,4 +239,31 @@ bool cedar::ref::operator==(ref other) const {
     return false;
   }
   return compare(other) == 0;
+}
+
+
+
+ref ref::binary_op(binop op, ref & a, ref & b) {
+  if (a.is_number() && b.is_number()) {
+    switch (op) {
+      #define V(name, op) \
+        case name: {\
+                     return (a.is_flt() || b.is_flt()) ? ref((a.to_float() op b.to_float())) : ref((i64)(a.to_int() op b.to_int())); \
+                   }
+
+        FOREACH_OP(V)
+      #undef V
+      default:
+        throw cedar::make_exception("unknown op");
+    }
+  }
+
+
+  switch (op) {
+    #define V(name, op) case name: return self_call(a, #op, b);
+    FOREACH_OP(V);
+
+    #undef V
+  }
+  return 0.0;
 }

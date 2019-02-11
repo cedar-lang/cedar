@@ -55,6 +55,9 @@ namespace cedar {
   class type;
   class dict;
 
+
+  extern object *obj_root;
+
   namespace vm { class machine; };
 
 
@@ -85,14 +88,12 @@ namespace cedar {
 
   class object : public gc {
    public:
-
-    // object_type *type = nullptr;
-    // refcount is used by the `ref` class to determine how many things hold
-    // references to this particular object on the heap
-    u16 refcount = 0;
     type *m_type;
 
     attr_map m_attrs;
+
+
+    object *next;
 
 
     ref getattr_fast(int);

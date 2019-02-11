@@ -108,7 +108,7 @@ ref cedar::vm::bytecode_pass(ref obj, vm::compiler *c) {
 
   c->compile_object(obj, *code, sc, &context);
 
-  code->write((uint8_t)OP_EXIT);
+  code->write_op(OP_EXIT);
   // finalize the code (sum up stack effect)
   code->finalize();
   // build a lambda around the code
@@ -138,7 +138,7 @@ void vm::compiler::compile_object(ref obj, vm::bytecode &code, scope_ptr sc,
     return compile_symbol(obj, code, sc, ctx);
   }
   if (obj.is<cedar::nil>()) {
-    code.write((uint8_t)OP_NIL);
+    code.write_op(OP_NIL);
     return;
   }
 
@@ -155,7 +155,7 @@ void vm::compiler::compile_progn(ref obj, vm::bytecode &code, scope_ptr sc,
   while (true) {
     compile_object(obj.first(), code, sc, ctx);
     if (obj.rest().is_nil()) break;
-    code.write((uint8_t)OP_SKIP);
+    code.write_op(OP_SKIP);
     obj = obj.rest();
   }
 }
@@ -173,8 +173,7 @@ void vm::compiler::compile_list(ref obj, vm::bytecode &code, scope_ptr sc,
       throw cedar::make_exception("invalid defmacro. name must be a symbol");
     }
 
-    code.write((u8)OP_DEF_MACRO);
-    code.write((u64)s->id);
+    code.write_op(OP_DEF_MACRO, s->id);
 
     return;
   }
@@ -187,13 +186,13 @@ void vm::compiler::compile_list(ref obj, vm::bytecode &code, scope_ptr sc,
 
     compile_object(cond, code, sc, ctx);
 
-    code.write((u8)OP_JUMP_IF_FALSE);
+    code.write_op(OP_JUMP_IF_FALSE);
     i64 false_join_loc = code.write((u64)0);
 
     // compile the true expression
     compile_object(tru, code, sc, ctx);
     // write a jump instruction to jump to after the true expr
-    code.write((u8)OP_JUMP);
+    code.write_op(OP_JUMP);
     i64 true_join_loc = code.write((u64)0);
 
     // write to the false instruction's argument where to jump to
@@ -246,9 +245,8 @@ void vm::compiler::compile_list(ref obj, vm::bytecode &code, scope_ptr sc,
     auto val_obj = obj.rest().rest().first();
     // compile the value onto the stack
     compile_object(val_obj, code, sc, ctx);
-    code.write(opcode);
-    code.write(index);
 
+    code.write_op(opcode, index);
     return;
   }
 
@@ -289,8 +287,7 @@ void vm::compiler::compile_list(ref obj, vm::bytecode &code, scope_ptr sc,
           if (kw->get_content() == ":=") {
             ref val = curr.rest().rest().first();
             compile_object(val, code, sc, ctx);
-            code.write((u8)OP_SET_ATTR);
-            code.write((i64)id);
+            code.write_op(OP_SET_ATTR, id);
             break;
           } else {
             throw cedar::make_exception("Unknown keyword '", next,
@@ -298,8 +295,8 @@ void vm::compiler::compile_list(ref obj, vm::bytecode &code, scope_ptr sc,
           }
         }
 
-        code.write((u8)OP_GET_ATTR);
-        code.write((i64)id);
+
+        code.write_op(OP_GET_ATTR, id);
 
       } else if (a.isa(list_type)) {
         // compile calls
@@ -307,8 +304,7 @@ void vm::compiler::compile_list(ref obj, vm::bytecode &code, scope_ptr sc,
         ref args = a.rest();
 
         // duplicate the top of the stack
-        code.write((u8)OP_DUP);
-        code.write((i64)1);
+        code.write_op(OP_DUP, 1);
 
         if (!method_ref.is<symbol>()) {
           throw cedar::make_exception(
@@ -317,10 +313,9 @@ void vm::compiler::compile_list(ref obj, vm::bytecode &code, scope_ptr sc,
         }
 
         int id = method_ref.as<symbol>()->id;
-        code.write((u8)OP_GET_ATTR);
-        code.write((i64)id);
 
-        code.write((u8)OP_SWAP);
+        code.write_op(OP_GET_ATTR, id);
+        code.write_op(OP_SWAP);
 
         int argc = 1;
 
@@ -330,8 +325,8 @@ void vm::compiler::compile_list(ref obj, vm::bytecode &code, scope_ptr sc,
           args = args.rest();
         }
 
-        code.write((uint8_t)OP_CALL);
-        code.write((i64)argc);
+
+        code.write_op(OP_CALL, argc);
       } else {
         throw cedar::make_exception("invalid syntax in dot special form: ",
                                     obj);
@@ -348,7 +343,8 @@ void vm::compiler::compile_list(ref obj, vm::bytecode &code, scope_ptr sc,
 
     compile_object(b, code, sc, ctx);
     compile_object(a, code, sc, ctx);
-    code.write((u8)OP_CONS);
+
+    code.write_op(OP_CONS);
     return;
   }
 
@@ -430,7 +426,7 @@ void vm::compiler::compile_list(ref obj, vm::bytecode &code, scope_ptr sc,
 
   if (list_is_call_to("eval", obj)) {
     compile_object(obj.rest().first(), code, sc, ctx);
-    code.write((uint8_t)OP_EVAL);
+    code.write_op(OP_EVAL);
     return;
   }
 
@@ -480,18 +476,11 @@ void vm::compiler::compile_list(ref obj, vm::bytecode &code, scope_ptr sc,
   }
 
   if (recur_call) {
-    code.write((uint8_t)OP_RECUR);
-    code.write((i64)argc);
+    code.write_op(OP_RECUR, argc);
     return;
   }
 
-  if (ctx->inside_catch) {
-    code.write((uint8_t)OP_CALL_EXCEPTIONAL);
-    ctx->inside_catch = false;
-  } else {
-    code.write((uint8_t)OP_CALL);
-  }
-  code.write((i64)argc);
+  code.write_op(OP_CALL, argc);
 }
 
 void vm::compiler::compile_vector(ref vec_ref, vm::bytecode &code, scope_ptr sc,
@@ -587,13 +576,13 @@ void vm::compiler::compile_symbol(ref sym, bytecode &code, scope_ptr sc,
     }
 
     if (rest.size() == 0)
-      throw cedar::make_exception("invalid dot notation on dict: ", sym);
+      throw cedar::make_exception("invalid dot notation: ", sym);
 
     ref d = nsym(obj);
     ref key = nsym(rest);
-    ref get = nsym("get");
+    ref get = nsym(".");
 
-    ref expr = newlist(get, d, newlist(nsym("quote"), key));
+    ref expr = newlist(get, d, key);
 
     return compile_object(expr, code, sc, ctx);
   }

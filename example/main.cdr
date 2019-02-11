@@ -27,22 +27,6 @@
 
 
 
-(defn read-eval ()
-  (do
-    (print "CEDAR> ")
-    (eval (macroexpand (read)))))
-
-;; (let ((v nil))
-;;   (def v (catch (read-eval)
-;;            e (do (println "unhandled exception:" e) nil)))
-;;   (if (not (= v :EOF))
-;;     (do
-;;       (println v)
-;;       (recur nil))))
-
-
-
-
 (deftype lazy-seq
   ;; the function that will be called eventually
   (def func nil)
@@ -56,8 +40,8 @@
   (def (new self f)
       (setattr self func f))
   ;; implementations of first and rest
-  (def (first self) (first* (. self (seq))))
-  (def (rest self) (rest* (. self (seq))))
+  (def (first self) (first (. self (seq))))
+  (def (rest self) (rest (. self (seq))))
   ;; the seq function "steps" this lazy sequence.
   ;; this means it checks if it's been evaluated
   ;; yet, and if it needs to, evaluates the function
@@ -220,7 +204,6 @@
           (apply (. mm (get-method (apply func args))) args))
       (. ,name set-method := (fn (self dispatch-val method)
                                (. mm (set-method dispatch-val method))))))
-         
 
 
 (defmacro defmethod (multifn dispatch-val & fn-tail)
@@ -232,7 +215,7 @@
 
 ;; define a multi method that takes any
 ;; object and switches over it's type
-(defmulti parse-ast (fn (obj) (type obj)))
+(defmulti parse-ast type)
 
 
 (defmethod parse-ast List (obj)
@@ -246,3 +229,78 @@
 
 (defmethod parse-ast :default (obj) {:op :const
                                      :val obj})
+
+
+(defmethod parse-ast :default (obj)
+  {:type :const
+   :val obj})
+
+
+
+
+(def (gcd n d)
+  (while (not= d 0)
+    (let (t d)
+      (def d (mod n d))
+      (def n t)))
+  n)
+
+
+(deftype Fraction
+  (def (new self n d)
+    (let (g (gcd n d))
+      (. self n := (/ n g))
+      (. self d := (/ d g))))
+
+  ;; show operations
+  (def (repr self)
+    (str "(Fraction " self.n " " self.d ")"))
+  (def (str self)
+    (cond (= self.n 0)      "0"
+          (= self.n self.d) "1"
+          :default          (str self.n "/" self.d)))
+
+  (def (+ a b)
+    (Fraction (+ (* a.n b.d) (* a.d b.n))
+              (+ (* a.d b.d))))
+
+  (def (- a b)
+    (Fraction (- (* a.n b.d) (* a.d b.n))
+              (+ (* a.d b.d))))
+
+  (def (* a b)
+    (Fraction (* a.n b.n) (* a.d b.d)))
+
+  (def (/ a b)
+    (Fraction (* a.n b.d) (* a.d b.n))))
+
+
+(def f1 (Fraction 1 2))
+(def f2 (Fraction 1 2))
+(println (+ f1 f2))
+(println (- f1 f2))
+(println (* f1 f2))
+(println (/ f1 f2))
+
+
+
+
+
+(deftype Cons
+  (def (new self f r)
+    (. self f := f)
+    (. self r := r))
+  (def (first self)
+    self.f)
+  (def (rest self)
+    (self.r))
+  (def (str self)
+    (str "(" self.f " . " self.r ")"))
+  (def (repr self)
+    (.self (str))))
+
+
+(def (cons f r) (Cons f r))
+
+
+

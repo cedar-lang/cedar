@@ -125,7 +125,7 @@ vm::machine::machine(void) : m_compiler(this) {
   // before creating anything, init the types
   type_init();
 
-  true_value = cedar::new_obj<cedar::symbol>("t");
+  true_value = cedar::new_obj<cedar::symbol>("true");
   bind(true_value, true_value);
   init_binding(this);
 }
@@ -799,8 +799,6 @@ loop:
     symbol s;
     // set it's id
     s.id = id;
-    // make sure the refcount doesnt try to free it :)
-    s.refcount = 100;
     // actually getattr
     auto attr = val.getattr(&s);
     // push the value
@@ -818,8 +816,6 @@ loop:
     symbol s;
     // set it's id
     s.id = id;
-    // make sure the refcount doesnt try to free it :)
-    s.refcount = 100;
     // actually getattr
     obj.setattr(&s, val);
     // push the value

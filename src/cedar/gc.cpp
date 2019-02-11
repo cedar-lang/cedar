@@ -1,11 +1,18 @@
 #include <cedar.h>
 #include <stdio.h>
+
+
 #define GC_THREADS
 #include <gc/gc.h>
+
+
+extern "C" void GC_allow_register_threads();
 
 struct gc_startup {
   gc_startup() {
     GC_INIT();
+
+    GC_allow_register_threads();
   }
 };
 
@@ -28,16 +35,14 @@ void* operator new[](size_t size) {
 #endif
 
 void operator delete(void* ptr) _NOEXCEPT {
-	// GC_FREE(ptr);
 }
+
 void operator delete[](void* ptr) _NOEXCEPT {
-	// GC_FREE(ptr);
 }
 
 
-void operator delete(void* ptr, std::size_t) _NOEXCEPT {
-	// GC_FREE(ptr);
+void operator delete(void* ptr, std::size_t s) _NOEXCEPT {
 }
-void operator delete[](void* ptr, std::size_t) _NOEXCEPT {
-	// GC_FREE(ptr);
+
+void operator delete[](void* ptr, std::size_t s) _NOEXCEPT {
 }
