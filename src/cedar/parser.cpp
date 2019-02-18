@@ -29,11 +29,11 @@
 
 #include <cedar/object/keyword.h>
 #include <cedar/object/list.h>
-#include <cedar/object/vector.h>
 #include <cedar/object/nil.h>
 #include <cedar/object/number.h>
 #include <cedar/object/string.h>
 #include <cedar/object/symbol.h>
+#include <cedar/object/vector.h>
 
 #include <cctype>
 #include <iostream>
@@ -75,17 +75,23 @@ bool in_charset(wchar_t c, const wchar_t *set) {
 }
 
 token lexer::lex() {
-  auto c = next();
+  int32_t c = next();
 
 
-  auto in_set = [] (cedar::runes & set, cedar::rune c) {
-    for (auto & n : set) {
+  // the basic C escape codes
+  static std::map<char, char> esc_mappings = {
+      {'a', 0x07}, {'b', 0x08}, {'f', 0x0C}, {'n', 0x0A}, {'r', 0x0D}, {'t', 0x09}, {'v', 0x0B}, {'\\', 0x5C}, {'"', 0x22}, {'e', 0x1B},
+  };
+
+
+  auto in_set = [](cedar::runes &set, cedar::rune c) {
+    for (auto &n : set) {
       if (n == c) return true;
     }
     return false;
   };
 
-  auto accept_run = [&] (cedar::runes set) {
+  auto accept_run = [&](cedar::runes set) {
     cedar::runes buf;
     while (in_set(set, peek())) {
       buf += next();
@@ -100,7 +106,7 @@ token lexer::lex() {
   }
 
   // skip over spaces by calling again
-  if (isspace(c)) return lex();
+  if (isspace(c) || c == ',') return lex();
 
   if ((int32_t)c == -1 || c == 0) {
     return token(tok_eof, "");
@@ -110,18 +116,46 @@ token lexer::lex() {
     return token(tok_backquote, "`");
   }
 
-  if (c == ',') {
+  if (c == '~') {
     if (peek() == '@') {
       next();
-      return token(tok_comma_at, ",@");
+      return token(tok_splice, ",@");
     }
-    return token(tok_comma, ",");
+    return token(tok_unq, "~");
   }
 
 
   if (c == '#') {
     cedar::runes tok;
     tok += '#';
+
+    /* Parse raw string literals */
+    if (peek() == '"') {
+      next();
+      cedar::runes buf;
+      while (true) {
+        c = next();
+        if ((int32_t)c == -1) throw cedar::make_exception("unterminated string");
+        if (c == '"') break;
+        if (c == '\\') {
+          if (peek() == '"') {
+            buf += '"';
+            next();
+            continue;
+          } else if (peek() == '\\') {
+            buf += '\\';
+            next();
+            continue;
+          } else {
+            buf += '\\';
+            continue;
+          }
+        }
+        buf += c;
+      }
+      return token(tok_string, buf);
+    }
+
     if (isalpha(peek())) {
       tok += next();
     } else {
@@ -153,12 +187,36 @@ token lexer::lex() {
     // contain the encapsulating quotes in it's internal representation
     while (true) {
       c = next();
+      if ((int32_t)c == -1) throw cedar::make_exception("unterminated string");
       // also ignore the last double quote for the same reason as above
-      if (c == '"' && !escaped) break;
+      if (c == '"') break;
       escaped = c == '\\';
+      if (escaped) {
+        char e = next();
+        if (e == 'U' || e == 'u') {
+          // parse 32 bit unicode literals
+          std::string hex;
+
+          int l = 8;
+
+          if (e == 'u') l = 4;
+
+          for (int i = 0; i < l; i++) {
+            hex += next();
+          }
+          std::cout << hex << std::endl;
+          c = (int32_t)std::stoul(hex, nullptr, 16);
+          printf("%u\n", c);
+        } else {
+          c = esc_mappings[e];
+          if (c == 0) {
+            throw cedar::make_exception("unknown escape sequence \\", e, " in string");
+          }
+        }
+        escaped = false;
+      }
       buf += c;
     }
-
     return token(tok_string, buf);
   }
 
@@ -226,15 +284,12 @@ token lexer::lex() {
     symbol += v;
   }
 
-  if (symbol.length() == 0)
-    throw make_exception("lexer encountered zero-length identifier");
+  if (symbol.length() == 0) throw make_exception("lexer encountered zero-length identifier");
 
   uint8_t type = tok_symbol;
 
   if (symbol[0] == ':') {
-    if (symbol.size() == 1)
-      throw cedar::make_exception(
-          "Keyword token must have at least one character after the ':'");
+    if (symbol.size() == 1) throw cedar::make_exception("Keyword token must have at least one character after the ':'");
     type = tok_keyword;
   }
 
@@ -253,10 +308,9 @@ void reader::lex_source(cedar::runes src) {
   while ((t = m_lexer->lex()).type != tok_eof) {
     tokens.push_back(t);
   }
+  tokens.push_back(token{tok_eof, ""});
   tok = tokens[0];
   index = 0;
-
-
 }
 
 ref reader::read_one(bool *valid) {
@@ -346,9 +400,9 @@ ref reader::parse_expr(void) {
       return parse_special_syntax(U"quasiquote");
     case tok_quote:
       return parse_special_syntax(U"quote");
-    case tok_comma:
+    case tok_unq:
       return parse_special_syntax(U"unquote");
-    case tok_comma_at:
+    case tok_splice:
       return parse_special_syntax(U"unquote-splicing");
     case tok_hash_modifier:
       return parse_hash_modifier();
@@ -393,9 +447,10 @@ ref reader::parse_vector(void) {
   }
 
   ref vec = new vector();
-  for (auto & item : items) {
-    vec = vec.cons(item);
+  for (auto &item : items) {
+    vec = self_call(vec, "put", item);
   }
+
   // skip over the closing bracket
   next();
 
@@ -406,8 +461,7 @@ ref reader::parse_vector(void) {
 ref reader::parse_special_syntax(cedar::runes function_name) {
   // skip over the "special syntax token"
   next();
-  std::vector<ref> items = {new_obj<symbol>(function_name), parse_expr()};
-  ref obj = new_obj<list>(items);
+  ref obj = new list(new symbol(function_name), new list(parse_expr(), nullptr));
   return obj;
 }
 
@@ -472,8 +526,7 @@ ref reader::parse_string(void) {
 }
 
 /////////////////////////////////////////////////////
-ref reader::parse_special_grouping_as_call(cedar::runes name,
-                                           tok_type closing) {
+ref reader::parse_special_grouping_as_call(cedar::runes name, tok_type closing) {
   std::vector<ref> items;
   // skip over the first grouping oper
   next();
@@ -506,8 +559,7 @@ ref reader::parse_backslash_lambda(void) {
 
   ref args = parse_expr();
 
-  if (!args.isa(list_type))
-    args = newlist(args);
+  if (!args.isa(list_type)) args = newlist(args);
 
   ref body = parse_expr();
 

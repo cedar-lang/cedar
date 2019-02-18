@@ -38,17 +38,19 @@
 #include <uv.h>
 #include <chrono>
 #include <exception>
+#include <iomanip>  // setprecision
 #include <iostream>
 #include <map>
 #include <stdexcept>
 #include <string>
 #include <thread>
 #include <typeinfo>
-#include <uvw.hpp>
+
+#include <sys/resource.h>
 
 #define GC_THREADS
-#include <gc/gc.h>
 #include <cedar/thread.h>
+#include <gc/gc.h>
 
 #include <cedar/util.hpp>
 
@@ -75,59 +77,45 @@ cedar::type::method lambda_wrap(ref func) {
   throw cedar::make_exception("lambda_wrap requires a lambda object");
 }
 
+
 #ifndef CORE_DIR
 #define CORE_DIR "/usr/local/lib/cedar/core"
 #endif
 
+
+
 int main(int argc, char **argv) {
-  cvm.bind(new cedar::symbol("*cedar-version*"),
-           new cedar::string(CEDAR_VERSION));
+  cvm.bind(new cedar::symbol("*cedar-version*"), new cedar::string(CEDAR_VERSION));
 
   srand((unsigned int)time(nullptr));
 
-  cvm.bind(cedar::new_obj<cedar::symbol>("*cwd*"),
-           cedar::new_obj<cedar::string>(apathy::Path::cwd().string()));
+  cvm.bind(cedar::new_obj<cedar::symbol>("*cwd*"), cedar::new_obj<cedar::string>(apathy::Path::cwd().string()));
 
   auto core_path = apathy::Path(CORE_DIR);
   core_path.append("core.cdr");
 
-  cedar::runes core_entry =
-      path_resolve(core_path.string(), apathy::Path::cwd());
+  cedar::runes core_entry = path_resolve(core_path.string(), apathy::Path::cwd());
 
 
   cvm.eval_file(core_entry);
 
-
-  /*
-  object *c = obj_root;
-  int i = 0;
-  while (c != nullptr) {
-    std::cout << i++ << ": " << ref(c) << std::endl;
-    c = c->next;
-  }
-
-  */
-
   try {
     bool interactive = false;
-    bool daemon = false;
+    bool resources = false;
 
-    std::thread daemon_thread;
 
     char c;
-    while ((c = getopt(argc, argv, "iD:he:")) != -1) {
+    while ((c = getopt(argc, argv, "ihRe:")) != -1) {
       switch (c) {
         case 'h':
           help();
           exit(0);
 
-        case 'D': {
-          // daemon = true;
-          // daemon_thread = start_daemon_thread(atoi(optarg));
-        } break;
-
         case 'i':
           interactive = true;
+          break;
+        case 'R':
+          resources = true;
           break;
 
           // TODO: implement evaluate argument
@@ -145,7 +133,7 @@ int main(int argc, char **argv) {
     }
 
 
-    if (optind == argc && !daemon) {
+    if (optind == argc) {
       interactive = true;
     }
 
@@ -153,11 +141,9 @@ int main(int argc, char **argv) {
       std::string path = cedar::path_resolve(argv[optind]);
 
 
-      cvm.bind(cedar::new_obj<cedar::symbol>("*main*"),
-               cedar::new_obj<cedar::string>(path));
+      cvm.bind(cedar::new_obj<cedar::symbol>("*main*"), cedar::new_obj<cedar::string>(path));
 
-      cvm.bind(cedar::new_obj<cedar::symbol>("*file*"),
-               cedar::new_obj<cedar::string>(path));
+      cvm.bind(cedar::new_obj<cedar::symbol>("*file*"), cedar::new_obj<cedar::string>(path));
 
       // there are also args, so make that vector...
       ref args = new cedar::vector();
@@ -172,17 +158,30 @@ int main(int argc, char **argv) {
       cvm.bind(new symbol("*main*"), nullptr);
     }
 
-    if (interactive) {
-      cvm.bind(cedar::new_obj<cedar::symbol>("*file*"),
-               cedar::new_obj<cedar::string>(apathy::Path::cwd().string()));
 
-      printf("\n");
-      printf("cedar lisp v%s\n", CEDAR_VERSION);
+    struct rusage usage;
+
+    if (interactive) {
+      cvm.bind(cedar::new_obj<cedar::symbol>("*file*"), cedar::new_obj<cedar::string>(apathy::Path::cwd().string()));
+
       cedar::reader repl_reader;
 
       ref binding = cedar::new_obj<cedar::symbol>("$$");
       while (interactive) {
         std::string ps1;
+
+
+        if (resources) {
+          getrusage(RUSAGE_SELF, &usage);
+
+          double used_b = usage.ru_maxrss;
+          double used_mb = used_b / 1000.0 / 1000.0;
+
+          std::stringstream stream;
+          stream << std::fixed << std::setprecision(2) << used_mb;
+          ps1 += stream.str();
+          ps1 += " MiB used";
+        }
         ps1 += "> ";
         char *buf = linenoise(ps1.data());
         if (buf == nullptr) {
@@ -211,11 +210,6 @@ int main(int argc, char **argv) {
       }
     }
 
-    // wait for the daemon thread
-    if (daemon) {
-      daemon_thread.join();
-    }
-
   } catch (std::exception &e) {
     std::cerr << "Uncaught exception: " << e.what() << std::endl;
     exit(-1);
@@ -227,10 +221,14 @@ int main(int argc, char **argv) {
   return 0;
 }
 
+
+
+
 // print out the usage
-static void usage(void) {
-  printf("usage: cedar [-ih] [-e expression] [files ...]\n");
-}
+static void usage(void) { printf("usage: cedar [-ih] [-e expression] [files] [args...]\n"); }
+
+
+
 
 // print out the help
 static void help(void) {
@@ -241,78 +239,9 @@ static void help(void) {
   printf("  -i Run in an interactive repl\n");
   printf("  -h Show this help menu\n");
   printf("  -e Evaluate an expression\n");
+  printf("  -R Display resource usage at the REPL (debug)\n");
   printf("\n");
 }
 
-void daemon_thread(short port) {
-  auto loop = uvw::Loop::getDefault();
-  auto tcp = loop->resource<uvw::TCPHandle>();
 
-  tcp->on<uvw::ErrorEvent>([](const uvw::ErrorEvent &e, uvw::TCPHandle &h) {
-    //
-    std::cerr << e.what() << std::endl;
-  });
 
-  tcp->on<uvw::ListenEvent>([](const uvw::ListenEvent &, uvw::TCPHandle &srv) {
-    std::shared_ptr<uvw::TCPHandle> client =
-        srv.loop().resource<uvw::TCPHandle>();
-
-    std::string welcome = "cedar lisp v" CEDAR_VERSION "\n";
-
-    client->on<uvw::ConnectEvent>(
-        [&](const uvw::ConnectEvent &e, uvw::TCPHandle &h) {});
-
-    client->on<uvw::DataEvent>([&](const uvw::DataEvent &e, uvw::TCPHandle &h) {
-      /* data received */
-      cedar::runes str = e.data.get();
-
-      std::string headers;
-      std::string body;
-
-      try {
-        ref res = cvm.eval_string(str);
-        headers += "200 OKAY\n";
-        body += res.to_string();
-
-      } catch (std::exception &e) {
-        headers += "500 EXCEPTION\n";
-
-        body += e.what();
-      } catch (cedar::ref r) {
-        headers += "501 UNCAUGHT\n";
-
-        body += "Uncaught exception: ";
-        body += r.to_string();
-      }
-
-      std::string response;
-      response += headers;
-      response += "\n";
-      response += body;
-      response += "\n";
-
-      h.write(response.data(), response.size());
-    });
-
-    client->on<uvw::EndEvent>(
-        [](const uvw::EndEvent &e, uvw::TCPHandle &client) {
-          //
-          client.close();
-        });
-
-    srv.accept(*client);
-    client->write(welcome.data(), welcome.size());
-    client->read();
-  });
-
-  tcp->init();
-  tcp->bind("127.0.0.1", port);
-  printf("Daemon Listening on 127.0.0.1:%d\n", port);
-  tcp->listen();
-  loop->run();
-}
-
-std::thread start_daemon_thread(short port) {
-  auto th = std::thread(daemon_thread, port);
-  return th;
-}

@@ -58,7 +58,7 @@ ref type::get_field(ref k) {
 }
 
 ref type::get_field_fast(int i) {
-  // 
+  //
   return m_fields.at(i);
 }
 
@@ -132,6 +132,13 @@ static bound_function check_arity(cedar::runes name, int arity,
 static void type_init_default_bindings(type *t) {
   t->setattr("str", type_str_lambda);
   t->setattr("repr", type_str_lambda);
+
+
+  t->setattr("name",
+             check_arity("name", 1, bind_lambda(argc, argv, machine) {
+               type *self = argv[0].as<type>();
+               return new string(self->m_name);
+             }));
 
   t->setattr("add-field",
              check_arity("add-field", 3, bind_lambda(argc, argv, machine) {
@@ -320,6 +327,37 @@ static void init_list_type() {
     return len;
   });
 
+  list_type->set_field(
+      "put", check_arity("put", 2, bind_lambda(argc, argv, machine) {
+        return new list(argv[1], argv[0]);
+      }));
+
+  list_type->set_field(
+      "peek", check_arity("peek", 1, bind_lambda(argc, argv, machine) {
+        list *self = argv[0].as<list>();
+        return self->first();
+      }));
+
+  list_type->set_field(
+      "pop", check_arity("pop", 1, bind_lambda(argc, argv, machine) {
+        list *self = argv[0].as<list>();
+        return self->rest();
+      }));
+
+  list_type->set_field(
+      "get", check_arity("get", 2, bind_lambda(argc, argv, machine) {
+        i64 len = 0;
+        i64 ind = argv[1].to_int();
+        ref l = argv[0];
+        while (!l.is_nil()) {
+          if (len == ind) break;
+          len++;
+          l = l.rest();
+        }
+
+        return l.first();
+      }));
+
   list_type->setattr("__alloc__",
                      bind_lambda(argc, argv, machine) { return new list(); });
 
@@ -381,8 +419,8 @@ static void init_number_type() {
   });
 
   number_type->set_field("reciprocal", bind_lambda(argc, argv, machine) {
-        return 1.0 / argv[0].to_float();
-      });
+    return 1.0 / argv[0].to_float();
+  });
 
   primary_machine->bind(new symbol("Number"), number_type);
 }  // init_number_type
@@ -458,7 +496,7 @@ static void init_vector_type() {
 
   vector_type->set_field("new", bind_lambda(argc, argv, machine) {
     for (int i = 1; i < argc; i++) {
-      argv[0] = argv[0].cons(argv[i]);
+      argv[0] = self_call(argv[0], "put", argv[i]);
     }
     return nullptr;
   });
@@ -489,6 +527,27 @@ static void init_vector_type() {
         vector *self = argv[0].as<vector>();
         return self->set(argv[1], argv[2]);
       }));
+
+
+
+  vector_type->set_field(
+      "put", check_arity("put", 2, bind_lambda(argc, argv, machine) {
+        vector *self = argv[0].as<vector>();
+        return self->append(argv[1]);
+      }));
+
+  vector_type->set_field(
+      "pop", check_arity("pop", 1, bind_lambda(argc, argv, machine) {
+        vector *self = argv[0].as<vector>();
+        return new vector(self->items.erase(self->items.size()-1));
+      }));
+
+  vector_type->set_field(
+      "peek", check_arity("peek", 1, bind_lambda(argc, argv, machine) {
+        vector *self = argv[0].as<vector>();
+        return self->items[self->items.size()-1];
+      }));
+
 
   primary_machine->bind(new symbol("Vector"), vector_type);
 }  // init_vector_type
@@ -583,6 +642,7 @@ static void init_keyword_type() {
         return nullptr;
       }));
 
+
   primary_machine->bind(new symbol("Keyword"), keyword_type);
 }  // init_keyword_type
 
@@ -610,20 +670,64 @@ static void init_lambda_type() {
   primary_machine->bind(new symbol("Lambda"), lambda_type);
 }  // init_lambda_type
 
-void cedar::type_init(void) {
+//
+//
+//
+/////////////////////////////////////////////////////////////
+//
+//
+//
 
+type *cedar::namespace_type;
+static void init_namespace_type() {
+  // bind defaults
+  type_init_default_bindings(lambda_type);
+
+  namespace_type->setattr(
+      "__alloc__", bind_lambda(argc, argv, machine) { return new object(); });
+
+  namespace_type->set_field("new", bind_lambda(argc, argv, machine) {
+
+      static int name_id = get_symbol_intern_id("__name__");
+    ref self = argv[0];
+    ref name = argv[1];
+
+    if (string *name_s = ref_cast<string>(name); name_s != nullptr) {
+      self->setattr_fast(name_id, name);
+    } else {
+      throw cedar::make_exception(
+          "(Module ...) requires a string name as an argument");
+    }
+
+    return nullptr;
+  });
+
+  namespace_type->setattr("repr", bind_lambda(argc, argv, machine) {
+    static int name_id = get_symbol_intern_id("__name__");
+    ref self = argv[0];
+    cedar::runes s = "<namespace '";
+    s += self->getattr_fast(name_id).to_string(true);
+
+    s += "'>";
+
+    return new string(s);
+  });
+
+
+  primary_machine->bind(new symbol("Namespace"), namespace_type);
+}  // init_namespace_type
+
+void cedar::type_init(void) {
   // allocate all the builtin type names and variables
 #define BUILTIN_TYPE(name, str) \
-  name ## _type = new type(str);  \
-  name ## _type->m_type = type_type;
+  name##_type = new type(str);  \
+  name##_type->m_type = type_type;
 
 #include <cedar/builtin_types.h>
 #undef BUILTIN_TYPE
-
 
 // call all of the initialize functions for each type
 #define BUILTIN_TYPE(name, str) init_##name##_type();
 #include <cedar/builtin_types.h>
 #undef BUILTIN_TYPE
-
 }

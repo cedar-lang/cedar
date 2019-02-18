@@ -36,16 +36,13 @@
 namespace cedar {
 
   class vector : public indexable, public sequence {
-   private:
-    immer::flex_vector<ref> items;
-
    public:
+    immer::flex_vector<ref> items;
     vector(immer::flex_vector<ref>);
     vector(void);
     ~vector(void);
 
     inline const char *object_type_name(void) { return "vector"; };
-
 
     ref at(int);
     u64 hash(void);

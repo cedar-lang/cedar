@@ -46,21 +46,14 @@ object *cedar::obj_root = nullptr;
 // the object constructor and destructor keeps
 // track of how many objects are allocated
 object::object(void) {
-  // printf("+ %ld\n", object_count);
   m_type = object_type;
 
   next = obj_root;
 
-  /*
-  obj_root = this;
-  */
-
   object_count++;
 }
-object::~object(void) {
-  // printf("- %ld\n", object_count);
-  object_count--;
-}
+
+object::~object(void) { object_count--; }
 
 
 
@@ -93,18 +86,25 @@ ref object::getattr_fast(int i) {
     return b->val;
   }
 
-
-  ref val = nullptr;
-  if (auto *b = m_type->m_fields.buck(i); b != nullptr) {
-    return b->val;
-  }
-  for (auto *t : m_type->m_parents) {
-    if (auto *b = t->m_fields.buck(i); b != nullptr) {
+  if (m_type != nullptr) {
+    ref val = nullptr;
+    if (auto *b = m_type->m_fields.buck(i); b != nullptr) {
       return b->val;
     }
+    for (auto *t : m_type->m_parents) {
+      if (auto *b = t->m_fields.buck(i); b != nullptr) {
+        return b->val;
+      }
+    }
+
+    return object_type->get_field_fast(i);
   }
 
-  return object_type->get_field_fast(i);
+  throw cedar::make_exception("attribute '", get_symbol_id_runes(i), "' on object not found");
+}
+
+attr_map::bucket *object::getattrbucket(int i) {
+  return m_attrs.buck(i);
 }
 
 void object::setattr_fast(int k, ref v) { m_attrs.set(k, v); }
@@ -113,16 +113,14 @@ ref object::getattr(ref k) {
   if (symbol *s = ref_cast<symbol>(k); s != nullptr) {
     return getattr_fast(s->id);
   }
-  throw cedar::make_exception("unable to getattr, '", k,
-                              "' from object. requires symbol as key");
+  throw cedar::make_exception("unable to getattr, '", k, "' from object. requires symbol as key");
 }
 
 void object::setattr(ref k, ref v) {
   if (symbol *s = ref_cast<symbol>(k); s != nullptr) {
     return setattr_fast(s->id, v);
   }
-  throw cedar::make_exception("unable to setattr, '", k,
-                              "' from object. requires symbol as key ");
+  throw cedar::make_exception("unable to setattr, '", k, "' from object. requires symbol as key ");
 }
 
 void object::setattr(runes name, bound_function fn) {
@@ -158,7 +156,11 @@ cedar::runes object::to_string(bool human) {
   // default repr of some object
   cedar::runes s;
   s += "<object of type '";
-  s += m_type->m_name;
+  if (m_type != nullptr) {
+    s += m_type->m_name;
+  } else {
+    s += "Object";
+  }
   s += "' at ";
   char buf[20];
   sprintf(buf, "%p", this);
@@ -173,8 +175,7 @@ u64 object::hash(void) {
   ref res = self_call(hash_id, &valid);
   if (valid) return res.to_int();
 
-  throw cedar::make_exception("Unable to hash unknown object of type ",
-                              m_type->to_string());
+  throw cedar::make_exception("Unable to hash unknown object of type ", m_type->to_string());
 }
 
 const char *object::object_type_name(void) { return "object"; };
@@ -219,8 +220,7 @@ ref attr_map::at(int i) {
     }
     b = b->next;
   }
-  throw cedar::make_exception("attribute '", get_symbol_id_runes(i),
-                              "' not found");
+  throw cedar::make_exception("attribute '", get_symbol_id_runes(i), "' not found");
 };
 
 bool attr_map::has(int i) {

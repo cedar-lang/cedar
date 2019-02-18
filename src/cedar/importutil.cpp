@@ -34,7 +34,7 @@ static apathy::Path path_resolve_file(apathy::Path p) {
 
   auto filename = p.filename();
   auto dir = p.directory();
-  dir.append(filename + ".cdr");
+  dir.append("main.cdr");
   return dir;
 }
 

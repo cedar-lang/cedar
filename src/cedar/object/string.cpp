@@ -56,20 +56,26 @@ cedar::runes string::to_string(bool human) {
 
 
   static std::vector<string_char_conversion> mappings = {
-    {'"', "\\\""},
+    {'\a', "\\a"},
     {'\b', "\\b"},
+    {'\f', "\\f"},
     {'\n', "\\n"},
-    {'\t', "\\t"},
     {'\r', "\\r"},
-    {'\\', "\\"},
+    {'\t', "\\t"},
+    {'\v', "\\v"},
+    {'\\', "\\\\"},
+    {'"', "\\\""},
+    {0x1b, "\\e"}
   };
 
 
   auto get_char_runes = [&] (char c) -> runes {
-    runes str;
     for (auto & m : mappings) {
       if (m.c == c) return m.r;
     }
+
+
+    runes str;
     str += c;
     return str;
   };
@@ -82,39 +88,7 @@ cedar::runes string::to_string(bool human) {
     }
     str += "\"";
   } else {
-    auto it = m_content.begin();
-    while (it != m_content.end()) {
-      auto c = *it++;
-      if (c == '\\' && it != m_content.end()) {
-        switch (*it++) {
-          case '\\':
-            c = '\\';
-            break;
-          case 'b':
-            c = '\b';
-            break;
-          case 'n':
-            c = '\n';
-            break;
-          case 't':
-            c = '\t';
-            break;
-          case 'r':
-            c = '\r';
-            break;
-          case '"':
-            c = '"';
-            break;
-          case 'f':
-            c = '\f';
-            break;
-          default:
-            c = '?';
-            break;
-        }
-      }
-      str += c;
-    }
+    str += m_content;
   }
   return str;
 }

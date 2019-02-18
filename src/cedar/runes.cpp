@@ -126,6 +126,10 @@ runes& runes::operator+=(char c) {
 	buf.push_back(c);
 	return *this;
 }
+runes& runes::operator+=(int c) {
+	buf.push_back(c);
+	return *this;
+}
 
 runes& runes::operator+=(rune c) {
 	buf.push_back(c);

@@ -79,11 +79,10 @@ namespace cedar {
   // initialize all the builtin types
   void type_init(void);
 
-  template <typename... Ts>
-  inline ref self_call(ref self, const cedar::runes func, Ts... args) {
 
-    int argc = sizeof...(args) + 1;
-    ref argv[]{self, args...};
+
+  inline ref self_callv(ref self, const cedar::runes func, int argc, ref *argv) {
+
     ref s = new symbol(func);
     ref attr = self.getattr(s);
     if (!attr.is<lambda>()) {
@@ -92,6 +91,15 @@ namespace cedar {
 
     ref val = vm::call_function(attr.as<lambda>(), argc, argv);
     return val;
+  }
+
+
+  template <typename... Ts>
+  inline ref self_call(ref self, const cedar::runes func, Ts... args) {
+
+    int argc = sizeof...(args) + 1;
+    ref argv[]{self, args...};
+    return self_callv(self, func, argc, argv);
   }
 
 };  // namespace cedar

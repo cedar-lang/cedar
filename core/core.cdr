@@ -20,14 +20,11 @@
 ;; OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 ;; SOFTWARE.
 
-;; set the initial namespace to "core"
-(def* *ns* "core")
 
 ;; first is a wrapper around calling
 ;; the .first method on a type
 (def* first
   (fn (x) (. x (first))))
-
 
 ;; same for rest
 (def* rest
@@ -47,9 +44,10 @@
 ;; have true and false resolve to themselves.
 ;; there is only a reason for 'false' to exist
 ;; as there are only 2 'falsy' values
-;; in cedar (nil and false)
+;; in cedar (nil and false) but 'true' is a nice
+;; thing to have
 (def* true 'true)
-(def* false false)
+(def* false 'false)
 
 
 ;; define dumb logical operators. These will be replaced
@@ -78,10 +76,15 @@
 
 
 
+;; since eval is a special form, there needs to
+;; be a function that calls it. It looks weird
+;; but it makes sense if you think about it
+(def* eval (fn (obj) (eval obj)))
+
 ;; define the identity function, just returns the arg
 (def* identity (fn (x) x))
 
-(def* read-string (fn (str) (Reader str)))
+;; (def* read-string (fn (str) (Reader str)))
 
 ;; a sequence is defined as an object that has a first
 ;; and rest method
@@ -92,6 +95,8 @@
   (fn (v)
     (catch* (fn () (and (and (. v first) (. v rest)) true))
         (fn (e) false))))
+
+
 
 
 (def* map-1
@@ -126,11 +131,15 @@
 ;; NOTE: does not walk down the tree
 (def* macroexpand
   (fn (form)
-    (let* ((ex (macroexpand-1 form)))
-      (if (= ex form)
-        form
-        (macroexpand ex)))))
+      (let* ((ex (macroexpand-1 form)))
+        (if (= ex form)
+          form
+          (macroexpand ex)))))
 
+
+(def* macroexpand-all
+  (fn (form)
+      (prewalk (fn (x) (if (seq? x) (macroexpand x) x)) form)))
 
 ;; add the '+' operator to the string class
 ;; this *could* be implemented in c++ but nah.
@@ -181,11 +190,22 @@
 
 
 
+
+
 (defn second (x) (first (rest x)))
 
 
 (def* next rest)
 
+
+
+(. Keyword (set-field 'apply
+              (fn (self coll)
+                (get coll self nil))))
+
+(. Number (set-field 'apply
+             (fn (self coll)
+               (get coll self nil))))
 
 ;; redefine the def* special form to allow a more
 ;; complicated scheme-like function definition
@@ -235,28 +255,66 @@
 
 
 
+(def (put item coll)
+  (. coll (put item)))
+(def (pop coll)
+  (. coll (pop)))
+(def (peek coll)
+  (. coll (peek)))
+
+
 (def (every? pred coll)
   (cond (nil? coll) t
         (pred (first coll)) (recur pred (rest coll))
-        :else nil))
+        :else false))
 
+;; returns if some of the collection returns true
+;; when applied to the predicate
 (def (some? pred coll)
-  (or (pred (first coll)) (recur pred (rest coll))))
+  (or (pred (first coll)) (some? pred (rest coll))))
 
 (def (constantly x)
   (fn (& a) x))
 
+;; TODO: add this to the stdlib
+(def (contains? coll k)
+  (cond (nil? coll) false
+        (= (first coll) k) true
+        :otherwise (recur (rest coll) k)))
 
+;; TODO: add to stdlib
+(def (contains-where? coll pred)
+  (cond (nil? coll) nil
+        (pred (first coll)) true
+        :otherwise (recur (rest coll) pred)))
+
+;; TODO: add all flavours to stdlib
+(def (contains-number? coll)
+  (contains-where? coll number?))
+
+
+
+;; given a list of lists, turn their firsts into a vector and cons
+;; it with the recursive call to zip-lists on their rests
 (def (zip-lists ls)
   (let* ((c (map-1 first ls)))
-    (cond (every? nil? c) nil
+    (cond (contains? c nil) nil
           :else (cons (map-1 first ls) (zip-lists (map-1 rest ls))))))
-
 
 ;; zip any number of lists together into a single list, the
 ;; nth of which contains the nth item in each list passed
 (def (zip & lists)
   (zip-lists lists))
+
+
+(def (zip-lists-nil ls)
+  (let* ((c (map-1 first ls)))
+    (cond (every? nil? c) nil
+          :else (cons (map-1 first ls) (zip-lists-nil (map-1 rest ls))))))
+
+(def (zip-nil & lists)
+  (zip-lists-nil lists))
+
 
 (def (map f & colls)
   (cond (nil? (rest colls)) (map-1 f (first colls))
@@ -286,7 +344,6 @@
   (if (nil? xs) c
     (recur (inc c) (rest xs))))
 
-
 (def (count coll)
   (cond (vector? coll) (size coll)
         :else (count* 0 coll)))
@@ -295,6 +352,8 @@
 
 (defn inc (n) (+ n 1))
 (defn dec (n) (- n 1))
+(defmacro inc (n) (list '+ n 1))
+(defmacro dec (n) (list '- n 1))
 
 
 (def (even? x)
@@ -305,7 +364,20 @@
 (def (odd? x)
   (not (even? x)))
 
-(def reduce foldl)
+(def range-step
+  (fn (a b step)
+    (if (< a b) (cons a (range-step (+ a step) b step)))))
+
+(def (range a b)
+    (if (< a b) (cons a (range-step (+ 1 a) b 1))))
+
+
+
+;; reduce the function f over xs starting at i
+(def (reduce f i xs)
+     (if (nil? xs)
+         i
+         (reduce f (f i (first xs)) (rest xs))))
 
 (def (append-1 l1 l2)
   (if (nil? l1)
@@ -360,38 +432,35 @@
 
 
 (defmacro quasiquote (form)
-  (qq/transform-quasiquote-arg form))
+    (qq/transform-quasiquote-arg form))
 ;;;;;;;;;;;;;;;;;;;;;;;;;; QUASIQUOTE IS VALID NOW ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;; TODO: add this to the stdlib
-(def (contains? coll k)
-  (cond (nil? coll) nil
-        (= (first coll) k) true
-        :otherwise (recur (rest coll) k)))
 
-;; TODO: add to stdlib
-(def (contains-where? coll pred)
-  (cond (nil? coll) nil
-        (pred (first coll)) true
-        :otherwise (recur (rest coll) pred)))
+(defmacro first (x)
+  `(. ~x (first)))
+(defmacro rest (x)
+  `(. ~x (rest)))
+(defmacro len (x)
+  `(. ~x (len)))
 
-;; TODO: add all flavours to stdlib
-(def (contains-number? coll)
-  (contains-where? coll number?))
 
 
 
 (defmacro += (id n)
-  `(def ,id (+ ,id ,n)))
+  `(def ~id (+ ~id ~n)))
 (defmacro -= (id n)
-  `(def ,id (- ,id ,n)))
+  `(def ~id (- ~id ~n)))
 (defmacro *= (id n)
-  `(def ,id (* ,id ,n)))
+  `(def ~id (* ~id ~n)))
 (defmacro /= (id n)
-  `(def ,id (/ ,id ,n)))
+  `(def ~id (/ ~id ~n)))
 
 
-
+(def (interleave s1 s2)
+  (when (and s1 s2)
+    (cons (first s1)
+          (cons (first s2) 
+                (interleave (rest s1) (rest s2))))))
 (def (drop n l)
   (cond (= n 0) l
         (nil? l) nil
@@ -411,28 +480,90 @@
               :else (list p))))))
 
 
+(def nilify (fn (& args) nil))
+
+
+(defmacro locals (names & body)
+  (do (if (not= (type names) Vector)
+        (throw "'locals' macro requires a vector of names"))
+      (cons (list 'fn (map identity names) (cons 'do body)) (map nilify names))))
+
+
+
+(defn LETEXPAND (bindings & body))
+
+
+(defmacro LET (bindings & body)
+  (let* ((names (map first bindings))
+         (vals (map second bindings)))
+    `((fn ~names
+            (do ~@(map (fn (x) (cons 'def x)) bindings)
+               ((fn ~names (do ~@body)) ~@names))
+           (map nilify names)))))
 
 (defmacro let (defs & body)
-  (do (when (odd? (len defs)) (throw (String "Error in let syntax. bindings must be of even length: " defs "")))
-      `(let* ,(partition 2 defs) ,@body)))
+  (do (when (odd? (len defs))
+            (throw (str "Error in let syntax. bindings must be of even length: " defs "")))
+      `(LET ~(partition 2 defs) ~@body)))
+
+
+
+
+
+(defmacro case (dispatch & cases)
+  (let []))
 
 
 
 (defmacro while (test & body)
   `(let* ()
-     (when ,test
-       ,@body
+     (when ~test
+       ~@body
        (recur))))
 
+
+;; Threads the expr through the forms. Inserts x as the
+;; second item in the first form, making a list of it if it is not a
+;; list already. If there are more forms, inserts the first form as the
+;; second item in second form, etc.
+
+(def (->transform  x forms)
+  (if forms
+    (let (form (first forms))
+      (let (threaded (if (seq? form)
+                        `(~(first form) ~x ~@(rest form))
+                        (list form x)))
+          (->transform threaded (rest forms))))
+    x))
+
+
+(defmacro ->
+  (x & forms)
+  (->transform x forms))
+
+
+(def (->>transform x forms)
+  (if forms
+    (let (form (first forms))
+      (let (threaded (if (seq? form)
+                        `(~(first form) ~@(rest form) ~x)
+                        (list form x)))
+          (->>transform threaded (rest forms))))
+    x))
+
+
+(defmacro ->>
+  (x & forms)
+  (->>transform x forms))
 
 
 
 
 (defmacro getattr (obj attr)
-  `(getattr* ,obj (quote ,attr)))
+  `(getattr* ~obj (quote ~attr)))
 
 (defmacro setattr (obj attr value)
-  `(setattr* ,obj (quote ,attr) ,value))
+  `(setattr* ~obj (quote ~attr) ~value))
 
 
 
@@ -444,21 +575,16 @@
 ;; so common, this macro automatically quotes the key
 ;; identifier so you dont have to think about it.
 (defmacro setq (coll name val)
-  `(set ,coll (quote ,name) ,val))
+  `(set ~coll (quote ~name) ~val))
 
 ;; define a macro for use inside classes to clean up
 ;; the (set self 'name val) form. Cause it's ugly.
 (defmacro sets (name val)
-  `(setattr self ,name ,val))
+  `(setattr self ~name ~val))
 
 (defmacro gets (name & r)
-  (if (nil? r) `(. self ,name)
-    `(catch ,(gensym) (. self  ,name) ,@r)))
-
-
-
-
-
+  (if (nil? r) `(. self ~name)
+    `(catch ~(gensym) (. self  ~name) ~@r)))
 
 
 
@@ -468,12 +594,12 @@
         (let (curr (macroexpand (first exprs)))
           (cond
             ;; list expressions inside a class must be defs for fields
-            (list? curr) (cond (= 'def* (first curr)) (def res (cons `(. ,name (set-field (quote ,(second curr)) ,(first (rest (rest curr)))))
+            (list? curr) (cond (= 'def* (first curr)) (def res (cons `(. ~name (set-field (quote ~(second curr)) ~(first (rest (rest curr)))))
                                                                    res))
                                :else (throw (String "invalid list-style expression in class definition: " curr)))
 
             ;; vectors in a class definition adds superclasses
-            (vector? curr) (def res (cons `(do ,@(map (fn (c) `(. ,name (add-parent ,c)))
+            (vector? curr) (def res (cons `(do ~@(map (fn (c) `(. ~name (add-parent ~c)))
                                                       curr))
                                          res)))
           (def exprs (rest exprs))))
@@ -484,8 +610,8 @@
 ;; set a field:        `(. NewType (set-field 'attr value)
 ;; add a parent:       `(. NewType (add-parent ParentType))`
 (defmacro deftype (name & args)
-      `(do (def ,name (Type ,(String name)))
-           ,@(deftype-expr-expand name args)))
+      `(do (def ~name (Type ~(String name)))
+           ~@(deftype-expr-expand name args)))
 
 (def (extends? ta tb)
   (or (= ta tb) (contains? (. tb (get-parents)) ta)))
@@ -496,12 +622,12 @@
 
 ;; the stream class is a basic io class
 ;; it offers .write and .read
-(deftype stream
+(deftype Stream
   (def write nil)
   (def read nil))
 
 
-(deftype file-descriptor [stream]
+(deftype FileDescriptor [Stream]
   (def fd nil)
   ;; constructor that
   (def (new self fd_arg)
@@ -517,10 +643,57 @@
 (def (fopen-flags path flags)
   (let (fd (os-open path flags))
     (cond (= fd -1)  (throw (str "unable to open file '" path "'"))
-          :otherwise (file-descriptor fd))))
+          :otherwise (FileDescriptor fd))))
 
 (def (fopen path)
   (fopen-flags path (bit-or O_RDWR O_APPEND O_CREAT)))
+
+
+
+
+
+(def (eval-file-in-module path m)
+  (let [src (read-file path)
+        exprs (map identity (read-string src))]
+    (map eval exprs)))
+
+
+
+;; the Module type that represents the current module
+;; and what gets returned from (import)
+(deftype Module)
+
+
+(def *imported* {})
+
+(def (import path)
+  (let (qualified (path-resolve path *file*)
+        *old-file* *file*
+        *old-module* (internal/get-module)
+        *new-module* nil)
+    (if (not (get *imported* qualified false))
+      (do (internal/set-module *new-module*)
+          (eval-file-in-module qualified *new-module*)
+          (set *imported* qualified *new-module*)
+          (def *file* *old-file*)
+          (internal/set-module *old-module*)
+          *new-module*)
+      (get *imported* qualified))))
+
+
+
+(defmacro do-global (& globs)
+  (let [old-mod-name (gensym)
+        return-sym (gensym)]
+    `(let* ((~old-mod-name (internal/get-module))
+            (~return-sym nil))
+       (internal/set-module nil)
+       (def ~return-sym (do ~@globs))
+       (internal/set-module ~old-mod-name)
+       ~return-sym)))
+
+
+
 
 
 
@@ -528,19 +701,19 @@
 
 ;; Base Exceptions
 
-(deftype exception
+(deftype Exception
   ;; the exception's message defaults to an empty string
   ;; to be filled in later
   (def what "")
   (def (new self m)
     (sets what m))
   (def (str self)
-    (gets what))
+    (str (. self __class__ (name)) ": " self.what))
   (def (repr self)
-    (gets what)))
+    (str (. self __class__ (name)) ": " self.what)))
 
 
-(deftype assertion-error [exception])
+(deftype AssertionError [Exception])
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -549,19 +722,85 @@
 
 
 (defmacro assert (stmt)
-  `(if ,stmt true (throw (assertion-error (str "Assertion Failed: " `,stmt)))))
-
-
-(def *out* (file-descriptor 0))
-(def *err* (file-descriptor 1))
-(def *in*  (file-descriptor 2))
-
+  `(if ~stmt true (throw (AssertionError (str "Assertion " `~stmt " failed")))))
 
 (def (join l s)
   (reduce (fn (a b) (str a s b)) (str (first l)) (rest l)))
 
+
+(def (format s & vs)
+  (apply str (map (fn (x) (apply str x)) (zip-nil (re-match #"[^\{\}]+" s) vs))))
+
+
+
+
+(deftype lazy-seq
+  ;; the function that will be called eventually
+  (def func nil)
+  ;; if the lazy sequence has been evaluated yet
+  (def evaluated nil)
+  ;; the value stored in the list. will be filled
+  ;; when .seq is called
+  (def value nil)
+  ;; constructor. Takes the function that will be
+  ;; evaluated on .seq
+  (def (new self f)
+    (setattr self func f))
+  ;; implementations of first and rest
+  (def (first self) (first (. self (seq))))
+  (def (rest self) (rest (. self (seq))))
+  ;; the seq function "steps" this lazy sequence.
+  ;; this means it checks if it's been evaluated
+  ;; yet, and if it needs to, evaluates the function
+  ;; caching it's result and returning it. If it
+  ;; has already been evaluated, there is no reason
+  ;; in calling the function again and it returns
+  ;; the value it had cached
+  (def (seq self)
+    (if (. self evaluated) (. self value)
+      (do (setattr self evaluated t)
+          (. self value := (self.func))
+          (. self func := nil)
+          self.value)))
+  ;; convert the lazy list into a string.
+  ;; WARNING: this will consume the *entire*
+  ;; list
+  (def (str self)
+    (str "(" (join self " ") ")"))
+
+  (def (write-stream self stream)
+    (. stream (write "("))
+    (let [curr self]
+      (while curr
+        (. stream (write (first curr)))
+        (def curr (rest curr))
+        (if curr (. stream (write " ")))))
+    (. stream (write ")"))))
+
+(defmacro lazily (& expr)
+  `(lazy-seq (fn () (do ~@expr))))
+
+
+
+
+(def *out* (FileDescriptor 0))
+(def *err* (FileDescriptor 1))
+(def *in*  (FileDescriptor 2))
+
+
+(. Object (set-field 'write-stream (fn (self stream)
+                                     (. stream (write (str self))))))
+
+
+
+(def (up-to n))
+
 (def (write stream & things)
   (. stream (write (apply str things))))
+
+
+(def (sprint v)
+  (. v (write-stream *out*)))
 
 ;; redefine print and println in terms of
 ;; *out* the stream class system
@@ -592,9 +831,33 @@
   (fn (& args)
     (not (apply f args))))
 
-;; takes a value x and returns a function that constantly
-;; returns that value
-(def (constantly x)
-  (fn (& args) x))
+
+
+(deftype MultiMethod
+  ;; constructor for the MultiMethod map wrapper
+  (def (new self)
+    ;; by default, the :default method is simply id
+    ;; TODO: decide if this is a bad idea or not
+    (do (. self methods := {:default (fn (& x) (throw "multimethod unable to find key"))})))
+  ;; add a method handler
+  (def (set-method self key method)
+    (do (set (. self methods) key method)))
+  (def (get-method self dispatch-val)
+    (catch e
+      (get (. self methods) dispatch-val)
+      (get (. self methods) :default))))
+
+
+(defmacro defmulti (name dispatch-func)
+  `(let* ((mm (MultiMethod))
+          (func ~dispatch-func))
+      ;; define the multimethod globally
+      (defn ~name (& args)
+          (apply (. mm (get-method (apply func args))) args))
+      (. ~name set-method := (fn (self dispatch-val method)
+                               (. mm (set-method dispatch-val method))))))
+
+(defmacro defmethod (multifn dispatch-val & fn-tail)
+  `(. ~multifn (set-method ~dispatch-val (fn ~@fn-tail))))
 
 

@@ -31,6 +31,7 @@
 #include <cedar/runes.h>
 #include <gc/gc_cpp.h>
 #include <unordered_map>
+#include <immer/map.hpp>
 
 #include <vector>
 

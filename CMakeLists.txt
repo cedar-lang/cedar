@@ -22,6 +22,9 @@ set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
 add_definitions(-DCORE_DIR="${CORE_DIR}")
 
 
+add_compile_options(-frtti)
+
+
 include_directories(${CMAKE_SOURCE_DIR}/include)
 
 include(${CMAKE_SOURCE_DIR}/src/cedar/CMakeLists.txt)

@@ -76,7 +76,6 @@ namespace cedar {
 
       void init(void);
 
-
       bool has(int);
 
       bucket *buck(int);
@@ -85,6 +84,8 @@ namespace cedar {
       int size(void);
       void rehash(int);
   };
+
+
 
   class object : public gc {
    public:
@@ -102,6 +103,8 @@ namespace cedar {
     ref getattr(ref);
     void setattr(ref, ref);
     void setattr(runes, bound_function);
+
+    attr_map::bucket *getattrbucket(int);
 
 
     // self call an attr with some symbol id

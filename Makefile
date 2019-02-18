@@ -1,5 +1,5 @@
 
-.PHONY: clean install libinc
+.PHONY: clean install libinc gen
 
 BUILDMODE=Release
 

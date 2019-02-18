@@ -221,10 +221,10 @@ void vm::compiler::compile_list(ref obj, vm::bytecode &code, scope_ptr sc,
       opcode = OP_SET_LOCAL;
       index = ind;
     } else {
-      u64 hash = name_obj.hash();
+      symbol *sym = name_obj.as<symbol>();
+      i64 global_ind = sym->id;
 
-      i64 global_ind = 0;
-
+      /*
       if (m_vm->global_symbol_lookup_table.find(hash) ==
           m_vm->global_symbol_lookup_table.end()) {
         // make space in global table
@@ -238,6 +238,8 @@ void vm::compiler::compile_list(ref obj, vm::bytecode &code, scope_ptr sc,
       } else {
         global_ind = m_vm->global_symbol_lookup_table.at(hash);
       }
+      */
+
       opcode = OP_SET_GLOBAL;
       index = global_ind;
     }
@@ -247,6 +249,11 @@ void vm::compiler::compile_list(ref obj, vm::bytecode &code, scope_ptr sc,
     compile_object(val_obj, code, sc, ctx);
 
     code.write_op(opcode, index);
+    return;
+  }
+
+  if (list_is_call_to("ns", obj)) {
+    std::cout << obj << std::endl;
     return;
   }
 
@@ -295,7 +302,6 @@ void vm::compiler::compile_list(ref obj, vm::bytecode &code, scope_ptr sc,
           }
         }
 
-
         code.write_op(OP_GET_ATTR, id);
 
       } else if (a.isa(list_type)) {
@@ -325,7 +331,6 @@ void vm::compiler::compile_list(ref obj, vm::bytecode &code, scope_ptr sc,
           args = args.rest();
         }
 
-
         code.write_op(OP_CALL, argc);
       } else {
         throw cedar::make_exception("invalid syntax in dot special form: ",
@@ -336,93 +341,43 @@ void vm::compiler::compile_list(ref obj, vm::bytecode &code, scope_ptr sc,
     return;
   }
 
-  if (list_is_call_to("cons", obj)) {
-    auto args = obj.rest();
-    auto a = args.first();
-    auto b = args.rest().first();
-
-    compile_object(b, code, sc, ctx);
-    compile_object(a, code, sc, ctx);
-
-    code.write_op(OP_CONS);
-    return;
-  }
-
   // let is a special form, not expanded by macros
+  // this version of let is only used when bootstrapping
+  // the runtime, and a LET macro is defined that does a
+  // more powerful macroexpand
   if (list_is_call_to("let*", obj)) {
+
     std::vector<ref> arg_names;
     std::vector<ref> arg_vals;
 
     ref args = obj.rest().first();
     ref body = obj.rest().rest();
 
-    if (!args.is_nil()) {
-      if (!args.isa(list_type))
-        throw cedar::make_exception(
-            "let expression requires second argument to be list of bindings");
+    ref bname = args.first().first();
+    ref bval = args.first().rest().first();
+    ref brest = args.rest();
 
-      while (true) {
-        if (args.is_nil()) break;
-        ref arg = args.first();
-        arg_names.push_back(arg.first());
-        arg_vals.push_back(arg.rest().first());
-        args = args.rest();
-      }
+    ref bdy = new list(new symbol("do"), body);
+
+    if (!brest.is_nil()) {
+      bdy = newlist(obj.first() /* let* */, brest, bdy);
     }
 
-    ref argobj = arg_names.size() == 0 ? nullptr : new_obj<list>(arg_names);
+    bool has_val = !bname.is_nil();
 
-    auto func = newlist(new_obj<symbol>("fn"), argobj,
-                        new_obj<list>(new_obj<symbol>("progn"), body));
+    if (has_val) bname = new list(bname, nullptr);
 
-    std::vector<ref> call;
-    call.push_back(func);
-    for (auto it : arg_vals) {
-      call.push_back(it);
-    }
+    ref fn = newlist(new symbol("fn"), bname, bdy);
 
-    ref expr = new_obj<list>(call);
+    ref call = has_val ? newlist(fn, bval) : newlist(fn);
 
-    return compile_object(expr, code, sc, ctx);
-  }
 
-  // let is a special form, not expanded by macros
-  if (list_is_call_to("let*", obj)) {
-    std::vector<ref> arg_names;
-    std::vector<ref> arg_vals;
+    return compile_object(call, code, sc, ctx);
+  } // end of let construction
 
-    ref args = obj.rest().first();
-    ref body = obj.rest().rest();
 
-    if (!args.is_nil()) {
-      if (!args.isa(list_type))
-        throw cedar::make_exception(
-            "let expression requires second argument to be list of bindings");
 
-      while (true) {
-        if (args.is_nil()) break;
-        ref arg = args.first();
-        arg_names.push_back(arg.first());
-        arg_vals.push_back(arg.rest().first());
-        args = args.rest();
-      }
-    }
 
-    ref argobj = arg_names.size() == 0 ? nullptr : new_obj<list>(arg_names);
-
-    auto func = newlist(new_obj<symbol>("fn"), argobj,
-                        body = new_obj<list>(new_obj<symbol>("do"), body));
-
-    std::vector<ref> call;
-    call.push_back(func);
-    for (auto it : arg_vals) {
-      call.push_back(it);
-    }
-
-    ref expr = new_obj<list>(call);
-
-    return compile_object(expr, code, sc, ctx);
-  }
 
   if (list_is_call_to("eval", obj)) {
     compile_object(obj.rest().first(), code, sc, ctx);
@@ -595,18 +550,21 @@ void vm::compiler::compile_symbol(ref sym, bytecode &code, scope_ptr sc,
     return;
   }
 
-  u64 hash = sym.hash();
 
+  /*
+  u64 hash = sym.hash();
   if (m_vm->global_symbol_lookup_table.find(hash) ==
       m_vm->global_symbol_lookup_table.end()) {
     throw cedar::make_exception("Symbol '", sym, "' not found");
   }
+  */
 
-  auto ind = m_vm->global_symbol_lookup_table.at(hash);
+  symbol *symb = sym.as<symbol>();
+  // auto ind = m_vm->global_symbol_lookup_table.at(hash);
 
   // grab the symbol from the global scope
   code.write((uint8_t)OP_LOAD_GLOBAL);
-  code.write((i64)ind);
+  code.write((i64)symb->id);
 }
 
 // lambda compilation is complicated becuase of the closure system behind the

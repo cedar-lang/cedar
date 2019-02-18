@@ -46,6 +46,8 @@ namespace cedar {
     lambda *get_macro(int);
     void set_macro(int, ref);
 
+
+
     ref macroexpand_1(ref);
 
     // a "var" is a storage cell in the machine. It allows
@@ -69,12 +71,11 @@ namespace cedar {
       // ref *stack = nullptr;
 
      public:
-      // the global table is just a vector of objects which the
-      // compiler will index into in O(1) time
-      std::vector<var> global_table;
-      // becuase the global_table doesn't have any name binding associated
-      // with it, we must have a mapping from hash values to indexes
-      std::map<u64, i64> global_symbol_lookup_table;
+
+      // the current module that is evaluated. This is primarially here
+      // in order to have quick access in (get-module) and (set-module x)
+      ref current_module = nullptr;
+      ref globals = nullptr;
 
       // a mutex lock around the reading and writing of global variables
       std::mutex globals_lock;

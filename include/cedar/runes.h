@@ -85,6 +85,7 @@ namespace cedar {
 			runes& operator+=(const char *);
 			runes& operator+=(std::string);
 			runes& operator+=(char);
+			runes& operator+=(int);
 			runes& operator+=(rune);
 
 			runes& operator=(const runes&);

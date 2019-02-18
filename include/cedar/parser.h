@@ -46,8 +46,8 @@
   V(tok_symbol, 6)            \
   V(tok_keyword, 7)           \
   V(tok_quote, 8)             \
-  V(tok_comma, 9)             \
-  V(tok_comma_at, 10)         \
+  V(tok_unq, 9)             \
+  V(tok_splice, 10)         \
   V(tok_backquote, 11)        \
   V(tok_left_bracket, 12)     \
   V(tok_right_bracket, 13)    \
@@ -152,6 +152,7 @@ namespace cedar {
     ref parse_list(void);
 
     ref parse_vector(void);
+    // ref parse_dict(void);
 
     // parse things like
     //    'a  -> (quote a)

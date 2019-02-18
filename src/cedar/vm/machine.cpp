@@ -64,8 +64,7 @@ lambda *vm::get_macro(int id) {
 
 void vm::set_macro(int id, ref mac) {
   if (ref_cast<lambda>(mac) == nullptr) {
-    throw cedar::make_exception("unable to add macro ", get_symbol_id_runes(id),
-                                " to non-lambda ", mac);
+    throw cedar::make_exception("unable to add macro ", get_symbol_id_runes(id), " to non-lambda ", mac);
   }
   macros[id] = mac;
 }
@@ -121,6 +120,9 @@ ref vm::call_function(lambda *fn, int argc, ref *argv) {
 void init_binding(cedar::vm::machine *m);
 
 vm::machine::machine(void) : m_compiler(this) {
+
+  this->globals = new object();
+
   primary_machine = this;
   // before creating anything, init the types
   type_init();
@@ -132,24 +134,12 @@ vm::machine::machine(void) : m_compiler(this) {
 
 vm::machine::~machine() {}
 
-void vm::machine::bind(ref symbol, ref value) {
+void vm::machine::bind(ref key, ref value) {
   std::lock_guard<std::mutex> lck(globals_lock);
-  u64 hash = symbol.hash();
 
-  i64 global_ind = 0;
+  symbol *s = ref_cast<symbol>(key);
 
-  if (global_symbol_lookup_table.find(hash) ==
-      global_symbol_lookup_table.end()) {
-    // make space in global table
-    global_ind = global_table.size();
-    var v;
-    v.value = nullptr;
-    global_table.push_back(v);
-  } else {
-    global_ind = global_symbol_lookup_table.at(hash);
-  }
-  global_symbol_lookup_table[hash] = global_ind;
-  global_table[global_ind].value = value;
+  globals->setattr_fast(s->id, value);
 }
 
 void vm::machine::bind(runes name, bound_function f) {
@@ -158,17 +148,22 @@ void vm::machine::bind(runes name, bound_function f) {
   bind(symbol, lambda);
 }
 
-ref vm::machine::find(ref &symbol) {
+ref vm::machine::find(ref &sym) {
   std::lock_guard<std::mutex> lck(globals_lock);
-  u64 hash = symbol.hash();
 
-  if (global_symbol_lookup_table.find(hash) ==
-      global_symbol_lookup_table.end()) {
-    return nullptr;
-  } else {
-    return global_table[global_symbol_lookup_table.at(hash)].value;
+  symbol *s = ref_cast<symbol>(sym);
+
+  if (s == nullptr) return nullptr;
+
+
+  int ind = s->id;
+  if (!current_module.is_nil()) {
+    auto *buck = current_module->getattrbucket(ind);
+    if (buck != nullptr) {
+      return buck->val;
+    }
   }
-  return nullptr;
+  return globals->getattr_fast(ind);
 }
 
 ref vm::machine::eval_file(cedar::runes path) {
@@ -192,6 +187,7 @@ ref vm::machine::eval_string(cedar::runes expr) {
   reader.lex_source(expr);
   bool valid = true;
 
+
   while (true) {
     ref e = reader.read_one(&valid);
     if (!valid) break;
@@ -204,9 +200,8 @@ ref vm::machine::eval_string(cedar::runes expr) {
 // #define VM_TRACE_INTERACTIVE
 // #define VM_TRACE_INTERACTIVE_AUTO
 
-#define USE_PREDICT
-
 #ifdef VM_TRACE
+
 static const char *instruction_name(uint8_t op) {
   switch (op) {
 #define OP_NAME(name, code, op_type, effect) \
@@ -217,11 +212,13 @@ static const char *instruction_name(uint8_t op) {
   }
   return "unknown";
 }
+
 #endif
 
 static void *threaded_labels[255];
 bool created_thread_labels = false;
 
+// evaluate a single file
 ref vm::machine::eval(ref obj) {
   try {
     ref compiled_lambda = m_compiler.compile(obj, this);
@@ -234,16 +231,13 @@ ref vm::machine::eval(ref obj) {
     std::cerr << "Uncaught Exception: " << e << std::endl;
   }
 
+
   std::cerr << "Exception thrown when evaluating '" << obj << "'" << std::endl;
-  std::cerr << std::endl;
+
   return nullptr;
 }
 
-static std::mutex gil_mtx;
-
 ref vm::machine::eval_lambda(lambda *raw_program) {
-  // GC_gcollect();
-
   int max_sp = 0;
 
   if (raw_program == nullptr) {
@@ -300,7 +294,7 @@ ref vm::machine::eval_lambda(lambda *raw_program) {
   };
 
   auto print_stack = [&]() {
-    i64 height = 40;
+    i64 height = 20;
     i64 upper_bound = std::min(stacksize, sp);
     i64 lower_bound = std::max((i64)0, (i64)(sp - height));
     printf("---------------------------------------\n");
@@ -324,6 +318,9 @@ ref vm::machine::eval_lambda(lambda *raw_program) {
       std::cerr << val;
       std::cerr << std::endl;
     }
+    for (int i = upper_bound; i < height; i++) {
+      std::cerr << std::endl;
+    }
     printf("---------------------------------------\n");
   };
 
@@ -331,8 +328,7 @@ ref vm::machine::eval_lambda(lambda *raw_program) {
 
 #ifdef VM_TRACE
 
-  std::chrono::high_resolution_clock::time_point last_time =
-      std::chrono::high_resolution_clock::now();
+  std::chrono::high_resolution_clock::time_point last_time = std::chrono::high_resolution_clock::now();
 
   auto trace_current_state = [&](void) {
 
@@ -340,8 +336,7 @@ ref vm::machine::eval_lambda(lambda *raw_program) {
     printf("\033[2J");
     printf("\033[2H");
 #endif
-    std::chrono::high_resolution_clock::time_point now =
-        std::chrono::high_resolution_clock::now();
+    std::chrono::high_resolution_clock::time_point now = std::chrono::high_resolution_clock::now();
     std::chrono::duration<long long, std::nano> dt = now - last_time;
     double dtns = dt.count();
 
@@ -392,21 +387,6 @@ instruction_name(op)); \ last_time = now;
   // modern CPUs because of the l1 cache typically caching 8 bytes, so the best
   // case scenario is a cache miss 1/8 opcodes that predict the next instruction
   // long correct_predictions = 0;
-#ifdef USE_PREDICT
-#define PREDICT(pred, label) \
-  do {                       \
-    if (*ip == pred) {       \
-      ip++;                  \
-      op = *ip;              \
-      correct_predictions++; \
-      goto label;            \
-    } else                   \
-      correct_predictions--; \
-  } while (0);
-
-#else
-#define PREDICT(pred, label)
-#endif
 
 #define SET_LABEL(op) threaded_labels[op] = &&DO_##op;
 
@@ -464,24 +444,22 @@ instruction_name(op)); \ last_time = now;
 
 loop:
 
-
-  /*
-  printf("\033[2J");
-  printf("\033[2H");
-  PROG()->code->print(ip);
-  usleep(10000);
-  */
-
-
   // read the opcode from the instruction pointer
   op = *ip;
 
+  /*
+  if (isatty(STDOUT_FILENO)) {
+    printf("\033[2J");
+    printf("\033[2H");
+  }
+  PROG()->code->print(ip);
+  if (isatty(STDOUT_FILENO)) usleep(100000);
+  */
+
   ip++;
+
   goto *threaded_labels[op];
 
-  // OP_NOP is currently a catchall. If this instruction is
-  // encountered, an error is printed and the program just exits...
-  // TODO: make it not do this and actually just ignore it.
   TARGET(OP_NOP) {
     PRELUDE;
     fprintf(stderr, "UNHANDLED INSTRUCTION: %02x\n", op);
@@ -543,18 +521,33 @@ loop:
     PRELUDE;
     i64 ind = CODE_READ(i64);
     CODE_SKIP(i64);
-    PUSH(global_table[ind].value);
+
+
+    symbol s;
+    s.id = ind;
+
+    ref c = &s;
+
+    ref val = find(c);
+
+    PUSH(val);
     DISPATCH;
   }
 
   TARGET(OP_SET_GLOBAL) {
     PRELUDE;
     auto ind = CODE_READ(i64);
-    ref val = POP();
-    global_table[ind].value = val;
-
-    PUSH(val);
     CODE_SKIP(i64);
+
+    ref val = POP();
+    if (!current_module.is_nil()) {
+      current_module->setattr_fast(ind, val);
+      PUSH(val);
+      DISPATCH;
+    }
+
+    globals->setattr_fast(ind, val);
+    PUSH(val);
     DISPATCH;
   }
 
@@ -581,7 +574,16 @@ loop:
 
   TARGET(OP_CALL) {
     PRELUDE;
+
     i64 argc = CODE_READ(i64);
+
+    // TODO: move this somewhere else. It's not very nice to future nick when he wants
+    //       to implement threading or async. Maybe when the fiber abstraction comes along
+    //       store this in there instead so you can grab the current fiber frame and it's
+    //       argc.
+    static ref argc_ident = new symbol("*internal-currentfn-argc*");
+    bind(argc_ident, argc);
+    
     ref *argv = stack + sp - argc;
 
     CODE_SKIP(i64);
@@ -591,8 +593,6 @@ loop:
                             argument list */
 
     ref catcher = nullptr;
-
-    type *fn_type = stack[new_fp].get_type();
 
     if (stack[new_fp].isa(lambda_type)) {
       auto *new_program = stack[new_fp].reinterpret<cedar::lambda *>();
@@ -654,15 +654,13 @@ loop:
       ref alloc_func_ref = cls->getattr_fast(__alloc__id);
 
       // allocate the instance
-      ref inst =
-          vm::call_function(alloc_func_ref.as<lambda>(), 0, stack + new_fp);
+      ref inst = vm::call_function(alloc_func_ref.as<lambda>(), 0, stack + new_fp);
 
       stack[new_fp] = inst;
 
       ref new_func_ref = inst->getattr_fast(new_id);
       if (!new_func_ref.is<lambda>()) {
-        throw cedar::make_exception("`new` method for ", ref{cls},
-                                    " is not a function");
+        throw cedar::make_exception("`new` method for ", ref{cls}, " is not a function");
       }
 
       lambda *new_func = new_func_ref.as<lambda>();
@@ -672,18 +670,15 @@ loop:
 
       sp = new_fp + 1;
       DISPATCH;
-    } else if (fn_type == number_type || fn_type == keyword_type) {
-      ref key = stack[new_fp];
-      ref coll = stack[abp];
-
-      stack[new_fp] = idx_get(coll, key);
-      sp = new_fp + 1;
-      DISPATCH;
     }
 
+    ref v = self_callv(stack[new_fp], "apply", argc + 1, stack + abp - 1);
+    stack[new_fp] = v;
+    sp = new_fp + 1;
+    DISPATCH;
+
     print_stack();
-    throw cedar::make_exception(
-        "function to be called is not a valid callable: ", stack[new_fp]);
+    throw cedar::make_exception("function to be called is not a valid callable: ", stack[new_fp]);
     goto error;
   }
 
@@ -772,10 +767,7 @@ loop:
 
     i64 argc = CODE_READ(i64);
     CODE_SKIP(i64);
-    if (argc != PROG()->argc)
-      throw cedar::make_exception(
-          "recur call has invalid number of arguments. Given ", argc,
-          " expected ", PROG()->argc);
+    if (argc != PROG()->argc) throw cedar::make_exception("recur call has invalid number of arguments. Given ", argc, " expected ", PROG()->argc);
 
     int abp = sp - argc; /* argumement base pointer, represents the base of the
                             argument list */
@@ -857,12 +849,12 @@ loop:
   TARGET(OP_EVAL) {
     PRELUDE;
     ref thing = POP();
-    // gil_mtx.unlock();
     ref res = eval(thing);
-    // gil_mtx.lock();
     PUSH(res);
     DISPATCH;
   }
+
+  printf("GOT HERE\n");
 
   goto loop;
 

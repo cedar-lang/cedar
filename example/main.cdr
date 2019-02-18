@@ -1,15 +1,7 @@
 
-(def range-step (fn (a b step)
-                  (if (< a b) (cons a (range-step (+ a step) b step)))))
 
-(def (range a b)
-    (if (< a b) (cons a (range-step (+ 1 a) b 1))))
 
-;; reduce the function f over xs starting at i
-(def (reduce f i xs)
-     (if (nil? xs)
-         i
-         (reduce f (f i (first xs)) (rest xs))))
+
 
 
 
@@ -19,48 +11,15 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defn fib (n)
+(defn ofib (n)
   (if (< n 2)
     n
-    (+ (fib (- n 2)) (fib (- n 1)))))
+    (+ (ofib (- n 2)) (ofib (- n 1)))))
 
 
 
 
-(deftype lazy-seq
-  ;; the function that will be called eventually
-  (def func nil)
-  ;; if the lazy sequence has been evaluated yet
-  (def evaluated nil)
-  ;; the value stored in the list. will be filled
-  ;; when .seq is called
-  (def value nil)
-  ;; constructor. Takes the function that will be
-  ;; evaluated on .seq
-  (def (new self f)
-      (setattr self func f))
-  ;; implementations of first and rest
-  (def (first self) (first (. self (seq))))
-  (def (rest self) (rest (. self (seq))))
-  ;; the seq function "steps" this lazy sequence.
-  ;; this means it checks if it's been evaluated
-  ;; yet, and if it needs to, evaluates the function
-  ;; caching it's result and returning it. If it
-  ;; has already been evaluated, there is no reason
-  ;; in calling the function again and it returns
-  ;; the value it had cached
-  (def (seq self)
-    (if (. self evaluated) (. self value)
-      (do (setattr self evaluated t)
-          (setattr self value ((. self func))))))
-  ;; convert the lazy list into a string.
-  ;; WARNING: this will consume the *entire*
-  ;; list
-  (def (str self)
-    (str "(" (join self " ") ")")))
 
-(defmacro lazily (& expr)
-  `(lazy-seq (fn () (do ,@expr))))
 
 
 
@@ -84,14 +43,6 @@
       (def x (bit-shift-right x 4))
       (def i (inc i)))
     (trim-zeros s)))
-
-;; (when (number? x)
-;;     (if (< 0 x) (def x (* x -1)))
-;;     (cond (= 0 x) ""
-;;           :else (str (hex (bit-shift-right-logic x 4))
-;;                      (hexchar (bit-and 0x0F x))))))
-
-
 
 
 (def (vmap func v)
@@ -145,7 +96,6 @@
     (lazily (cons p (sieve (lazy-filter (prime-filter p) ps))))))
 
 
-
 (def primes (sieve (walk 2)))
 
 (def (apply-to f)
@@ -181,35 +131,9 @@
         [0 0 1]])
 
 
-(deftype MultiMethod
-  ;; constructor for the MultiMethod map wrapper
-  (def (new self)
-    ;; by default, the :default method is simply id
-    ;; TODO: decide if this is a bad idea or not
-    (do (. self methods := {:default (fn (& x) (throw "multimethod unable to find key"))})))
-  ;; add a method handler
-  (def (set-method self key method)
-    (do (set (. self methods) key method)))
-  (def (get-method self dispatch-val)
-    (catch e
-      (get (. self methods) dispatch-val)
-      (get (. self methods) :default))))
+(def V1 (transpose [[1 2 3]]))
 
-
-(defmacro defmulti (name dispatch-func)
-  `(let* ((mm (MultiMethod))
-          (func ,dispatch-func))
-      ;; define the multimethod globally
-      (defn ,name (& args)
-          (apply (. mm (get-method (apply func args))) args))
-      (. ,name set-method := (fn (self dispatch-val method)
-                               (. mm (set-method dispatch-val method))))))
-
-
-(defmacro defmethod (multifn dispatch-val & fn-tail)
-  `(. ,multifn (set-method ,dispatch-val (fn ,@fn-tail))))
-
-
+(def V2 (transpose [[2 4 6]]))
 
 
 
@@ -275,32 +199,35 @@
     (Fraction (* a.n b.d) (* a.d b.n))))
 
 
-(def f1 (Fraction 1 2))
-(def f2 (Fraction 1 2))
-(println (+ f1 f2))
-(println (- f1 f2))
-(println (* f1 f2))
-(println (/ f1 f2))
+(deftype ArityException [Exception])
 
 
+(defmacro arity (& groups)
+  (let [args (map first groups)
+        bodys (map (fn (x) (cons 'do (apply list (rest x)))) groups)
+        lens (map len args)
+        together (zip lens args bodys)
+        argc-id (gensym)
+        expand-cond (fn (c) `((= ~argc-id ~(first c)) (apply (fn ~(1 c) ~(2 c)) passed)))]
+
+    `(fn (& passed)
+       (let* ((~argc-id *internal-currentfn-argc*))
+         (cond ~@(apply append (map expand-cond together))
+              :default (throw (ArityException "Invalid arity")))))))
+
+(def atest (arity [(x) (atest x 0)]
+                  [(x y) (+ x y)]))
 
 
+(def (nth n coll)
+  (cond (= n 0) (first coll)
+        (recur (dec n) (rest coll))))
 
-(deftype Cons
-  (def (new self f r)
-    (. self f := f)
-    (. self r := r))
-  (def (first self)
-    self.f)
-  (def (rest self)
-    (self.r))
-  (def (str self)
-    (str "(" self.f " . " self.r ")"))
-  (def (repr self)
-    (.self (str))))
+(def fib
+  (arity [(n)
+          (nth n (fib 0 1))]
+         [(a b)
+          (lazily (cons a (fib b (+ a b))))]))
 
 
-(def (cons f r) (Cons f r))
-
-
-
+(def (sq x) (* x x))
