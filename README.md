@@ -1,27 +1,7 @@
-# Cedar Lisp
-### A lisp implementation in c++ that kinda looks like clojure
+# CEDAR
+## A lisp dialect that looks like clojure and feels like go.
+
+
 ---
 
-Here's a quick example of the syntax:
-```clojure
-; normal lisp function application
-(+ 1 2)
-; normal looking funciton literals
-(fn (x) x)
-; variable setting
-(def foo "bar")
-; function setting macro
-(defn id (x) x)
-
-;; classes
-; define
-(class person (name)
-  ((say (fn (thing) (print name "says '" thing "'")))))
-; instantiate
-(def bob (person "Bob"))
-; call
-(bob.say "Hello World!)
-; prints: "Bob says 'Hello World!'"
-```
-
-It's still in its early days, so I'll update this README as features get implemented
+Cedar is an interesting lisp interpreter that focuses on concurrency and immutability. It has a coroutine system called "fibers" that cooperatively multitask on thread pools in libUV event loops in order to create highly concurrent programs in lisp
