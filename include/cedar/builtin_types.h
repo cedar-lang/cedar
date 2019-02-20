@@ -21,6 +21,6 @@ BUILTIN_TYPE(vector, "Vector")
 BUILTIN_TYPE(dict, "Dict")
 BUILTIN_TYPE(symbol, "Symbol")
 BUILTIN_TYPE(keyword, "Keyword")
-BUILTIN_TYPE(namespace, "Namespace")
+BUILTIN_TYPE(fiber, "Fiber")
 
 #endif

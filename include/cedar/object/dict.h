@@ -40,7 +40,7 @@ namespace cedar {
 
   class dict : public indexable {
    private:
-    struct bucket : public gc_cleanup {
+    struct bucket : public gc {
       u64 hash = 0;
       ref key = nullptr;
       ref val = nullptr;

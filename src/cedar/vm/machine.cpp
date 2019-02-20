@@ -27,13 +27,14 @@
 #include <chrono>
 #include <ratio>
 
+#include <cedar/scheduler.h>
 #include <cedar/object.h>
 #include <cedar/object/dict.h>
 #include <cedar/object/lambda.h>
 #include <cedar/object/list.h>
 #include <cedar/object/string.h>
 #include <cedar/object/symbol.h>
-#include <cedar/object/user_type.h>
+#include <cedar/object/fiber.h>
 #include <cedar/objtype.h>
 #include <cedar/parser.h>
 #include <cedar/ref.h>
@@ -43,6 +44,7 @@
 #include <unistd.h>
 #include <cedar/util.hpp>
 #include <thread>
+#include <cedar/globals.h>
 
 #include <gc/gc.h>
 #include <unordered_map>
@@ -66,6 +68,7 @@ void vm::set_macro(int id, ref mac) {
   if (ref_cast<lambda>(mac) == nullptr) {
     throw cedar::make_exception("unable to add macro ", get_symbol_id_runes(id), " to non-lambda ", mac);
   }
+
   macros[id] = mac;
 }
 
@@ -89,13 +92,9 @@ ref vm::macroexpand_1(ref obj) {
           args = args.rest();
         }
 
-        ref expanded = call_function(mac, argc, argv.data());
 
-        /*
-        std::cout << "->  " << obj << std::endl;
-        std::cout << "<-  " << expanded << std::endl;
-        std::cout << std::endl;
-        */
+        call_context ctx;
+        ref expanded = call_function(mac, argc, argv.data(), &ctx);
 
         return expanded;
       }
@@ -107,64 +106,18 @@ ref vm::macroexpand_1(ref obj) {
 
 vm::machine *cedar::primary_machine = nullptr;
 
-ref vm::call_function(lambda *fn, int argc, ref *argv) {
-  if (fn->code_type == lambda::function_binding_type) {
-    return fn->function_binding(argc, argv, primary_machine);
-  }
-
-  fn = fn->copy();
-  fn->prime_args(argc, argv);
-  return primary_machine->eval_lambda(fn);
-}
 
 void init_binding(cedar::vm::machine *m);
 
+
 vm::machine::machine(void) : m_compiler(this) {
-
-  this->globals = new object();
-
   primary_machine = this;
   // before creating anything, init the types
   type_init();
-
-  true_value = cedar::new_obj<cedar::symbol>("true");
-  bind(true_value, true_value);
   init_binding(this);
 }
 
 vm::machine::~machine() {}
-
-void vm::machine::bind(ref key, ref value) {
-  std::lock_guard<std::mutex> lck(globals_lock);
-
-  symbol *s = ref_cast<symbol>(key);
-
-  globals->setattr_fast(s->id, value);
-}
-
-void vm::machine::bind(runes name, bound_function f) {
-  ref symbol = new_obj<cedar::symbol>(name);
-  ref lambda = new_obj<cedar::lambda>(f);
-  bind(symbol, lambda);
-}
-
-ref vm::machine::find(ref &sym) {
-  std::lock_guard<std::mutex> lck(globals_lock);
-
-  symbol *s = ref_cast<symbol>(sym);
-
-  if (s == nullptr) return nullptr;
-
-
-  int ind = s->id;
-  if (!current_module.is_nil()) {
-    auto *buck = current_module->getattrbucket(ind);
-    if (buck != nullptr) {
-      return buck->val;
-    }
-  }
-  return globals->getattr_fast(ind);
-}
 
 ref vm::machine::eval_file(cedar::runes path) {
   ref file_star = new symbol("*file*");
@@ -173,7 +126,7 @@ ref vm::machine::eval_file(cedar::runes path) {
 
   ref path_obj = new string(path);
 
-  bind(file_star, path_obj);
+  def_global(file_star, path_obj);
 
   ref val = this->eval_string(std::move(src));
 
@@ -215,10 +168,6 @@ static const char *instruction_name(uint8_t op) {
 
 #endif
 
-static void *threaded_labels[255];
-bool created_thread_labels = false;
-
-// evaluate a single file
 ref vm::machine::eval(ref obj) {
   try {
     ref compiled_lambda = m_compiler.compile(obj, this);
@@ -230,646 +179,7 @@ ref vm::machine::eval(ref obj) {
   } catch (cedar::ref e) {
     std::cerr << "Uncaught Exception: " << e << std::endl;
   }
-
-
   std::cerr << "Exception thrown when evaluating '" << obj << "'" << std::endl;
-
   return nullptr;
 }
 
-ref vm::machine::eval_lambda(lambda *raw_program) {
-  int max_sp = 0;
-
-  if (raw_program == nullptr) {
-    throw cedar::make_exception("eval_lambda passed null reference to lambda");
-  }
-
-  ref return_value;
-  i32 stack_size_required = raw_program->code->stack_size + 10;
-  u64 stacksize = stack_size_required;
-  ref *stack = new ref[stacksize];
-
-  u64 fp, sp;
-  fp = sp = 0;
-
-  // ip is the "instruction pointer" and dereferencing
-  // it will select the opcode to run
-  uint8_t *ip = nullptr;
-
-  // how high the "call stack" is
-  u64 callheight = 0;
-
-  // the currently evaluating opcode
-  uint8_t op = OP_NOP;
-
-  ref program = nullptr;
-
-  cedar::runes errormsg;
-
-#define PROG() program.stat_cast<cedar::lambda *>()
-#define PUSH(val) (stack[sp++] = (val))
-#define PUSH_PTR(ptr) (stack[sp++].store_ptr((void *)(ptr)))
-#define POP() (stack[--sp])
-#define POP_PTR() (stack[--sp].reinterpret<void *>())
-
-#define CODE_READ(type) (*(type *)(void *)ip)
-#define CODE_SKIP(type) (ip += sizeof(type))
-
-#define LABEL(op) DO_##op
-#define TARGET(op) DO_##op:
-
-  auto check_stack_size_and_resize = [&](void) {
-    max_sp = std::max((int)sp, max_sp);
-
-    if ((i64)sp >= (i64)stacksize - stack_size_required) {
-      auto new_size = stacksize * 2;
-      auto *new_stack = new ref[new_size];
-      for (i64 i = 0; i < (i64)sp; i++) {
-        new_stack[i] = stack[i];
-      }
-      delete[] stack;
-      stack = new_stack;
-      stacksize = new_size;
-    }
-  };
-
-  auto print_stack = [&]() {
-    i64 height = 20;
-    i64 upper_bound = std::min(stacksize, sp);
-    i64 lower_bound = std::max((i64)0, (i64)(sp - height));
-    printf("---------------------------------------\n");
-    printf("       size: %lu refs\n", stacksize);
-    printf("             %lu bytes\n", stacksize * sizeof(ref));
-    printf("---------------------------------------\n");
-    for (i64 i = lower_bound; i <= upper_bound; i++) {
-      if (i == (i64)fp) {
-        printf(" fp -> ");
-      } else if (i == (i64)sp) {
-        printf(" sp -> ");
-      } else {
-        printf("       ");
-      }
-      printf("%04lx ", i);
-      std::string val = stack[i].to_string(false);
-      if (val.size() > 40) {
-        val.erase(40, val.size());
-        val += "...";
-      }
-      std::cerr << val;
-      std::cerr << std::endl;
-    }
-    for (int i = upper_bound; i < height; i++) {
-      std::cerr << std::endl;
-    }
-    printf("---------------------------------------\n");
-  };
-
-#define DEFAULT_PRELUDE check_stack_size_and_resize();
-
-#ifdef VM_TRACE
-
-  std::chrono::high_resolution_clock::time_point last_time = std::chrono::high_resolution_clock::now();
-
-  auto trace_current_state = [&](void) {
-
-#ifdef VM_TRACE_INTERACTIVE
-    printf("\033[2J");
-    printf("\033[2H");
-#endif
-    std::chrono::high_resolution_clock::time_point now = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<long long, std::nano> dt = now - last_time;
-    double dtns = dt.count();
-
-    printf("op: %02x %-20.15s ", op, instruction_name(op));
-    printf("Δt: %5.5fms  ", dtns / 1000.0 / 1000.0);
-    printf("sp: %6lu  ", sp);
-    printf("depth: %6lu  ", callheight);
-    printf("ip: %p ", ip);
-
-    std::cout << std::this_thread::get_id() << " ";
-    printf("\n");
-
-    last_time = now;
-#ifdef VM_TRACE_INTERACTIVE
-    print_stack();
-#ifdef VM_TRACE_INTERACTIVE_AUTO
-    usleep(1000);
-#else
-    std::cout << "Press Enter to Continue ";
-    std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-#endif
-
-#endif
-  };
-
-#define PRELUDE    \
-  DEFAULT_PRELUDE; \
-  trace_current_state();
-/*
-#define PRELUDE \
-        std::chrono::high_resolution_clock::time_point now =
-std::chrono::high_resolution_clock::now();  \
-        std::chrono::duration<long long, std::nano> dt = now - last_time; \
-        double dtns = dt.count();                                         \
-        printf("sp: %3zu, fp: %3zu, ip %p, preds: %4ld, prev_dt: %8.5fms, op:
-%s\n", (size_t)sp, (size_t)fp, ip, correct_predictions, dtns / 1000.0 / 1000.0,
-instruction_name(op)); \ last_time = now;
-        */
-#else
-#define PRELUDE DEFAULT_PRELUDE
-#endif
-#define DISPATCH goto loop;
-
-  // some opcodes come in very common pairs, making it very possible to do
-  // speculative exec on what the next opcode could be... This macro allows high
-  // speed assumptions to be made at the end of an opcode that is typically
-  // followed by another opcode The performance loss by this check is minimal on
-  // modern CPUs because of the l1 cache typically caching 8 bytes, so the best
-  // case scenario is a cache miss 1/8 opcodes that predict the next instruction
-  // long correct_predictions = 0;
-
-#define SET_LABEL(op) threaded_labels[op] = &&DO_##op;
-
-  // if the global thread label vector isn't initialized, we need to do that
-  // first
-  if (!created_thread_labels) {
-    for (int i = 0; i < 255; i++) threaded_labels[i] = &&LABEL(OP_NOP);
-    SET_LABEL(OP_NIL);
-    SET_LABEL(OP_CONST);
-    SET_LABEL(OP_FLOAT);
-    SET_LABEL(OP_INT);
-    SET_LABEL(OP_LOAD_LOCAL);
-    SET_LABEL(OP_SET_LOCAL);
-    SET_LABEL(OP_LOAD_GLOBAL);
-    SET_LABEL(OP_SET_GLOBAL);
-    SET_LABEL(OP_CONS);
-    SET_LABEL(OP_APPEND);
-    SET_LABEL(OP_CALL);
-    SET_LABEL(OP_MAKE_FUNC);
-    SET_LABEL(OP_ARG_POP);
-    SET_LABEL(OP_RETURN);
-    SET_LABEL(OP_EXIT);
-    SET_LABEL(OP_SKIP);
-    SET_LABEL(OP_JUMP_IF_FALSE);
-    SET_LABEL(OP_JUMP);
-    SET_LABEL(OP_RECUR);
-    SET_LABEL(OP_DUP);
-    SET_LABEL(OP_GET_ATTR);
-    SET_LABEL(OP_SET_ATTR);
-    SET_LABEL(OP_SWAP);
-    SET_LABEL(OP_DEF_MACRO);
-    SET_LABEL(OP_EVAL);
-    created_thread_labels = true;
-  }
-
-  program = raw_program;  // ref_cast<cedar::lambda>(progref);
-
-  // PROG()->closure = std::make_shared<closure>(0, nullptr, 0);
-
-  // obtain a reference to the code
-  // and set the instruction pointer to the begining of this code.
-  ip = PROG()->code->code;
-
-  // push the current code being evaluated. This will also be kept in a local
-  // variable in the evaluation loop for quick, uninterupted access without
-  // having to go through a slow dynamic_cast() for each call
-  PUSH(program);
-  // after pushing the lambda to the stack, we need to push the previous frame
-  // pointer, which in this case is zero again
-  PUSH_PTR(fp);
-  // the final thing to push is the previous instruction pointer, and since this
-  // is a top level evaluation, pushing nullptr is the only value that really
-  // makes sense...
-  PUSH(nullptr);
-
-loop:
-
-  // read the opcode from the instruction pointer
-  op = *ip;
-
-  /*
-  if (isatty(STDOUT_FILENO)) {
-    printf("\033[2J");
-    printf("\033[2H");
-  }
-  PROG()->code->print(ip);
-  if (isatty(STDOUT_FILENO)) usleep(100000);
-  */
-
-  ip++;
-
-  goto *threaded_labels[op];
-
-  TARGET(OP_NOP) {
-    PRELUDE;
-    fprintf(stderr, "UNHANDLED INSTRUCTION: %02x\n", op);
-    exit(-1);
-    DISPATCH;
-  }
-
-  TARGET(OP_NIL) {
-    PRELUDE;
-    PUSH(nullptr);
-    DISPATCH;
-  }
-
-  TARGET(OP_CONST) {
-    PRELUDE;
-    const auto ind = CODE_READ(u64);
-    PUSH(PROG()->code->constants[ind]);
-    CODE_SKIP(u64);
-    DISPATCH;
-  }
-
-  TARGET(OP_FLOAT) {
-    PRELUDE;
-    const auto flt = CODE_READ(double);
-    PUSH(flt);
-    CODE_SKIP(double);
-    DISPATCH;
-  }
-
-  TARGET(OP_INT) {
-    PRELUDE;
-    const auto integer = CODE_READ(i64);
-    PUSH(ref{(i64)integer});
-    CODE_SKIP(i64);
-    DISPATCH;
-  }
-
-  TARGET(OP_LOAD_LOCAL) {
-    PRELUDE;
-    auto ind = CODE_READ(u64);
-    auto val = PROG()->m_closure->at(ind);
-    PUSH(val);
-
-    CODE_SKIP(u64);
-    DISPATCH;
-  }
-
-  TARGET(OP_SET_LOCAL) {
-    PRELUDE;
-    auto ind = CODE_READ(u64);
-    CODE_SKIP(u64);
-    // ref val = POP();
-    PROG()->m_closure->at(ind) = stack[sp - 1];
-    // PUSH(val);
-    DISPATCH;
-  }
-
-  TARGET(OP_LOAD_GLOBAL) {
-    PRELUDE;
-    i64 ind = CODE_READ(i64);
-    CODE_SKIP(i64);
-
-
-    symbol s;
-    s.id = ind;
-
-    ref c = &s;
-
-    ref val = find(c);
-
-    PUSH(val);
-    DISPATCH;
-  }
-
-  TARGET(OP_SET_GLOBAL) {
-    PRELUDE;
-    auto ind = CODE_READ(i64);
-    CODE_SKIP(i64);
-
-    ref val = POP();
-    if (!current_module.is_nil()) {
-      current_module->setattr_fast(ind, val);
-      PUSH(val);
-      DISPATCH;
-    }
-
-    globals->setattr_fast(ind, val);
-    PUSH(val);
-    DISPATCH;
-  }
-
-  TARGET(OP_CONS) {
-    PRELUDE;
-
-    auto lst = POP();
-    auto val = POP();
-
-    PUSH(val.cons(lst));
-    DISPATCH;
-  }
-
-  TARGET(OP_APPEND) {
-    PRELUDE;
-    auto a = POP();
-    auto b = POP();
-
-    ref r = append(a, b);
-
-    PUSH(r);
-    DISPATCH;
-  }
-
-  TARGET(OP_CALL) {
-    PRELUDE;
-
-    i64 argc = CODE_READ(i64);
-
-    // TODO: move this somewhere else. It's not very nice to future nick when he wants
-    //       to implement threading or async. Maybe when the fiber abstraction comes along
-    //       store this in there instead so you can grab the current fiber frame and it's
-    //       argc.
-    static ref argc_ident = new symbol("*internal-currentfn-argc*");
-    bind(argc_ident, argc);
-    
-    ref *argv = stack + sp - argc;
-
-    CODE_SKIP(i64);
-
-    i64 new_fp = sp - argc - 1;
-    int abp = sp - argc; /* argumement base pointer, represents the base of the
-                            argument list */
-
-    ref catcher = nullptr;
-
-    if (stack[new_fp].isa(lambda_type)) {
-      auto *new_program = stack[new_fp].reinterpret<cedar::lambda *>();
-
-      if (new_program == nullptr) {
-        errormsg = "Function to be run in call returned nullptr";
-      }
-
-      if (new_program->code_type == lambda::bytecode_type) {
-        new_program = new_program->copy();
-
-        new_program->prime_args(argc, stack + abp);
-
-        // if the lambda call should be a new call on the c stack, call it
-        // that way
-        if (false) {
-          ref ret_val = eval_lambda(new_program);
-          stack[new_fp] = ret_val;
-          sp = new_fp + 1;
-          DISPATCH;
-        }
-
-        // otherwise, call it using the builtin frame pointer and stack
-        // pointer logic.
-        callheight++;
-        sp = abp;
-        PUSH_PTR(ip);
-        PUSH_PTR(fp);
-        fp = new_fp;
-        stack_size_required = new_program->code->stack_size;
-        ip = new_program->code->code;
-        stack[fp] = new_program;
-        program = new_program;
-        DISPATCH;
-      } else if (new_program->code_type == lambda::function_binding_type) {
-        // gil_mtx.unlock();
-        ref val = new_program->function_binding(argc, argv, this);
-        // gil_mtx.lock();
-        sp = abp - 1;
-
-        /* delete all the arguments from the stack by setting them to nullptr
-         */
-        for (int i = 0; i < argc; i++) {
-          stack[abp + i] = nullptr;
-        }
-        PUSH(val);
-        DISPATCH;
-      }
-    } else if (stack[new_fp].is<user_type>()) {
-      user_type *cls = stack[new_fp].reinterpret<user_type *>();
-      ref instance = cls->instantiate(argc, stack + abp, this);
-      PUSH(instance);
-      DISPATCH;
-    } else if (stack[new_fp].is<type>()) {
-      static int __alloc__id = get_symbol_intern_id("__alloc__");
-      static int new_id = get_symbol_intern_id("new");
-      // if the function to be called was a type, we need to make an instance
-      type *cls = stack[new_fp].as<type>();
-      ref alloc_func_ref = cls->getattr_fast(__alloc__id);
-
-      // allocate the instance
-      ref inst = vm::call_function(alloc_func_ref.as<lambda>(), 0, stack + new_fp);
-
-      stack[new_fp] = inst;
-
-      ref new_func_ref = inst->getattr_fast(new_id);
-      if (!new_func_ref.is<lambda>()) {
-        throw cedar::make_exception("`new` method for ", ref{cls}, " is not a function");
-      }
-
-      lambda *new_func = new_func_ref.as<lambda>();
-
-      // call the new function on the object
-      vm::call_function(new_func, argc + 1, stack + new_fp);
-
-      sp = new_fp + 1;
-      DISPATCH;
-    }
-
-    ref v = self_callv(stack[new_fp], "apply", argc + 1, stack + abp - 1);
-    stack[new_fp] = v;
-    sp = new_fp + 1;
-    DISPATCH;
-
-    print_stack();
-    throw cedar::make_exception("function to be called is not a valid callable: ", stack[new_fp]);
-    goto error;
-  }
-
-  TARGET(OP_MAKE_FUNC) {
-    PRELUDE;
-    auto ind = CODE_READ(u64);
-    ref function_template = PROG()->code->constants[ind];
-    auto *template_ptr = ref_cast<cedar::lambda>(function_template);
-
-    ref function = template_ptr->copy();
-
-    auto *fptr = ref_cast<cedar::lambda>(function);
-
-    // inherit closures from parent, a new
-    // child closure is created on call
-    fptr->m_closure = PROG()->m_closure;
-
-    PUSH(function);
-    CODE_SKIP(u64);
-    DISPATCH;
-  }
-
-  TARGET(OP_ARG_POP) {
-    PRELUDE;
-    i32 ind = CODE_READ(u64);
-    ref arg = stack[fp].first();
-    PROG()->m_closure->at(ind) = arg;
-    stack[fp] = stack[fp].rest();
-    CODE_SKIP(u64);
-    DISPATCH;
-  }
-
-  TARGET(OP_RETURN) {
-    PRELUDE;
-    ref val = POP();
-    auto prevfp = fp;
-
-    for (auto i = sp; i < fp + stack_size_required; i++) {
-      stack[i] = nullptr;
-    }
-    fp = (u64)POP_PTR();
-    ip = (u8 *)POP_PTR();
-    sp = prevfp;
-    program = ref_cast<cedar::lambda>(stack[fp]);
-    stack_size_required = PROG()->code->stack_size;
-    callheight--;
-    PUSH(val);
-    if (ip == 0) goto end;
-    DISPATCH;
-  }
-
-  TARGET(OP_EXIT) {
-    PRELUDE;
-    goto end;
-    DISPATCH;
-  }
-
-  TARGET(OP_SKIP) {
-    PRELUDE;
-    sp--;
-    DISPATCH;
-  }
-
-  TARGET(OP_JUMP_IF_FALSE) {
-    PRELUDE;
-
-    static ref false_val = new symbol("false");
-    i64 offset = CODE_READ(i64);
-    CODE_SKIP(i64);
-    auto val = POP();
-    if (val.is_nil() || val == false_val) {
-      ip = PROG()->code->code + offset;
-    }
-    DISPATCH;
-  }
-
-  TARGET(OP_JUMP) {
-    PRELUDE;
-    i64 offset = CODE_READ(i64);
-    ip = PROG()->code->code + offset;
-    DISPATCH;
-  }
-
-  TARGET(OP_RECUR) {
-    PRELUDE;
-
-    i64 argc = CODE_READ(i64);
-    CODE_SKIP(i64);
-    if (argc != PROG()->argc) throw cedar::make_exception("recur call has invalid number of arguments. Given ", argc, " expected ", PROG()->argc);
-
-    int abp = sp - argc; /* argumement base pointer, represents the base of the
-                            argument list */
-
-    for (int i = 0; i < argc; i++) {
-      PROG()->m_closure->at(i + PROG()->arg_index) = stack[abp + i];
-      stack[abp + i] = nullptr;
-    }
-    ip = PROG()->code->code;
-
-    sp = fp + 3;
-    DISPATCH;
-  }
-
-  TARGET(OP_GET_ATTR) {
-    PRELUDE;
-    i64 id = CODE_READ(i64);
-    CODE_SKIP(i64);
-    auto val = POP();
-    // create a stack allocated symbol
-    symbol s;
-    // set it's id
-    s.id = id;
-    // actually getattr
-    auto attr = val.getattr(&s);
-    // push the value
-    PUSH(attr);
-    DISPATCH;
-  }
-
-  TARGET(OP_SET_ATTR) {
-    PRELUDE;
-    i64 id = CODE_READ(i64);
-    CODE_SKIP(i64);
-    auto val = POP();
-    auto obj = POP();
-    // create a stack allocated symbol
-    symbol s;
-    // set it's id
-    s.id = id;
-    // actually getattr
-    obj.setattr(&s, val);
-    // push the value
-    PUSH(val);
-    DISPATCH;
-  }
-
-  TARGET(OP_DUP) {
-    PRELUDE;
-    i64 off = CODE_READ(i64);
-    auto val = stack[sp - off];
-    CODE_SKIP(i64);
-    PUSH(val);
-    DISPATCH;
-  }
-
-  // swap the two top values on the stack
-  TARGET(OP_SWAP) {
-    PRELUDE;
-    auto a = POP();
-    auto b = POP();
-    PUSH(a);
-    PUSH(b);
-    DISPATCH;
-  }
-
-  TARGET(OP_DEF_MACRO) {
-    PRELUDE;
-    auto func = POP();
-    int id = CODE_READ(i64);
-    CODE_SKIP(i64);
-    set_macro(id, func);
-    auto s = new symbol();
-    s->id = id;
-    PUSH(id);
-    DISPATCH;
-  }
-
-  TARGET(OP_EVAL) {
-    PRELUDE;
-    ref thing = POP();
-    ref res = eval(thing);
-    PUSH(res);
-    DISPATCH;
-  }
-
-  printf("GOT HERE\n");
-
-  goto loop;
-
-end:
-
-  return_value = POP();
-  delete[] stack;
-
-  return return_value;
-
-error:
-  std::cerr << "FATAL ERROR IN EVALUATION:\n";
-  std::cerr << " err: " << errormsg << std::endl;
-  std::cerr << " stack trace:\n";
-  print_stack();
-
-  exit(1);
-}

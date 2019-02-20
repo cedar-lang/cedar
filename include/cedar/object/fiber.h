@@ -24,68 +24,56 @@
 
 #pragma once
 
-#include <cedar/ref.h>
-#include <cedar/runes.h>
-#include <cedar/vm/binding.h>
-#include <cedar/vm/bytecode.h>
-#include <cedar/vm/compiler.h>
 #include <cedar/object.h>
-#include <cstdio>
-#include <map>
-#include <tuple>
-#include <vector>
-#include <mutex>
+#include <cedar/scheduler.h>
 
 namespace cedar {
 
+
+  // forward declarations
   class lambda;
+  class scheduler;
   namespace vm {
-
-    // check if an id is a macro or not
-    bool is_macro(int);
-    lambda *get_macro(int);
-    void set_macro(int, ref);
+    class machine;
+  }
 
 
+  struct frame {
+    frame *caller = nullptr;
+    lambda *code;
+    int sp;
+    int fp;
+    u8 *ip;
+  };
 
-    ref macroexpand_1(ref);
+  class fiber : public object {
+   private:
+    int stack_size = 0;
+    ref *stack = nullptr;
+    // the frame list is a linked list, where the first element
+    // is the newest call stack and the last frame in the list
+    // is the initial function. Nullptr means to return from the
+    // fiber and mark it as done
+    frame *call_stack = nullptr;
 
-    // a "var" is a storage cell in the machine. It allows
-    // storage of values, docs, etc...
-    struct var {
-      ref docs;
-      ref meta;
-      ref value;
-    };
-
-
-    class machine {
-     protected:
-      cedar::vm::compiler m_compiler;
-
-      friend cedar::vm::compiler;
-
-     public:
-
-      machine(void);
-      ~machine(void);
-
-      /*
-       * given some object reference,
-       * compile it into this specific target
-       */
-      ref eval(ref);
-      /*
-      ref eval_lambda(lambda *);
-      */
-
-      ref eval_file(cedar::runes);
-      ref eval_string(cedar::runes);
-    };
+    void adjust_stack(int);
 
 
+    frame *add_call_frame(lambda *);
+    frame *pop_call_frame(void);
 
-  }  // namespace vm
+   public:
+    bool done = false;
+    int fid = 0;
 
-  extern vm::machine *primary_machine;
+    fiber(lambda *);
+    ~fiber(void);
+
+    // run the fiber for at most max_ms miliseconds
+    void run(scheduler *sched, run_context *state, int max_ms);
+
+    // run the fiber until it returns, then return the value it yields
+    ref run(void);
+  };
+
 }  // namespace cedar

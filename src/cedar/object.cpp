@@ -133,7 +133,10 @@ ref object::self_call(int id, bool *valid) {
   ref fn = getattr_fast(id);
   if (auto *l = ref_cast<lambda>(fn); l != nullptr) {
     ref self = this;
-    ref res = vm::call_function(l, 1, &self);
+
+    // TODO: fill out this context
+    call_context ctx;
+    ref res = call_function(l, 1, &self, &ctx);
     if (valid != nullptr) *valid = true;
     return res;
   }

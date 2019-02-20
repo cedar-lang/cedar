@@ -24,68 +24,24 @@
 
 #pragma once
 
+#ifndef _GLOBALS_H
+#define _GLOBALS_H
+
 #include <cedar/ref.h>
 #include <cedar/runes.h>
 #include <cedar/vm/binding.h>
-#include <cedar/vm/bytecode.h>
-#include <cedar/vm/compiler.h>
-#include <cedar/object.h>
-#include <cstdio>
-#include <map>
-#include <tuple>
-#include <vector>
-#include <mutex>
 
 namespace cedar {
 
-  class lambda;
-  namespace vm {
+  void def_global(int, ref);
+  void def_global(ref, ref);
+  void def_global(runes, ref);
+  void def_global(runes, bound_function);
 
-    // check if an id is a macro or not
-    bool is_macro(int);
-    lambda *get_macro(int);
-    void set_macro(int, ref);
-
-
-
-    ref macroexpand_1(ref);
-
-    // a "var" is a storage cell in the machine. It allows
-    // storage of values, docs, etc...
-    struct var {
-      ref docs;
-      ref meta;
-      ref value;
-    };
+  ref get_global(int);
+  ref get_global(ref);
+  ref get_global(runes);
+};
 
 
-    class machine {
-     protected:
-      cedar::vm::compiler m_compiler;
-
-      friend cedar::vm::compiler;
-
-     public:
-
-      machine(void);
-      ~machine(void);
-
-      /*
-       * given some object reference,
-       * compile it into this specific target
-       */
-      ref eval(ref);
-      /*
-      ref eval_lambda(lambda *);
-      */
-
-      ref eval_file(cedar::runes);
-      ref eval_string(cedar::runes);
-    };
-
-
-
-  }  // namespace vm
-
-  extern vm::machine *primary_machine;
-}  // namespace cedar
+#endif

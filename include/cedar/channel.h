@@ -24,48 +24,48 @@
 
 #pragma once
 
-#include <cedar/object.h>
-#include <cedar/object/list.h>
-#include <cedar/object/sequence.h>
-#include <cedar/ref.h>
-#include <cedar/vm/machine.h>
+#include <list>
+#include <mutex>
+
 
 namespace cedar {
-
-  class lazy_seq : public sequence {
-    vm::machine *m_vm;
-    ref m_fn;
-    bool evaluated = false;
-    ref m_value;
-
-    ref seq(void) {
-      if (evaluated) return m_value;
-
-      m_value = m_vm->eval_lambda(ref_cast<lambda>(m_fn));
-      evaluated = true;
-      return m_value;
-    }
+  template <class item>
+  class channel {
+   private:
+    std::list<item> queue;
+    std::mutex m;
+    std::condition_variable cv;
+    bool closed;
 
    public:
-    inline lazy_seq(ref fn, vm::machine *vm) {
-      if (ref_cast<lambda>(fn) == nullptr) {
-        throw cedar::make_exception("fn argument to lazy-seq not a lambda");
-      }
-      m_fn = fn;
-      m_vm = vm;
+    channel() : closed(false) {}
+    inline void close() {
+      std::unique_lock<std::mutex> lock(m);
+      closed = true;
+      cv.notify_all();
     }
-    ~lazy_seq(){};
+    inline bool is_closed() {
+      std::unique_lock<std::mutex> lock(m);
+      return closed;
+    }
+    inline bool has_data() {
+      std::unique_lock<std::mutex> lock(m);
+      return queue.size() != 0;
+    }
 
-    inline const char *object_type_name(void) { return "lazy-seq"; };
-
-    inline ref first(void) { return seq().first(); }
-    inline ref rest(void) { return seq().rest(); }
-    inline ref cons(ref f) { return new list(f, this); }
-
-    inline void set_first(ref) {}
-    inline void set_rest(ref) {}
-
-    inline u64 hash(void) { return (u64)this; }
+    inline void put(const item &i) {
+      std::unique_lock<std::mutex> lock(m);
+      if (closed) throw std::logic_error("put to closed channel");
+      queue.push_back(i);
+      cv.notify_one();
+    }
+    inline bool get(item &out, bool wait = true) {
+      std::unique_lock<std::mutex> lock(m);
+      if (wait) cv.wait(lock, [&]() { return closed || !queue.empty(); });
+      if (queue.empty()) return false;
+      out = queue.front();
+      queue.pop_front();
+      return true;
+    }
   };
 }  // namespace cedar
-

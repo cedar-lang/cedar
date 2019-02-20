@@ -195,9 +195,6 @@
 (defn second (x) (first (rest x)))
 
 
-(def* next rest)
-
-
 
 (. Keyword (set-field 'apply
               (fn (self coll)
@@ -446,6 +443,11 @@
 
 
 
+(defmacro inc= (id)
+  `(def ~id (inc ~id)))
+(defmacro dec= (id)
+  `(def ~id (dec ~id)))
+
 (defmacro += (id n)
   `(def ~id (+ ~id ~n)))
 (defmacro -= (id n)
@@ -505,6 +507,15 @@
   (do (when (odd? (len defs))
             (throw (str "Error in let syntax. bindings must be of even length: " defs "")))
       `(LET ~(partition 2 defs) ~@body)))
+
+
+
+
+
+
+(defmacro go (& body)
+  `(go* (fn nil (do ~@body))))
+
 
 
 
@@ -669,14 +680,12 @@
 (def (import path)
   (let (qualified (path-resolve path *file*)
         *old-file* *file*
-        *old-module* (internal/get-module)
+        *old-module* nil
         *new-module* nil)
     (if (not (get *imported* qualified false))
-      (do (internal/set-module *new-module*)
-          (eval-file-in-module qualified *new-module*)
+      (do (eval-file-in-module qualified *new-module*)
           (set *imported* qualified *new-module*)
           (def *file* *old-file*)
-          (internal/set-module *old-module*)
           *new-module*)
       (get *imported* qualified))))
 
@@ -792,6 +801,9 @@
                                      (. stream (write (str self))))))
 
 
+(. Number (set-field 'first (fn (self) self)))
+(. Number (set-field 'rest (fn (self) (inc self))))
+
 
 (def (up-to n))
 
@@ -860,4 +872,25 @@
 (defmacro defmethod (multifn dispatch-val & fn-tail)
   `(. ~multifn (set-method ~dispatch-val (fn ~@fn-tail))))
 
+
+
+(defmacro wait-until (check & body)
+  `(do (while (not ~check) (sleep 0))
+      ~@body))
+
+;; call the function 'pred' every i ms,
+;; stopping when pred returns false/nil
+(def (interval* i pred)
+  (if (or (nil? i) (= i 0))
+    ;; if there is no i interval, don't yield to
+    ;; the scheduler with (sleep) and let the scheduler
+    ;; preempt the fiber
+    (go (while (pred)))
+    ;; otherwise we need to yield to the scheduler
+    ;; every time around
+    (go (while (pred)
+          (sleep i)))))
+
+(defmacro interval (i & body)
+  `(interval* ~i (fn () (do ~@body))))
 

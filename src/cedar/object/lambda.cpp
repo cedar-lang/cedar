@@ -36,8 +36,7 @@ using namespace cedar;
 
 /////////////////////////////////////////////////////
 
-closure::closure(i32 size, std::shared_ptr<closure> parent, i32 index)
-    : m_size(size), m_index(index) {
+closure::closure(i32 size, std::shared_ptr<closure> parent, i32 index) : m_size(size), m_index(index) {
   m_parent = parent;
   m_vars = std::vector<ref>(size);
 }
@@ -49,9 +48,7 @@ std::shared_ptr<closure> closure::clone(void) {
   return c;
 }
 
-ref &cedar::closure::at(int i) {
-  return i >= m_index ? m_vars[i - m_index] : m_parent->at(i);
-}
+ref &cedar::closure::at(int i) { return i >= m_index ? m_vars[i - m_index] : m_parent->at(i); }
 
 /////////////////////////////////////////////////////
 
@@ -75,10 +72,7 @@ cedar::lambda::lambda(bound_function func) {
 cedar::lambda::~lambda() {}
 
 
-u64 lambda::hash(void) {
-  return reinterpret_cast<u64>(code_type == bytecode_type ? (void *)code.get()
-                                                          : &function_binding);
-}
+u64 lambda::hash(void) { return reinterpret_cast<u64>(code_type == bytecode_type ? (void *)code.get() : &function_binding); }
 
 lambda *lambda::copy(void) {
   lambda *new_lambda = new lambda();
@@ -97,14 +91,7 @@ lambda *lambda::copy(void) {
   return new_lambda;
 }
 
-// the prime_args function creates a closure and loads the values into it
-// as would be expected for whatever calling convention this lambda has
-// ie: for varargs
-void lambda::prime_args(int a_argc, ref *a_argv) {
-  this->m_closure =
-      std::make_shared<cedar::closure>(argc, m_closure, arg_index);
-
-
+void lambda::set_args_closure(int a_argc, ref *a_argv) {
   if (a_argc != 0 && a_argv != nullptr) {
     // here we need to setup some variables which will be derived
     // from the argument state passed in.
@@ -122,15 +109,11 @@ void lambda::prime_args(int a_argc, ref *a_argv) {
       // if vararg, there is one less argument in the concrete list
       concrete--;
       if (concrete > a_argc) {
-        throw cedar::make_exception(
-            "invalid arg count passed to function. given: ", a_argc,
-            " expected: ", argc, " - ", this->to_string());
+        throw cedar::make_exception("invalid arg count passed to function. given: ", a_argc, " expected: ", argc, " - ", this->to_string());
       }
     } else {
       if (a_argc != argc) {
-        throw cedar::make_exception(
-            "invalid arg count passed to function. given: ", a_argc,
-            " expected: ", argc, " - ", this->to_string());
+        throw cedar::make_exception("invalid arg count passed to function. given: ", a_argc, " expected: ", argc, " - ", this->to_string());
       }
     }
 
@@ -148,5 +131,13 @@ void lambda::prime_args(int a_argc, ref *a_argv) {
       m_closure->at(arg_index + argc - 1) = valist;
     }
   }
+}
+
+// the prime_args function creates a closure and loads the values into it
+// as would be expected for whatever calling convention this lambda has
+// ie: for varargs
+void lambda::prime_args(int a_argc, ref *a_argv) {
+  this->m_closure = std::make_shared<cedar::closure>(argc, m_closure, arg_index);
+  set_args_closure(a_argc, a_argv);
 }
 

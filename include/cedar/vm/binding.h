@@ -26,18 +26,17 @@
 
 #include <cedar/ref.h>
 #include <functional>
+#include <cedar/scheduler.h>
 
 
 // just forward declare machine
 namespace cedar {namespace vm { class machine; }}
 
 namespace cedar {
-  using bound_function = std::function<ref(int, ref*, vm::machine*)>;
-	// typedef ref (*bound_function)(int argc, cedar::ref *argv, cedar::vm::machine*);
-	// using bound_function = std::function<cedar::ref(cedar::ref, cedar::vm::machine*)>;
+  using bound_function = std::function<ref(int, ref*, call_context*)>;
 }
 
-#define cedar_binding_sig(name) cedar::ref name(int argc, cedar::ref *argv, cedar::vm::machine * machine)
+#define cedar_binding_sig(name) cedar::ref name(int argc, cedar::ref *argv, cedar::call_context *ctx)
 #define cedar_binding(name) \
 	cedar_binding_sig(name) asm ("_$CDR$" #name); \
 	cedar_binding_sig(name)
@@ -46,4 +45,4 @@ namespace cedar {
 #define cedar_init() cedar_init_sig() asm ("$CDR-INIT$"); cedar_init_sig()
 
 
-#define bind_lambda(argc, argv, machine) [=] (int argc, cedar::ref *argv, vm::machine *machine) -> cedar::ref
+#define bind_lambda(argc, argv, ctx) [=] (int argc, cedar::ref *argv, cedar::call_context * ctx) -> cedar::ref

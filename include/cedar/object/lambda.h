@@ -27,10 +27,10 @@
 #include <cedar/object.h>
 #include <cedar/ref.h>
 #include <cedar/runes.h>
+#include <cedar/vm/binding.h>
 #include <cedar/vm/bytecode.h>
 #include <cedar/vm/machine.h>
-
-#include <cedar/vm/binding.h>
+#include <atomic>
 #include <functional>
 #include <memory>
 
@@ -46,9 +46,7 @@ namespace cedar {
   // array if it can, but will also allocate a vector
   // if needed
   class closure {
-
    public:
-
     i32 m_size = 0;
     i32 m_index = 0;
     std::shared_ptr<closure> m_parent;
@@ -96,5 +94,6 @@ namespace cedar {
     // prime_args configures the lambda with a closure and loads it
     // with the arguments according to that lambda's calling conv
     void prime_args(int argc = 0, ref *argv = nullptr);
+    void set_args_closure(int argc = 0, ref *argv = nullptr);
   };
 }  // namespace cedar

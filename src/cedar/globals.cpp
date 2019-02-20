@@ -22,70 +22,64 @@
  * SOFTWARE.
  */
 
-#pragma once
-
+#include <cedar/globals.h>
+#include <cedar/object/lambda.h>
+#include <cedar/object/symbol.h>
 #include <cedar/ref.h>
-#include <cedar/runes.h>
-#include <cedar/vm/binding.h>
-#include <cedar/vm/bytecode.h>
-#include <cedar/vm/compiler.h>
-#include <cedar/object.h>
-#include <cstdio>
-#include <map>
-#include <tuple>
-#include <vector>
 #include <mutex>
+#include <unordered_map>
 
-namespace cedar {
+using namespace cedar;
 
-  class lambda;
-  namespace vm {
-
-    // check if an id is a macro or not
-    bool is_macro(int);
-    lambda *get_macro(int);
-    void set_macro(int, ref);
+static std::mutex g_lock;
+static std::unordered_map<int, ref> globals;
 
 
-
-    ref macroexpand_1(ref);
-
-    // a "var" is a storage cell in the machine. It allows
-    // storage of values, docs, etc...
-    struct var {
-      ref docs;
-      ref meta;
-      ref value;
-    };
-
-
-    class machine {
-     protected:
-      cedar::vm::compiler m_compiler;
-
-      friend cedar::vm::compiler;
-
-     public:
-
-      machine(void);
-      ~machine(void);
-
-      /*
-       * given some object reference,
-       * compile it into this specific target
-       */
-      ref eval(ref);
-      /*
-      ref eval_lambda(lambda *);
-      */
-
-      ref eval_file(cedar::runes);
-      ref eval_string(cedar::runes);
-    };
+void cedar::def_global(int id, ref val) {
+  g_lock.lock();
+  globals[id] = val;
+  g_lock.unlock();
+}
 
 
 
-  }  // namespace vm
 
-  extern vm::machine *primary_machine;
-}  // namespace cedar
+void cedar::def_global(ref k, ref val) {
+  def_global(k.as<symbol>()->id, val);
+}
+
+
+
+void cedar::def_global(runes k, ref val) {
+  def_global(get_symbol_intern_id(k), val);
+}
+
+
+
+void cedar::def_global(runes k, bound_function f) {
+  int id = get_symbol_intern_id(k);
+  ref func = new lambda(f);
+  def_global(id, func);
+}
+
+
+
+ref cedar::get_global(int id) {
+  std::unique_lock<std::mutex> lock(g_lock);
+
+  try {
+    return globals.at(id);
+  } catch (std::exception & e) {
+    throw cedar::make_exception("Unable to find global variable ", get_symbol_id_runes(id));
+  }
+
+  return nullptr;
+}
+
+ref cedar::get_global(ref k) {
+  return get_global(k.as<symbol>()->id);
+}
+
+ref cedar::get_global(runes k) {
+  return get_global(get_symbol_intern_id(k));
+}

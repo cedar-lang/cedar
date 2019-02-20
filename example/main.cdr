@@ -199,35 +199,31 @@
     (Fraction (* a.n b.d) (* a.d b.n))))
 
 
-(deftype ArityException [Exception])
-
-
-(defmacro arity (& groups)
-  (let [args (map first groups)
-        bodys (map (fn (x) (cons 'do (apply list (rest x)))) groups)
-        lens (map len args)
-        together (zip lens args bodys)
-        argc-id (gensym)
-        expand-cond (fn (c) `((= ~argc-id ~(first c)) (apply (fn ~(1 c) ~(2 c)) passed)))]
-
-    `(fn (& passed)
-       (let* ((~argc-id *internal-currentfn-argc*))
-         (cond ~@(apply append (map expand-cond together))
-              :default (throw (ArityException "Invalid arity")))))))
-
-(def atest (arity [(x) (atest x 0)]
-                  [(x y) (+ x y)]))
-
-
 (def (nth n coll)
   (cond (= n 0) (first coll)
         (recur (dec n) (rest coll))))
 
-(def fib
-  (arity [(n)
-          (nth n (fib 0 1))]
-         [(a b)
-          (lazily (cons a (fib b (+ a b))))]))
+(def (fib-iter max n i j)
+  (if (= n max)
+    j
+    (recur max
+           (inc n)
+           j
+           (+ i j))))
 
+
+(def (fib max)
+  (if (< max 2)
+    max
+    (fib-iter max 1 0.0 1.0)))
 
 (def (sq x) (* x x))
+
+
+(def (each f coll)
+  (do (f (first coll))
+      (recur f (rest coll))))
+
+
+
+

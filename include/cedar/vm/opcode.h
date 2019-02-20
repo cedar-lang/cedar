@@ -31,6 +31,7 @@
 #define OP_SET_ATTR                 0x18
 #define OP_DEF_MACRO                0x19
 #define OP_EVAL                     0x1a
+#define OP_SLEEP                    0x1b
 
 /* Instruction opcode foreach macro for code generation */
 /* Arg order: (name, bytecode, type, stack effect */
@@ -61,6 +62,7 @@
   V(GET_ATTR, OP_GET_ATTR, imm_int, 0) \
   V(SET_ATTR, OP_SET_ATTR, imm_int, 0) \
   V(DEF_MACRO, OP_DEF_MACRO, imm_int, 0) \
-  V(EVAL, OP_EVAL, no_arg, 0)
+  V(EVAL, OP_EVAL, no_arg, 0) \
+  V(SLEEP, OP_SLEEP, no_arg, -1)
 
 #endif

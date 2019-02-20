@@ -31,6 +31,7 @@
 #include <cedar/object/symbol.h>
 #include <cedar/object/vector.h>
 #include <cedar/vm/machine.h>
+#include <cedar/globals.h>
 
 /**
  * every type in cedar is an object, so it has attributes and other things
@@ -105,14 +106,14 @@ static cedar_binding(obj_str_lambda) {
 
 static bound_function check_arity(cedar::runes name, int arity,
                                   bound_function fn) {
-  return [=](int argc, ref *argv, vm::machine *m) -> ref {
+  return [=](int argc, ref *argv, call_context *ctx) -> ref {
     if (argc != arity)
       // the exception needs to remove the first argument from the artiy
       // since it's self.
       throw cedar::make_exception("function ", name, " requires ", arity - 1,
                                   " args. given ", argc - 1);
 
-    return fn(argc, argv, m);
+    return fn(argc, argv, ctx);
   };
 }
 
@@ -240,7 +241,7 @@ static void init_type_type(void) {
                          return nullptr;
                        }));
 
-  primary_machine->bind(new symbol("Type"), type_type);
+  def_global(new symbol("Type"), type_type);
 }
 
 //
@@ -268,7 +269,7 @@ static void init_object_type() {
   object_type->set_field("new",
                          bind_lambda(argc, argv, machine) { return nullptr; });
 
-  primary_machine->bind(new symbol("Object"), object_type);
+  def_global(new symbol("Object"), object_type);
 }  // init_object_type
 
 //
@@ -361,7 +362,7 @@ static void init_list_type() {
   list_type->setattr("__alloc__",
                      bind_lambda(argc, argv, machine) { return new list(); });
 
-  primary_machine->bind(new symbol("List"), list_type);
+  def_global(new symbol("List"), list_type);
 }  // init_list_type
 
 //
@@ -392,7 +393,7 @@ static void init_nil_type() {
 
   nil_type->set_field("len", bind_lambda(argc, argv, machine) { return 0; });
 
-  primary_machine->bind(new symbol("Nil"), nil_type);
+  def_global(new symbol("Nil"), nil_type);
 }  // init_nil_type
 
 //
@@ -422,7 +423,7 @@ static void init_number_type() {
     return 1.0 / argv[0].to_float();
   });
 
-  primary_machine->bind(new symbol("Number"), number_type);
+  def_global(new symbol("Number"), number_type);
 }  // init_number_type
 //
 //
@@ -475,7 +476,7 @@ static void init_string_type() {
         string *self = argv[0].as<string>();
         return self->set(argv[1], argv[2]);
       }));
-  primary_machine->bind(new symbol("String"), string_type);
+  def_global(new symbol("String"), string_type);
 }  // init_string_type
 
 //
@@ -549,7 +550,7 @@ static void init_vector_type() {
       }));
 
 
-  primary_machine->bind(new symbol("Vector"), vector_type);
+  def_global(new symbol("Vector"), vector_type);
 }  // init_vector_type
 
 //
@@ -588,7 +589,7 @@ static void init_dict_type() {
                          return self->set(argv[1], argv[2]);
                        }));
 
-  primary_machine->bind(new symbol("Dict"), dict_type);
+  def_global(new symbol("Dict"), dict_type);
 }  // init_dict_type
 
 //
@@ -615,7 +616,7 @@ static void init_symbol_type() {
         return nullptr;
       }));
 
-  primary_machine->bind(new symbol("Symbol"), symbol_type);
+  def_global(new symbol("Symbol"), symbol_type);
 }  // init_symbol_type
 
 //
@@ -643,7 +644,7 @@ static void init_keyword_type() {
       }));
 
 
-  primary_machine->bind(new symbol("Keyword"), keyword_type);
+  def_global(new symbol("Keyword"), keyword_type);
 }  // init_keyword_type
 
 //
@@ -667,8 +668,9 @@ static void init_lambda_type() {
     return nullptr;
   });
 
-  primary_machine->bind(new symbol("Lambda"), lambda_type);
+  def_global("Lambda", lambda_type);
 }  // init_lambda_type
+
 
 //
 //
@@ -678,44 +680,20 @@ static void init_lambda_type() {
 //
 //
 
-type *cedar::namespace_type;
-static void init_namespace_type() {
+type *cedar::fiber_type;
+static void init_fiber_type() {
   // bind defaults
-  type_init_default_bindings(lambda_type);
+  type_init_default_bindings(fiber_type);
 
-  namespace_type->setattr(
+  fiber_type->setattr(
       "__alloc__", bind_lambda(argc, argv, machine) { return new object(); });
 
-  namespace_type->set_field("new", bind_lambda(argc, argv, machine) {
-
-      static int name_id = get_symbol_intern_id("__name__");
-    ref self = argv[0];
-    ref name = argv[1];
-
-    if (string *name_s = ref_cast<string>(name); name_s != nullptr) {
-      self->setattr_fast(name_id, name);
-    } else {
-      throw cedar::make_exception(
-          "(Module ...) requires a string name as an argument");
-    }
-
+  fiber_type->set_field("new", bind_lambda(argc, argv, machine) {
     return nullptr;
   });
 
-  namespace_type->setattr("repr", bind_lambda(argc, argv, machine) {
-    static int name_id = get_symbol_intern_id("__name__");
-    ref self = argv[0];
-    cedar::runes s = "<namespace '";
-    s += self->getattr_fast(name_id).to_string(true);
-
-    s += "'>";
-
-    return new string(s);
-  });
-
-
-  primary_machine->bind(new symbol("Namespace"), namespace_type);
-}  // init_namespace_type
+  def_global(new symbol("Fiber"), fiber_type);
+}  // init_fiber_type
 
 void cedar::type_init(void) {
   // allocate all the builtin type names and variables

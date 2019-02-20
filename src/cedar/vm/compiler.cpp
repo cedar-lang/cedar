@@ -108,6 +108,7 @@ ref cedar::vm::bytecode_pass(ref obj, vm::compiler *c) {
 
   c->compile_object(obj, *code, sc, &context);
 
+  code->write_op(OP_RETURN);
   code->write_op(OP_EXIT);
   // finalize the code (sum up stack effect)
   code->finalize();
@@ -257,11 +258,21 @@ void vm::compiler::compile_list(ref obj, vm::bytecode &code, scope_ptr sc,
     return;
   }
 
+
+  if (list_is_call_to("sleep", obj)) {
+
+    ref arg = obj.rest().first();
+
+    compile_object(arg, code, sc, ctx);
+    code.write((u8)OP_SLEEP);
+    return;
+  }
+
   if (list_is_call_to("quote", obj)) {
     return compile_constant(obj.rest().first(), code, sc, ctx);
   }
 
-  if (list_is_call_to("fn", obj)) {
+  if (list_is_call_to("fn", obj) || list_is_call_to("gen", obj)) {
     return compile_lambda_expression(obj, code, sc, ctx);
   }
 
@@ -573,6 +584,12 @@ void vm::compiler::compile_symbol(ref sym, bytecode &code, scope_ptr sc,
 void vm::compiler::compile_lambda_expression(ref expr, bytecode &code,
                                              scope_ptr sc, compiler_ctx *ctx) {
   static auto amp_sym = newsymbol("&");
+
+  static auto fn_sym = newsymbol("fn");
+  static auto gen_sym = newsymbol("gen");
+
+  ref func_sig_symbol = expr.first();
+
 
   ctx->lambda_depth++;
 

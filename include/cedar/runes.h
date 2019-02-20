@@ -33,7 +33,7 @@ namespace cedar {
 	class runes {
 		public:
 
-			typedef std::u32string container;
+		  using container = std::u32string;
 
 		protected:
 

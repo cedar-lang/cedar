@@ -42,7 +42,6 @@ namespace cedar {
     class machine;
 
     // forward declare
-    ref call_function(lambda *fn, int argc, ref *argv);
   }  // namespace vm
 
   class type;
@@ -89,7 +88,8 @@ namespace cedar {
       throw cedar::make_exception("self call failed, unable to call non-lambda");
     }
 
-    ref val = vm::call_function(attr.as<lambda>(), argc, argv);
+    call_context ctx;
+    ref val = call_function(attr.as<lambda>(), argc, argv, &ctx);
     return val;
   }
 

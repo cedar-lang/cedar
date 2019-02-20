@@ -11,7 +11,6 @@ extern "C" void GC_allow_register_threads();
 struct gc_startup {
   gc_startup() {
     GC_INIT();
-
     GC_allow_register_threads();
   }
 };

@@ -70,7 +70,7 @@ cedar::type::method lambda_wrap(ref func) {
     return [func](int argc, ref *argv, vm::machine *m) -> ref {
       lambda *fn = ref_cast<lambda>(func)->copy();
       fn->prime_args(argc, argv);
-      return m->eval_lambda(fn);
+      return eval_lambda(fn);
     };
   }
 
@@ -85,11 +85,14 @@ cedar::type::method lambda_wrap(ref func) {
 
 
 int main(int argc, char **argv) {
-  cvm.bind(new cedar::symbol("*cedar-version*"), new cedar::string(CEDAR_VERSION));
+
+  init_scheduler();
+
+  def_global("*cedar-version*", new cedar::string(CEDAR_VERSION));
 
   srand((unsigned int)time(nullptr));
 
-  cvm.bind(cedar::new_obj<cedar::symbol>("*cwd*"), cedar::new_obj<cedar::string>(apathy::Path::cwd().string()));
+  def_global("*cwd*", cedar::new_obj<cedar::string>(apathy::Path::cwd().string()));
 
   auto core_path = apathy::Path(CORE_DIR);
   core_path.append("core.cdr");
@@ -141,9 +144,9 @@ int main(int argc, char **argv) {
       std::string path = cedar::path_resolve(argv[optind]);
 
 
-      cvm.bind(cedar::new_obj<cedar::symbol>("*main*"), cedar::new_obj<cedar::string>(path));
+      def_global("*main*", cedar::new_obj<cedar::string>(path));
 
-      cvm.bind(cedar::new_obj<cedar::symbol>("*file*"), cedar::new_obj<cedar::string>(path));
+      def_global("*file*", cedar::new_obj<cedar::string>(path));
 
       // there are also args, so make that vector...
       ref args = new cedar::vector();
@@ -152,17 +155,17 @@ int main(int argc, char **argv) {
       for (int i = optind; i < argc; i++) {
         args = cedar::idx_append(args, new cedar::string(argv[i]));
       }
-      cvm.bind(new symbol("*args*"), args);
+      def_global("*args*", args);
       cvm.eval_file(path);
     } else {
-      cvm.bind(new symbol("*main*"), nullptr);
+      def_global("*main*", ref{nullptr});
     }
 
 
     struct rusage usage;
 
     if (interactive) {
-      cvm.bind(cedar::new_obj<cedar::symbol>("*file*"), cedar::new_obj<cedar::string>(apathy::Path::cwd().string()));
+      def_global("*file*", cedar::new_obj<cedar::string>(apathy::Path::cwd().string()));
 
       cedar::reader repl_reader;
 
@@ -182,6 +185,8 @@ int main(int argc, char **argv) {
           ps1 += stream.str();
           ps1 += " MiB used";
         }
+
+
         ps1 += "> ";
         char *buf = linenoise(ps1.data());
         if (buf == nullptr) {
@@ -202,7 +207,7 @@ int main(int argc, char **argv) {
           ref res = cvm.eval_string(b);
           printf("\x1B[0m");
 
-          cvm.bind(binding, res);
+          def_global(binding, res);
           std::cout << "\x1B[33m" << res << "\x1B[0m" << std::endl;
         } catch (std::exception &e) {
           std::cerr << "Uncaught Exception: " << e.what() << std::endl;
@@ -217,6 +222,7 @@ int main(int argc, char **argv) {
     std::cerr << "Uncaught exception: " << r << std::endl;
     exit(-1);
   }
+
 
   return 0;
 }
@@ -242,6 +248,4 @@ static void help(void) {
   printf("  -R Display resource usage at the REPL (debug)\n");
   printf("\n");
 }
-
-
 
