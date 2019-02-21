@@ -183,6 +183,7 @@ cedar::runes ref::to_string(bool human) {
     return str;
   }
   if (m_obj == nullptr) return U"nil";
+
   return m_obj->to_string(human);
 }
 

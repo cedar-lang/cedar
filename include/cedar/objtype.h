@@ -71,8 +71,8 @@ namespace cedar {
 
 
 
-#define BUILTIN_TYPE(name, str) extern type * name##_type;
-  #include "builtin_types.h"
+#define BUILTIN_TYPE(name, str) extern type *name##_type;
+#include "builtin_types.h"
 #undef BUILTIN_TYPE
 
   // initialize all the builtin types
@@ -81,7 +81,6 @@ namespace cedar {
 
 
   inline ref self_callv(ref self, const cedar::runes func, int argc, ref *argv) {
-
     ref s = new symbol(func);
     ref attr = self.getattr(s);
     if (!attr.is<lambda>()) {
@@ -96,11 +95,12 @@ namespace cedar {
 
   template <typename... Ts>
   inline ref self_call(ref self, const cedar::runes func, Ts... args) {
-
     int argc = sizeof...(args) + 1;
     ref argv[]{self, args...};
     return self_callv(self, func, argc, argv);
   }
+
+  void type_init_default_bindings(type *t);
 
 };  // namespace cedar
 

@@ -147,6 +147,11 @@ namespace cedar {
       return *this;
     }
 
+
+    inline object *get(void) {
+      return is_obj() ? m_obj : nullptr;
+    }
+
     inline ref &operator=(const ref &other) {
       if (other.is_obj()) {
         store_obj(other.m_obj);
@@ -243,7 +248,10 @@ namespace cedar {
      */
     template <typename T>
     inline T *as() const {
-      return is_obj() ? dynamic_cast<T *>(m_obj) : nullptr;
+      if (is_obj()) {
+        return dynamic_cast<T*>(m_obj);
+      }
+      return nullptr;
     }
 
     /*

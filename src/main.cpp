@@ -86,7 +86,7 @@ cedar::type::method lambda_wrap(ref func) {
 
 int main(int argc, char **argv) {
 
-  init_scheduler();
+  init();
 
   def_global("*cedar-version*", new cedar::string(CEDAR_VERSION));
 

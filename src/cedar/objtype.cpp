@@ -130,7 +130,7 @@ static bound_function check_arity(cedar::runes name, int arity,
  * applied or used by instances of the type. Functions accessable
  * to instances are behind the m_fields attribute map
  */
-static void type_init_default_bindings(type *t) {
+void cedar::type_init_default_bindings(type *t) {
   t->setattr("str", type_str_lambda);
   t->setattr("repr", type_str_lambda);
 

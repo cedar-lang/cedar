@@ -268,6 +268,13 @@ void vm::compiler::compile_list(ref obj, vm::bytecode &code, scope_ptr sc,
     return;
   }
 
+  if (list_is_call_to("return", obj)) {
+    ref arg = obj.rest().first();
+    compile_object(arg, code, sc, ctx);
+    code.write((u8)OP_RETURN);
+    return;
+  }
+
   if (list_is_call_to("quote", obj)) {
     return compile_constant(obj.rest().first(), code, sc, ctx);
   }

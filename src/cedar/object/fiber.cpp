@@ -191,39 +191,6 @@ void fiber::run(scheduler *sched, run_context *state, int max_ms) {
 
 #define CONSTANT(i) (PROG()->code->constants[(i)])
 
-
-  /*
-  auto print_stack = [&]() {
-    i64 height = 20;
-    i64 upper_bound = std::min(stack_size, SP());
-    i64 lower_bound = std::max((i64)0, (i64)(SP() - height));
-    printf("---------------------------------------\n");
-    printf("       size: %d refs\n", stack_size);
-    printf("             %lu bytes\n", stack_size * sizeof(ref));
-    printf("---------------------------------------\n");
-    for (i64 i = lower_bound; i <= upper_bound; i++) {
-      if (i == (i64)SP()) {
-        printf(" sp -> ");
-      } else {
-        printf("       ");
-      }
-      printf("%04lx ", i);
-      std::string val = stack[i].to_string(false);
-      if (val.size() > 40) {
-        val.erase(40, val.size());
-        val += "...";
-      }
-      std::cerr << val;
-      std::cerr << std::endl;
-    }
-    for (int i = upper_bound; i < height; i++) {
-      std::cerr << std::endl;
-    }
-    printf("---------------------------------------\n");
-  };
-  */
-
-
 #define SET_LABEL(op) threaded_labels[op] = &&DO_##op;
 
   static void *threaded_labels[255];
@@ -499,7 +466,13 @@ loop:
     PRELUDE;
     auto ind = CODE_READ(u64);
     ref function_template = PROG()->code->constants[ind];
-    auto *template_ptr = ref_cast<cedar::lambda>(function_template);
+    (void)function_template.to_string(false);
+    // std::cout << "make_func: " << function_template << std::endl;
+    auto *template_ptr = (lambda*)function_template.get();
+
+    if (template_ptr == nullptr) {
+      printf("nullptr\n");
+    }
 
     ref function = template_ptr->copy();
 
@@ -679,7 +652,6 @@ loop:
     ref expr = POP();
     vm::compiler c(nullptr);
     ref compiled_lambda = c.compile(expr, nullptr);
-
     lambda *func = compiled_lambda.as<lambda>();
     fiber eval_fiber(func);
     ref res = eval_fiber.run();

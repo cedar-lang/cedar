@@ -24,15 +24,16 @@
 
 
 #include <cedar/object/fiber.h>
+#include <cedar/object/lambda.h>
+#include <cedar/objtype.h>
 #include <cedar/scheduler.h>
 #include <cedar/thread.h>
-#include <cedar/object/lambda.h>
 #include <cedar/types.h>
 #include <unistd.h>
+#include <uv.h>
 #include <chrono>
 #include <cstdlib>
 #include <mutex>
-#include <uv.h>
 
 using namespace cedar;
 
@@ -70,8 +71,6 @@ static job *job_pool = nullptr;
 
 // add a fiber to the front of the jobs linked list
 void scheduler::add_job(fiber *f) {
-
-
   // grab a lock on this scheduler's jobs
   job_mutex.lock();
 
@@ -109,7 +108,6 @@ void scheduler::add_job(fiber *f) {
   // jobs = j;
 
   job_mutex.unlock();
-
 }
 
 
@@ -152,8 +150,9 @@ void scheduler::remove_job(job *j) {
 
 static std::mutex io_mutex;
 
-bool scheduler::schedule(void) {
 
+
+bool scheduler::schedule(void) {
   if (state != running) {
     return false;
   }
@@ -178,7 +177,6 @@ bool scheduler::schedule(void) {
 
   bool done = false;
   if (time >= (next_job->last_ran + next_job->sleeping_for)) {
-
     // printf("Scheduling Job %d\n", next_job->jid);
     next_job->run_count++;
     run_context ctx;
@@ -245,14 +243,29 @@ std::thread scheduler_thread;
 
 // the callback for when libuv feels like it's okay to
 // schedule a fiber run. How nice of it.
-void event_idle_schedule(uv_idle_t* handle) {
-  auto *sched = (scheduler*)handle->data;
+void event_idle_schedule(uv_idle_t *handle) {
+  auto *sched = (scheduler *)handle->data;
   sched->schedule();
 }
 
 
+namespace cedar {
+  void bind_stdlib(void);
+};
 
-void cedar::init_scheduler(void) {
+  void init_binding(cedar::vm::machine *m);
+
+/**
+ * this is the primary entry point for cedar, this function
+ * should be called before ANY code is run.
+ */
+void cedar::init(void) {
+  type_init();
+
+  init_binding(nullptr);
+
+  bind_stdlib();
+
   const char *CDRMAXPROCS = getenv("CDRMAXPROCS");
   if (CDRMAXPROCS != nullptr) {
     max_procs = std::stol(CDRMAXPROCS);
@@ -304,9 +317,7 @@ void cedar::join_scheduler(void) {
 }
 
 
-void cedar::add_job(fiber *f) {
-  primary_scheduler.add_job(f);
-}
+void cedar::add_job(fiber *f) { primary_scheduler.add_job(f); }
 
 ref cedar::eval_lambda(lambda *fn) {
   fiber f(fn);

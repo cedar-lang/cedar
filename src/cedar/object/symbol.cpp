@@ -32,13 +32,16 @@
 #include <cedar/memory.h>
 #include <cedar/util.hpp>
 #include <cedar/objtype.h>
-
+#include <mutex>
 #include <vector>
 
 using namespace cedar;
 
 
 
+
+
+static std::mutex intern_lock;
 struct symbol_table_entry {
   u64 hash = 0;
   cedar::runes sym;
@@ -48,17 +51,23 @@ struct symbol_table_entry {
 std::vector<symbol_table_entry> symbol_table;
 
 cedar::runes cedar::get_symbol_id_runes(int i) {
-  return symbol_table[i].sym;
+  intern_lock.lock();
+  cedar::runes s = symbol_table[i].sym;
+  intern_lock.unlock();
+  return s;
 }
 
 static int find_or_insert_symbol_table(cedar::runes sym) {
+  intern_lock.lock();
   u64 hash = std::hash<cedar::runes>()(sym);
   for (size_t i = 0; i < symbol_table.size(); i++) {
     if (hash == symbol_table[i].hash) {
+      intern_lock.unlock();
       return i;
     }
   }
   symbol_table.push_back({hash, sym});
+  intern_lock.unlock();
   return symbol_table.size() - 1;
 }
 

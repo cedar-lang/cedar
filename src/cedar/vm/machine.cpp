@@ -104,17 +104,8 @@ ref vm::macroexpand_1(ref obj) {
   return obj;
 }
 
-vm::machine *cedar::primary_machine = nullptr;
-
-
-void init_binding(cedar::vm::machine *m);
-
 
 vm::machine::machine(void) : m_compiler(this) {
-  primary_machine = this;
-  // before creating anything, init the types
-  type_init();
-  init_binding(this);
 }
 
 vm::machine::~machine() {}

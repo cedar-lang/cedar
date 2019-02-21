@@ -894,3 +894,48 @@
 (defmacro interval (i & body)
   `(interval* ~i (fn () (do ~@body))))
 
+
+(deftype chan
+  (def has-value false)
+  (def (new self)
+    (. self has-value := false)
+    (. self value := nil))
+  ;; put an item in the channel
+  (def (put self val)
+    (wait-until (not self.has-value))
+    (sleep)
+    (. self has-value := true)
+    (. self value := val))
+  ;; take an item out of the channel
+  (def (pop self)
+    (wait-until self.has-value)
+    (. self has-value := false)
+    (. self value))
+
+  (def (first self)
+    (first (ChannelIterator self)))
+  (def (rest self)
+    (rest (ChannelIterator self))))
+
+
+
+
+(def (locked? x)
+  (. x (locked?)))
+
+(def (lock! m) (. m (lock!)))
+
+(def (unlock! m) (. m (unlock!)))
+
+
+;; define an event-loop safe wrapper around a kernel mutex
+(deftype Mutex
+  (def (new self)
+    (. self _mut := (KernelMutex)))
+  (def (locked? self)
+    (locked? self._mut))
+  (def (lock! self)
+    (wait-until (not (locked? self._mut))
+      (lock! self._mut)))
+  (def (unlock! self)
+      (unlock! self._mut)))

@@ -585,85 +585,6 @@ std::vector<cedar::runes> regex_matches(std::string r, std::string s, std::regex
 
 
 
-/*
-//
-//
-// setup the basic thread system
-//
-//
-//
-type *thread_type;
-
-class thread_obj : public object {
- public:
-  std::thread m_thread;
-  inline thread_obj() { m_type = thread_type; }
-};
-
-
-static void init_thread_type(vm::machine *m) {
-  thread_type = new type("Thread");
-
-  thread_type->setattr("__alloc__", bind_lambda(argc, argv, machine) { return new thread_obj(); });
-
-
-  thread_type->set_field("new", bind_lambda(argc, argv, machine) {
-    if (argc != 2 || argv[1].get_type() != lambda_type) {
-      throw cedar::make_exception("Thread.new requires a lambda as a constructor argument");
-    }
-
-    thread_obj *self = ref_cast<thread_obj>(argv[0]);
-    lambda *func = ref_cast<lambda>(argv[1]);
-
-    self->m_thread = std::thread([func, machine](void) -> void {
-      register_thread();
-      machine->eval_lambda(func);
-      deregister_thread();
-    });
-
-    return nullptr;
-  });
-
-  def_global(new symbol("Thread"), thread_type);
-}
-
-
-
-
-static type *mutex_type = nullptr;
-
-class mutex_obj : public object {
- public:
-  std::mutex m_lock;
-  inline mutex_obj() { m_type = mutex_type; }
-};
-
-
-void init_mutex_type(vm::machine *m) {
-  mutex_type = new type("Mutex");
-  mutex_type->setattr("__alloc__", bind_lambda(argc, argv, machine) {
-    //
-    return new mutex_obj();
-  });
-
-  mutex_type->set_field("new", bind_lambda(argc, argv, machine) { return nullptr; });
-
-  mutex_type->set_field("lock", bind_lambda(argc, argv, machine) {
-    argv[0].as<mutex_obj>()->m_lock.lock();
-    return nullptr;
-  });
-
-  mutex_type->set_field("unlock", bind_lambda(argc, argv, machine) {
-    argv[0].as<mutex_obj>()->m_lock.unlock();
-    return nullptr;
-  });
-
-  def_global("Mutex", mutex_type);
-}
-
-*/
-
-
 
 void init_binding(cedar::vm::machine *m) {
 
@@ -880,6 +801,8 @@ void init_binding(cedar::vm::machine *m) {
 
   reader_type = new type("Reader");
 
+  type_init_default_bindings(reader_type);
+
   class reader_obj : public object {
    public:
     bool read = false;
@@ -931,7 +854,7 @@ void init_binding(cedar::vm::machine *m) {
     return self->m_parsed[self->index];
   });
 
-  def_global("Reader", reader_type);
+  def_global(new symbol("Reader"), reader_type);
 
 
 }

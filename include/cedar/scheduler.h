@@ -40,7 +40,9 @@ namespace cedar {
   class scheduler;
 
 
-  void init_scheduler(void);
+
+  // the intro initialization function
+  void init(void);
   void join_scheduler(void);
 
 

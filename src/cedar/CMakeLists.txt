@@ -31,6 +31,9 @@ add_library(cedar-lib SHARED
 	src/cedar/object/keyword.cpp
 	src/cedar/object/number.cpp
 	src/cedar/lib/linenoise.cpp
+	src/cedar/bindings/mutex.cpp
+	src/cedar/bindings/channel.cpp
+	src/cedar/bindings/entry.cpp
 )
 
 target_link_libraries(cedar-lib ${CMAKE_DL_LIBS} -lgc -lgccpp -pthread -lcurl -luv)
