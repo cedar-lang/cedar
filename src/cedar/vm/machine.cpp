@@ -105,7 +105,7 @@ ref vm::macroexpand_1(ref obj) {
 }
 
 
-vm::machine::machine(void) : m_compiler(this) {
+vm::machine::machine(void) {
 }
 
 vm::machine::~machine() {}

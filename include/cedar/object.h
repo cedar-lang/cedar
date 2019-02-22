@@ -36,9 +36,7 @@
 #include <new>
 #include <unordered_map>
 #include <cedar/vm/binding.h>
-
 #include <gc/gc.h>
-
 #include <gc/gc_cpp.h>
 
 
@@ -106,7 +104,6 @@ namespace cedar {
 
     attr_map::bucket *getattrbucket(int);
 
-
     // self call an attr with some symbol id
     // and sets the bool pointer to true if it
     // succeeded
@@ -120,6 +117,7 @@ namespace cedar {
     virtual const char *object_type_name(void);
 
     bool is_pair(void);
+
 
    protected:
 

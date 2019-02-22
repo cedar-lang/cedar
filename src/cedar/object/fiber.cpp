@@ -26,6 +26,7 @@
 #include <cedar/globals.h>
 #include <cedar/object/fiber.h>
 #include <cedar/object/list.h>
+#include <cedar/object/module.h>
 #include <cedar/objtype.h>
 #include <cedar/vm/compiler.h>
 #include <cedar/vm/machine.h>
@@ -228,9 +229,13 @@ void fiber::run(scheduler *sched, run_context *state, int max_ms) {
   }
 
 
+
+
 #define PRELUDE \
   if (SP() > stack_size - 10) adjust_stack(stack_size * 2)
-#define DISPATCH ran++; goto loop;
+#define DISPATCH \
+  ran++;         \
+  goto loop;
 
   u8 op = 0;
 
@@ -239,26 +244,22 @@ loop:
 
   if (max_ms != -1 && sched != nullptr) {
     u64 current = time_microseconds();
-
     if (current - start_time > max_time) {
       state->done = false;
       state->value = nullptr;
-      // printf("%d ran %lu instructions\n", fid, ran);
       return;
     }
   }
 
-  // printf("%p\n", call_stack);
   if (call_stack == nullptr) {
     printf("is nil\n");
   }
+
   op = *IP();
   IP()++;
 
-
-
-
   goto *threaded_labels[op];
+
 
   TARGET(OP_NOP) {
     PRELUDE;
@@ -313,26 +314,31 @@ loop:
     PRELUDE;
     auto ind = CODE_READ(u64);
     CODE_SKIP(u64);
-
-    // ref val = POP();
     PROG()->m_closure->at(ind) = stack[SP() - 1];
-    // PUSH(val);
     DISPATCH;
   }
 
 
   TARGET(OP_LOAD_GLOBAL) {
     PRELUDE;
-
     i64 ind = CODE_READ(i64);
     CODE_SKIP(i64);
-
     symbol s;
     s.id = ind;
     ref c = &s;
+    ref val = nullptr;
 
-    ref val = get_global(c);
+    if (PROG()->mod != nullptr) {
+      attr_map::bucket *b;
+      b = PROG()->mod->m_attrs.buck(ind);
+      if (b != nullptr) {
+        val = b->val;
+        PUSH(val);
+        DISPATCH;
+      }
+    }
 
+    val = get_global(c);
     PUSH(val);
     DISPATCH;
   }
@@ -342,17 +348,17 @@ loop:
     PRELUDE;
     auto ind = CODE_READ(i64);
     CODE_SKIP(i64);
-
     ref val = POP();
 
 
-    symbol s;
-    s.id = ind;
-    ref c = &s;
-
-
+    if (PROG()->mod != nullptr) {
+      PROG()->mod->setattr_fast(ind, val);
+      PUSH(val);
+      DISPATCH;
+    }
 
     def_global(ind, val);
+
     PUSH(val);
     DISPATCH;
   }
@@ -361,10 +367,8 @@ loop:
 
   TARGET(OP_CONS) {
     PRELUDE;
-
     auto lst = POP();
     auto val = POP();
-
     PUSH(new list(val, lst));
     DISPATCH;
   }
@@ -375,9 +379,7 @@ loop:
     PRELUDE;
     auto a = POP();
     auto b = POP();
-
     ref r = append(a, b);
-
     PUSH(r);
     DISPATCH;
   }
@@ -414,10 +416,10 @@ loop:
         add_call_frame(new_program);
         DISPATCH;
       } else if (new_program->code_type == lambda::function_binding_type) {
-
         call_context ctx;
         ctx.coro = this;
         ctx.schd = sched;
+        ctx.mod = PROG()->mod;
         ref val = new_program->function_binding(argc, argv, &ctx);
         SP() = new_fp;
         PUSH(val);
@@ -433,6 +435,7 @@ loop:
       call_context ctx;
       ctx.coro = this;
       ctx.schd = sched;
+      ctx.mod = PROG()->mod;
 
       // allocate the instance
       ref inst = call_function(alloc_func_ref.as<lambda>(), 0, stack + new_fp, &ctx);
@@ -466,9 +469,11 @@ loop:
     PRELUDE;
     auto ind = CODE_READ(u64);
     ref function_template = PROG()->code->constants[ind];
+
     (void)function_template.to_string(false);
-    // std::cout << "make_func: " << function_template << std::endl;
-    auto *template_ptr = (lambda*)function_template.get();
+
+
+    auto *template_ptr = (lambda *)function_template.get();
 
     if (template_ptr == nullptr) {
       printf("nullptr\n");
@@ -481,6 +486,10 @@ loop:
     // inherit closures from parent, a new
     // child closure is created on call
     fptr->m_closure = PROG()->m_closure;
+
+    // when creating functions, inherit the module object
+    fptr->mod = PROG()->mod;
+
 
     PUSH(function);
     CODE_SKIP(u64);
@@ -650,7 +659,7 @@ loop:
     PRELUDE;
 
     ref expr = POP();
-    vm::compiler c(nullptr);
+    vm::compiler c;
     ref compiled_lambda = c.compile(expr, nullptr);
     lambda *func = compiled_lambda.as<lambda>();
     fiber eval_fiber(func);

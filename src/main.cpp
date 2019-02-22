@@ -88,6 +88,14 @@ int main(int argc, char **argv) {
 
   init();
 
+
+
+
+  std::cout << sizeof(object) << std::endl;
+
+  module *mod = require("core/core");
+
+
   def_global("*cedar-version*", new cedar::string(CEDAR_VERSION));
 
   srand((unsigned int)time(nullptr));

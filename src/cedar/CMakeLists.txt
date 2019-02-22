@@ -6,6 +6,7 @@ add_library(cedar-lib SHARED
 	src/cedar/importutil.cpp
 	src/cedar/ref.cpp
 	src/cedar/object.cpp
+	src/cedar/modules.cpp
 	src/cedar/globals.cpp
 	src/cedar/passes.cpp
 	src/cedar/scheduler.cpp
@@ -19,6 +20,7 @@ add_library(cedar-lib SHARED
 	src/cedar/vm/machine.cpp
 	src/cedar/vm/bindings.cpp
 	src/cedar/object/symbol.cpp
+	src/cedar/object/module.cpp
 	src/cedar/object/dict.cpp
 	src/cedar/object/string.cpp
 	src/cedar/object/bytes.cpp
@@ -32,8 +34,9 @@ add_library(cedar-lib SHARED
 	src/cedar/object/number.cpp
 	src/cedar/lib/linenoise.cpp
 	src/cedar/bindings/mutex.cpp
-	src/cedar/bindings/channel.cpp
+	src/cedar/bindings/os.cpp
 	src/cedar/bindings/entry.cpp
+	src/cedar/bindings/stringutil.cpp
 )
 
 target_link_libraries(cedar-lib ${CMAKE_DL_LIBS} -lgc -lgccpp -pthread -lcurl -luv)

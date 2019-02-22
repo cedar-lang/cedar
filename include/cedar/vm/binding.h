@@ -42,7 +42,7 @@ namespace cedar {
 	cedar_binding_sig(name)
 
 #define cedar_init_sig() void cedar_module_init(void)
-#define cedar_init() cedar_init_sig() asm ("$CDR-INIT$"); cedar_init_sig()
+#define cedar_init() cedar_init_sig() asm ("_$CDR-INIT$"); cedar_init_sig()
 
 
 #define bind_lambda(argc, argv, ctx) [=] (int argc, cedar::ref *argv, cedar::call_context * ctx) -> cedar::ref

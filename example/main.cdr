@@ -1,10 +1,5 @@
 
 
-
-
-
-
-
 (def (fact n)
   (cond (<= n 1) 1
         :else (* n (fact (dec n)))))
@@ -225,5 +220,26 @@
       (recur f (rest coll))))
 
 
+
+
+(declare json/encode json/encode-map)
+
+
+(def (json/encode-dict-pair p)
+  (str (json/encode (first p)) ": " (json/encode (rest p))))
+
+(def (json/encode-dict m)
+  (str "{"  (join (map json/encode-dict-pair (keys m)) ", ")  "}"))
+
+(def (json/encode x)
+  (let [tp (type x)]
+    (cond (or (= tp Vector)
+              (= tp List)) (str "[" (join (map json/encode x) ", ") "]")
+          (= tp Dict) (json/encode-dict x)
+          (= tp Keyword) (repr (rest (str x)))
+          (= tp Symbol) (repr (str x))
+          (= tp Nil) "null"
+          (= tp Number) (str x)
+          :default (repr (str x)))))
 
 

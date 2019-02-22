@@ -22,28 +22,17 @@
  * SOFTWARE.
  */
 
-#include <cedar/objtype.h>
-#include <cedar/globals.h>
-#include <stdio.h>
+#pragma once
 
-using namespace cedar;
+#include <cedar/object.h>
 
-
-static type *channel_type = nullptr;
-
-class channel_obj {
-  public:
-};
+namespace cedar {
 
 
-void bind_channel(void) {
-  // Channel* is the low level implementation of a channel,
-  // the final user channel will be implemented as a type that
-  // wraps this and plays nicely with the event loop
-  channel_type = new type("Channel*");
-  type_init_default_bindings(channel_type);
+  class module : public object {
+   public:
+    module();
+    ~module(void);
+  };
 
-
-
-  def_global(new symbol("Channel*"), channel_type);
-}
+}  // namespace cedar

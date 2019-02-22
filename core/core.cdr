@@ -38,7 +38,6 @@
                 (cons 'do body)))))
 
 
-
 (def* t 't)
 
 ;; have true and false resolve to themselves.
@@ -666,6 +665,7 @@
 (def (eval-file-in-module path m)
   (let [src (read-file path)
         exprs (map identity (read-string src))]
+    (println exprs)
     (map eval exprs)))
 
 
@@ -688,6 +688,8 @@
           (def *file* *old-file*)
           *new-module*)
       (get *imported* qualified))))
+
+
 
 
 
@@ -792,9 +794,9 @@
 
 
 
-(def *out* (FileDescriptor 0))
-(def *err* (FileDescriptor 1))
-(def *in*  (FileDescriptor 2))
+(def *in*  (FileDescriptor 0))
+(def *out* (FileDescriptor 1))
+(def *err* (FileDescriptor 2))
 
 
 (. Object (set-field 'write-stream (fn (self stream)
@@ -939,3 +941,28 @@
       (lock! self._mut)))
   (def (unlock! self)
       (unlock! self._mut)))
+
+
+
+
+(def native/c++ "c++")
+(def native/so-ext ".so")
+
+(def (native/compile & args)
+  (let [opts (apply dict args)
+        name (:name opts)
+        files (:files opts)
+        extra-args (or (:args opts) [])]
+    (os/shell (str native/c++
+                  " -o " (str name native/so-ext)
+                  " -lcedar "
+                  " -shared -I/usr/local/include "
+                  (if (not (= 0 (len extra-args)))
+                    (join extra-args " ")
+                    "")
+                  " -fPIC -frtti -std=c++17 "
+                  " -Wall -Wextra -fpic -O3 "
+                  (join files " ")))))
+
+
+

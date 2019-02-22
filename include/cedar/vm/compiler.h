@@ -74,8 +74,7 @@ namespace cedar {
 
 		class compiler {
 			public:
-				cedar::vm::machine *m_vm;
-				compiler(cedar::vm::machine *vm);
+				compiler();
 				~compiler();
 
 
@@ -91,14 +90,12 @@ namespace cedar {
 				ref compile(ref, machine*);
 
 				void compile_lambda_expression(ref, bytecode &, scope_ptr sc, compiler_ctx*);
-				void compile_progn(ref, bytecode &, scope_ptr, compiler_ctx*);
 				void compile_number(ref, bytecode &, scope_ptr, compiler_ctx*);
 				void compile_object(ref, bytecode &, scope_ptr, compiler_ctx*);
 				void compile_constant(ref, bytecode &, scope_ptr, compiler_ctx*);
 				void compile_symbol(ref, bytecode &, scope_ptr, compiler_ctx*);
 				void compile_list(ref, bytecode &, scope_ptr, compiler_ctx*);
         void compile_vector(ref, bytecode &, scope_ptr, compiler_ctx*);
-				void compile_call_arguments(ref, bytecode &, scope_ptr sc, compiler_ctx*);
 				void compile_quasiquote(ref, bytecode &, scope_ptr sc, compiler_ctx*);
 		};
 

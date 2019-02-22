@@ -38,6 +38,7 @@ namespace cedar {
   class fiber;
   class lambda;
   class scheduler;
+  class module;
 
 
 
@@ -77,6 +78,7 @@ namespace cedar {
   struct call_context {
     fiber *coro;
     scheduler *schd;
+    module *mod;
   };
 
 

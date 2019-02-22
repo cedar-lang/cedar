@@ -39,7 +39,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <thread>
-
+#include <cedar/modules.h>
 #include <regex>
 
 #include <gc/gc.h>
@@ -481,7 +481,6 @@ cedar_binding(cedar_catch) {
   return nullptr;
 }
 
-
 struct url_data {
   size_t size;
   char *data;
@@ -647,6 +646,13 @@ void init_binding(cedar::vm::machine *m) {
 
 
 
+  def_global("repr", bind_lambda(argc, argv, machine) {
+    ERROR_IF_ARGS_PASSED_IS("repr", !=, 1);
+    return new string(argv[0].to_string(false));
+  });
+
+
+
   def_global("sqrt", bind_lambda(argc, argv, machine) {
     ERROR_IF_ARGS_PASSED_IS("sqrt", !=, 1);
     return sqrt(argv[0].to_float());
@@ -754,6 +760,20 @@ void init_binding(cedar::vm::machine *m) {
 
     return v;
   });
+
+
+
+
+  def_global("require", bind_lambda(argc, argv, machine) {
+    ERROR_IF_ARGS_PASSED_IS("require", !=, 1);
+    std::string path = argv[0].to_string(true);
+    return require(path);
+  });
+
+
+
+
+
 
 
   def_global("gc", bind_lambda(argc, argv, machine) {

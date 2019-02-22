@@ -54,10 +54,10 @@ ref &cedar::closure::at(int i) { return i >= m_index ? m_vars[i - m_index] : m_p
 
 cedar::lambda::lambda() {
   m_type = cedar::lambda_type;
-  code = std::make_shared<cedar::vm::bytecode>();
+  code = new cedar::vm::bytecode();
 }
 
-cedar::lambda::lambda(std::shared_ptr<vm::bytecode> bc) {
+cedar::lambda::lambda(vm::bytecode *bc) {
   m_type = cedar::lambda_type;
   code_type = bytecode_type;
   code = bc;
@@ -72,7 +72,10 @@ cedar::lambda::lambda(bound_function func) {
 cedar::lambda::~lambda() {}
 
 
-u64 lambda::hash(void) { return reinterpret_cast<u64>(code_type == bytecode_type ? (void *)code.get() : &function_binding); }
+u64 lambda::hash(void) {
+  //
+  return reinterpret_cast<u64>(code_type == bytecode_type ? (void *)code : &function_binding);
+}
 
 lambda *lambda::copy(void) {
   lambda *new_lambda = new lambda();

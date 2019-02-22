@@ -32,10 +32,12 @@ namespace cedar {
 
 
 using namespace cedar;
-void bind_channel(void);
+void bind_os(void);
 void bind_mutex(void);
+void bind_stringutil(void);
 
 void cedar::bind_stdlib(void) {
-  bind_channel();
+  bind_os();
   bind_mutex();
+  bind_stringutil();
 }

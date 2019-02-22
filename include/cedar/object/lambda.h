@@ -40,6 +40,8 @@
 
 namespace cedar {
 
+  class module;
+
   // closure represents a wraper around closed values
   // in functions, also known as "freevars" in LC
   // It will attempt to store things in a fixed sized
@@ -56,11 +58,10 @@ namespace cedar {
     //
     closure(i32, std::shared_ptr<closure> = nullptr, i32 = 0);
     ~closure(void);
-
     std::shared_ptr<closure> clone(void);
-
     ref &at(int);
   };
+
 
   class lambda : public object {
    public:
@@ -70,9 +71,11 @@ namespace cedar {
     };
 
     lambda_type code_type = bytecode_type;
-    std::shared_ptr<cedar::vm::bytecode> code;
+    vm::bytecode *code;
     std::shared_ptr<closure> m_closure = nullptr;
 
+
+    module *mod = nullptr;
     ref name;
 
     i32 arg_index = 0;
@@ -82,15 +85,14 @@ namespace cedar {
     bound_function function_binding;
 
     lambda(void);
-    lambda(std::shared_ptr<cedar::vm::bytecode>);
+    lambda(cedar::vm::bytecode*);
     lambda(cedar::bound_function);
     ~lambda(void);
 
-    inline const char *object_type_name(void) { return "lambda"; };
+
+
     u64 hash(void);
-
     lambda *copy(void);
-
     // prime_args configures the lambda with a closure and loads it
     // with the arguments according to that lambda's calling conv
     void prime_args(int argc = 0, ref *argv = nullptr);
