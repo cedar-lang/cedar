@@ -471,6 +471,14 @@ void vm::compiler::compile_symbol(ref sym, bytecode &code, scope_ptr sc, compile
 
   cedar::runes str = sym.to_string();
 
+
+  static ref mod_sym = new symbol("*module*");
+
+  if (sym == mod_sym) {
+    code.write((u8)OP_GET_MODULE);
+    return;
+  }
+
   bool is_dot = false;
   for (auto it : str) {
     if (it == '.') {

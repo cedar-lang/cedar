@@ -30,11 +30,17 @@
 #define _MODULES_H
 
 #include <string>
+#include <cedar/runes.h>
+#include <cedar/ref.h>
 
 namespace cedar {
   class module;
   // primary module require system
   module *require(std::string);
+
+  void define_builtin_module(std::string, module*);
+
+  ref eval_string_in_module(cedar::runes, module*);
 };
 
 #endif

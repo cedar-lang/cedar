@@ -31,6 +31,8 @@
 #include <cedar/types.h>
 #include <unistd.h>
 #include <uv.h>
+#include <cedar/globals.h>
+#include <cedar/modules.h>
 #include <chrono>
 #include <cstdlib>
 #include <mutex>
@@ -260,6 +262,7 @@ namespace cedar {
  * should be called before ANY code is run.
  */
 void cedar::init(void) {
+
   type_init();
 
   init_binding(nullptr);
@@ -302,6 +305,9 @@ void cedar::init(void) {
     uv_loop_close(primary_scheduler.loop);
     delete primary_scheduler.loop;
   });
+
+
+  core_mod = require("core");
 
   scheduler_thread.detach();
 }

@@ -27,6 +27,8 @@
 #include <cedar/object/keyword.h>
 #include <cedar/object/string.h>
 #include <cedar/object/vector.h>
+#include <cedar/object/module.h>
+#include <cedar/modules.h>
 #include <cedar/objtype.h>
 #include <cedar/vm/binding.h>
 #include <dirent.h>
@@ -57,10 +59,10 @@ static cedar_binding(os_which) {
 static cedar_binding(os_fork) { return fork(); }
 
 static cedar_binding(os_shell) {
-  if (argc != 1) throw cedar::make_exception("os/shell requires 1 argument");
+  if (argc != 1) throw cedar::make_exception("os.shell requires 1 argument");
 
   if (argv[0].get_type() != string_type) {
-    throw cedar::make_exception("os/shell requires a string as an argument");
+    throw cedar::make_exception("os.shell requires a string as an argument");
   }
 
   std::string cmd = argv[0].to_string(true);
@@ -71,9 +73,9 @@ static cedar_binding(os_shell) {
 
 
 static cedar_binding(os_stat) {
-  if (argc != 1) throw cedar::make_exception("os/stat requires 1 argument");
+  if (argc != 1) throw cedar::make_exception("os.stat requires 1 argument");
   if (argv[0].get_type() != string_type) {
-    throw cedar::make_exception("os/stat requires a string path as an argument");
+    throw cedar::make_exception("os.stat requires a string path as an argument");
   }
   std::string path = argv[0].to_string(true);
   struct stat s;
@@ -115,7 +117,7 @@ static cedar_binding(os_listdir) {
 
   if (argc == 1) {
     if (argv[0].get_type() != string_type) {
-      throw cedar::make_exception("os/listdir requires a string path as an argument");
+      throw cedar::make_exception("os.listdir requires a string path as an argument");
     }
     path = argv[0].to_string(true);
   }
@@ -135,9 +137,9 @@ static cedar_binding(os_listdir) {
 static cedar_binding(os_rm) {
   static ref _true = new symbol("true");
   static ref _false = new symbol("false");
-  if (argc != 1) throw cedar::make_exception("os/rm requires 1 argument");
+  if (argc != 1) throw cedar::make_exception("os.rm requires 1 argument");
   if (argv[0].get_type() != string_type) {
-    throw cedar::make_exception("os/rm requires a string path as an argument");
+    throw cedar::make_exception("os.rm requires a string path as an argument");
   }
   std::string path = argv[0].to_string(true);
   return remove(path.c_str()) == 0 ? _true : _false;
@@ -147,10 +149,10 @@ static cedar_binding(os_rm) {
 
 typedef void(init_func)(void);
 static cedar_binding(os_import_so) {
-  if (argc != 1) throw cedar::make_exception("os/import-so requires 1 argument");
+  if (argc != 1) throw cedar::make_exception("os.import-so requires 1 argument");
 
   if (argv[0].get_type() != string_type) {
-    throw cedar::make_exception("os/import-so requires a string as an argument");
+    throw cedar::make_exception("os.import-so requires a string as an argument");
   }
 
   std::string path = argv[0].to_string(true);
@@ -180,13 +182,19 @@ static cedar_binding(os_getppid) {
 }
 
 void bind_os(void) {
-  def_global("os/shell", os_shell);
-  def_global("os/fork", os_fork);
-  def_global("os/import-so", os_import_so);
-  def_global("os/which", os_which);
-  def_global("os/listdir", os_listdir);
-  def_global("os/stat", os_stat);
-  def_global("os/rm", os_rm);
-  def_global("os/getpid", os_getpid);
-  def_global("os/getppid", os_getppid);
+  module *mod = new module("os");
+
+  mod->def("shell", os_shell);
+  mod->def("fork", os_fork);
+  mod->def("shell", os_shell);
+  mod->def("fork", os_fork);
+  mod->def("import-so", os_import_so);
+  mod->def("which", os_which);
+  mod->def("listdir", os_listdir);
+  mod->def("stat", os_stat);
+  mod->def("rm", os_rm);
+  mod->def("getpid", os_getpid);
+  mod->def("getppid", os_getppid);
+
+  define_builtin_module("os", mod);
 }

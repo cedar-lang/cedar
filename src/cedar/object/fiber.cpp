@@ -225,6 +225,7 @@ void fiber::run(scheduler *sched, run_context *state, int max_ms) {
     SET_LABEL(OP_DEF_MACRO);
     SET_LABEL(OP_EVAL);
     SET_LABEL(OP_SLEEP);
+    SET_LABEL(OP_GET_MODULE);
     created_thread_labels = true;
   }
 
@@ -331,6 +332,16 @@ loop:
     if (PROG()->mod != nullptr) {
       attr_map::bucket *b;
       b = PROG()->mod->m_attrs.buck(ind);
+      if (b != nullptr) {
+        val = b->val;
+        PUSH(val);
+        DISPATCH;
+      }
+    }
+
+
+    if (core_mod != nullptr) {
+      attr_map::bucket *b = core_mod->m_attrs.buck(ind);
       if (b != nullptr) {
         val = b->val;
         PUSH(val);
@@ -686,6 +697,12 @@ loop:
     state->sleep_for = interval;
     // std::cout << "sleep: " << dur_ref << std::endl;
     return;
+    DISPATCH;
+  }
+
+  TARGET(OP_GET_MODULE) {
+    PRELUDE;
+    PUSH(PROG()->mod);
     DISPATCH;
   }
 

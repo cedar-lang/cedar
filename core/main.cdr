@@ -146,6 +146,9 @@
                           (str self other))))
 
 
+(. Module (add-field 'str (fn (self) (str "<Module " self.*name* ">"))))
+(. Module (add-field 'repr (fn (self) (str "<Module " self.*name* ">"))))
+
 (defmacro catch (id expr body)
   (list 'catch* (list 'fn nil expr) (list 'fn (list id) body)))
 
@@ -518,11 +521,18 @@
 
 
 
+(def (import-opt-expand name opts)
+  (when opts
+    (let [opt (first opts)
+          t (type (first opts))]
+      (cons (cond (= Vector t) (cons 'do (map (fn (x) `(def ~x (. ~name ~x)))
+                                           opt))
+                  true 1)
+            (import-opt-expand name (rest opts))))))
 
-
-(defmacro case (dispatch & cases)
-  (let []))
-
+(defmacro import (name & opts)
+  `(do (def ~name (require ~(str name)))
+     ~@(import-opt-expand name opts)))
 
 
 (defmacro while (test & body)
@@ -670,28 +680,6 @@
 
 
 
-;; the Module type that represents the current module
-;; and what gets returned from (import)
-(deftype Module)
-
-
-(def *imported* {})
-
-(def (import path)
-  (let (qualified (path-resolve path *file*)
-        *old-file* *file*
-        *old-module* nil
-        *new-module* nil)
-    (if (not (get *imported* qualified false))
-      (do (eval-file-in-module qualified *new-module*)
-          (set *imported* qualified *new-module*)
-          (def *file* *old-file*)
-          *new-module*)
-      (get *imported* qualified))))
-
-
-
-
 
 (defmacro do-global (& globs)
   (let [old-mod-name (gensym)
@@ -702,10 +690,6 @@
        (def ~return-sym (do ~@globs))
        (internal/set-module ~old-mod-name)
        ~return-sym)))
-
-
-
-
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -930,10 +914,12 @@
 (def (unlock! m) (. m (unlock!)))
 
 
+
+(import _mutex)
 ;; define an event-loop safe wrapper around a kernel mutex
 (deftype Mutex
   (def (new self)
-    (. self _mut := (KernelMutex)))
+    (. self _mut := (_mutex.KernelMutex)))
   (def (locked? self)
     (locked? self._mut))
   (def (lock! self)
@@ -963,6 +949,5 @@
                   " -fPIC -frtti -std=c++17 "
                   " -Wall -Wextra -fpic -O3 "
                   (join files " ")))))
-
 
 

@@ -37,6 +37,10 @@ static std::mutex g_lock;
 static std::unordered_map<int, ref> globals;
 
 
+
+module *cedar::core_mod = nullptr;
+
+
 void cedar::def_global(int id, ref val) {
   g_lock.lock();
   globals[id] = val;

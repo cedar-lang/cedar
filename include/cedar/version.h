@@ -22,4 +22,4 @@
  * SOFTWARE.
  */
 
-#define CEDAR_VERSION "0.4.1"
+#define CEDAR_VERSION "0.5.0"

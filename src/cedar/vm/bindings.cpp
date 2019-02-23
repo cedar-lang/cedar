@@ -771,11 +771,6 @@ void init_binding(cedar::vm::machine *m) {
   });
 
 
-
-
-
-
-
   def_global("gc", bind_lambda(argc, argv, machine) {
     GC_gcollect();
     return nullptr;

@@ -33,6 +33,10 @@
 
 namespace cedar {
 
+  class module;
+
+  extern module *core_mod;
+
   void def_global(int, ref);
   void def_global(ref, ref);
   void def_global(runes, ref);

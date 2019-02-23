@@ -81,6 +81,7 @@ new_op('DEF_MACRO', 'imm_int', effect=0);
 new_op('EVAL', effect=0)
 
 new_op('SLEEP', effect=-1)
+new_op('GET_MODULE', effect=1)
 
 def main(outfile):
     with open(outfile, 'w') as f:

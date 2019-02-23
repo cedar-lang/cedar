@@ -86,29 +86,19 @@ cedar::type::method lambda_wrap(ref func) {
 
 int main(int argc, char **argv) {
 
+  srand((unsigned int)time(nullptr));
+
   init();
-
-
-
-
-  std::cout << sizeof(object) << std::endl;
-
-  module *mod = require("core/core");
-
 
   def_global("*cedar-version*", new cedar::string(CEDAR_VERSION));
 
-  srand((unsigned int)time(nullptr));
 
   def_global("*cwd*", cedar::new_obj<cedar::string>(apathy::Path::cwd().string()));
 
   auto core_path = apathy::Path(CORE_DIR);
-  core_path.append("core.cdr");
-
-  cedar::runes core_entry = path_resolve(core_path.string(), apathy::Path::cwd());
+  core_path.append("main.cdr");
 
 
-  cvm.eval_file(core_entry);
 
   try {
     bool interactive = false;
@@ -149,7 +139,7 @@ int main(int argc, char **argv) {
     }
 
     if (optind < argc) {
-      std::string path = cedar::path_resolve(argv[optind]);
+      std::string path = argv[optind];
 
 
       def_global("*main*", cedar::new_obj<cedar::string>(path));
@@ -164,7 +154,8 @@ int main(int argc, char **argv) {
         args = cedar::idx_append(args, new cedar::string(argv[i]));
       }
       def_global("*args*", args);
-      cvm.eval_file(path);
+      require(path);
+
     } else {
       def_global("*main*", ref{nullptr});
     }
@@ -173,11 +164,15 @@ int main(int argc, char **argv) {
     struct rusage usage;
 
     if (interactive) {
-      def_global("*file*", cedar::new_obj<cedar::string>(apathy::Path::cwd().string()));
+
+      module *repl_mod = new module("*repl*");
+
+
+
+      repl_mod->def("*file*", cedar::new_obj<cedar::string>(apathy::Path::cwd().string()));
 
       cedar::reader repl_reader;
 
-      ref binding = cedar::new_obj<cedar::symbol>("$$");
       while (interactive) {
         std::string ps1;
 
@@ -212,10 +207,9 @@ int main(int argc, char **argv) {
         free(buf);
         try {
           printf("\x1B[32m");
-          ref res = cvm.eval_string(b);
+          ref res = eval_string_in_module(b, repl_mod);
           printf("\x1B[0m");
-
-          def_global(binding, res);
+          repl_mod->def("$$", res);
           std::cout << "\x1B[33m" << res << "\x1B[0m" << std::endl;
         } catch (std::exception &e) {
           std::cerr << "Uncaught Exception: " << e.what() << std::endl;

@@ -74,7 +74,6 @@ namespace cedar {
       f64 m_flt;
       object *m_obj;
       void *m_ptr;
-
       fractional m_frac;
     };
 

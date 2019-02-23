@@ -27,6 +27,8 @@
 #include <cedar/vm/compiler.h>
 #include <cedar/object/lambda.h>
 #include <cedar/object/module.h>
+#include <cedar/object/string.h>
+#include <cedar/object/symbol.h>
 #include <unordered_map>
 #include <mutex>
 #include <stdio.h>
@@ -67,22 +69,13 @@ static module *require_file(apathy::Path p) {
   cedar::runes src = util::read_file(path.c_str());
 
 
-  module *mod = new module();
+  module *mod = new module(path);
 
-  reader reader;
-  reader.lex_source(src);
 
-  vm::compiler c;
-  bool valid = true;
+  static int file_id = get_symbol_intern_id("*file*");
+  mod->setattr_fast(file_id, new string(path));
 
-  while (true) {
-    ref obj = reader.read_one(&valid);
-    if (!valid) break;
-    ref compiled_lambda = c.compile(obj, nullptr);
-    lambda *raw_program = ref_cast<cedar::lambda>(compiled_lambda);
-    raw_program->mod = mod;
-    ref val = eval_lambda(raw_program);
-  }
+  eval_string_in_module(src, mod);
 
   modules[path] = mod;
 
@@ -92,8 +85,10 @@ static module *require_file(apathy::Path p) {
 
 
 module *cedar::require(std::string name) {
+  if (modules.count(name) != 0) {
+    return modules.at(name);
+  }
   auto path = get_path();
-  static std::string dir_file_name = "main.cdr";
 
   for (std::string p : path) {
     apathy::Path f = p;
@@ -115,4 +110,29 @@ module *cedar::require(std::string name) {
   return nullptr;
 }
 
+// simple function to allow modules to be added externally
+void cedar::define_builtin_module(std::string name, module *mod) {
+  modules[name] = mod;
+}
 
+
+
+ref cedar::eval_string_in_module(cedar::runes src, module *mod) {
+  reader reader;
+  reader.lex_source(src);
+
+  vm::compiler c;
+  bool valid = true;
+
+  ref val;
+  while (true) {
+    ref obj = reader.read_one(&valid);
+    if (!valid) break;
+    ref compiled_lambda = c.compile(obj, nullptr);
+    lambda *raw_program = ref_cast<cedar::lambda>(compiled_lambda);
+    raw_program->mod = mod;
+    val = eval_lambda(raw_program);
+  }
+
+  return val;
+}

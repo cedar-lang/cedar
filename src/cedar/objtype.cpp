@@ -24,6 +24,7 @@
 
 #include <cedar/object/dict.h>
 #include <cedar/objtype.h>
+#include <cedar/object/module.h>
 
 #include <cedar/object/keyword.h>
 #include <cedar/object/list.h>
@@ -94,9 +95,9 @@ static cedar_binding(type_str_lambda) {
 
 static cedar_binding(obj_str_lambda) {
   cedar::runes s;
-  s += "<object of '";
+  s += "<";
   s += argv[0].get_type()->m_name;
-  s += "' at ";
+  s += " at ";
   char buf[20];
   sprintf(buf, "%p", argv[0].as<object>());
   s += buf;
@@ -694,6 +695,28 @@ static void init_fiber_type() {
 
   def_global(new symbol("Fiber"), fiber_type);
 }  // init_fiber_type
+
+//
+//
+//
+/////////////////////////////////////////////////////////////
+//
+//
+//
+
+type *cedar::module_type;
+static void init_module_type() {
+  // bind defaults
+  type_init_default_bindings(module_type);
+
+  fiber_type->setattr(
+      "__alloc__", bind_lambda(argc, argv, machine) { return new module(); });
+  fiber_type->set_field("new", bind_lambda(argc, argv, machine) {
+    return nullptr;
+  });
+  def_global(new symbol("Module"), module_type);
+}  // init_fiber_type
+
 
 void cedar::type_init(void) {
   // allocate all the builtin type names and variables

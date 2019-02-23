@@ -24,6 +24,9 @@
 
 #include <cedar/globals.h>
 #include <cedar/objtype.h>
+#include <cedar/modules.h>
+#include <cedar/object/string.h>
+#include <cedar/object/module.h>
 #include <cedar/vm/binding.h>
 #include <stdio.h>
 #include <mutex>
@@ -40,6 +43,11 @@ class mutex_obj : public object {
 
 
 void bind_mutex(void) {
+
+
+  module *mod = new module("_mutex");
+
+
   mutex_type = new type("KernelMutex");
   type_init_default_bindings(mutex_type);
 
@@ -70,4 +78,7 @@ void bind_mutex(void) {
   });
 
   def_global(new symbol("KernelMutex"), mutex_type);
+
+  mod->def("KernelMutex", mutex_type);
+  define_builtin_module("_mutex", mod);
 }

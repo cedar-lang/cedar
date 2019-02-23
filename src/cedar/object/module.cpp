@@ -22,9 +22,29 @@
  * SOFTWARE.
  */
 #include <cedar/object/module.h>
+#include <cedar/object/string.h>
+#include <cedar/objtype.h>
 
 using namespace cedar;
 
-module::module(void) {}
+module::module(void) {
+  def("*name*", new string("unnamed"));
+  m_type = module_type;
+}
+
+module::module(std::string name) {
+  def("*name*", new string(name));
+  m_type = module_type;
+}
 
 module::~module(void) {}
+
+
+void module::def(std::string name, ref val) {
+  setattr_fast(get_symbol_intern_id(name), val);
+}
+void module::def(std::string name, bound_function val) {
+  int id = get_symbol_intern_id(name);
+  ref func = new lambda(val);
+  setattr_fast(id, func);
+}

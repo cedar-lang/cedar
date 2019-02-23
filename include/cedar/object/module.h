@@ -31,8 +31,12 @@ namespace cedar {
 
   class module : public object {
    public:
-    module();
+    module(void);
+    module(std::string);
     ~module(void);
+
+    void def(std::string, ref);
+    void def(std::string, bound_function);
   };
 
 }  // namespace cedar
