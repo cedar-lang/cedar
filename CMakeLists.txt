@@ -10,6 +10,9 @@ endif()
 link_directories(/usr/local/lib)
 include_directories(/usr/local/include)
 
+
+add_subdirectory(${CMAKE_SOURCE_DIR}/dep/libuv)
+
 set (CMAKE_CXX_STANDARD 17)
 
 
@@ -32,7 +35,7 @@ target_compile_options(cedar-lib PRIVATE -g -Wall -Wextra -Wno-unused-parameter 
 
 add_executable(cedar-bin src/main.cpp)
 
-target_link_libraries(cedar-bin cedar-lib ${CMAKE_DL_LIBS} -pthread)
+target_link_libraries(cedar-bin cedar-lib uv_a ${CMAKE_DL_LIBS} -pthread)
 set_target_properties(cedar-bin PROPERTIES OUTPUT_NAME cedar)
 
 target_compile_options(cedar-bin PRIVATE -Wall -Wextra -Wno-unused-parameter -Wno-strict-aliasing)

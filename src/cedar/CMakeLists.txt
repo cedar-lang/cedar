@@ -35,9 +35,11 @@ add_library(cedar-lib SHARED
 	src/cedar/lib/linenoise.cpp
 	src/cedar/bindings/mutex.cpp
 	src/cedar/bindings/os.cpp
+	src/cedar/bindings/tcp.cpp
 	src/cedar/bindings/entry.cpp
+	src/cedar/bindings/uv.cpp
 	src/cedar/bindings/stringutil.cpp
 )
 
-target_link_libraries(cedar-lib ${CMAKE_DL_LIBS} -lgc -lgccpp -pthread -lcurl -luv)
+target_link_libraries(cedar-lib uv ${CMAKE_DL_LIBS} -lgc -lgccpp -pthread -lcurl)
 set_target_properties(cedar-lib PROPERTIES OUTPUT_NAME cedar)
