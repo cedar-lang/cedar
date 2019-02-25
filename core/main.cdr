@@ -881,30 +881,6 @@
   `(interval* ~i (fn () (do ~@body))))
 
 
-(deftype chan
-  (def has-value false)
-  (def (new self)
-    (. self has-value := false)
-    (. self value := nil))
-  ;; put an item in the channel
-  (def (put self val)
-    (wait-until (not self.has-value))
-    (sleep)
-    (. self has-value := true)
-    (. self value := val))
-  ;; take an item out of the channel
-  (def (pop self)
-    (wait-until self.has-value)
-    (. self has-value := false)
-    (. self value))
-
-  (def (first self)
-    (first (ChannelIterator self)))
-  (def (rest self)
-    (rest (ChannelIterator self))))
-
-
-
 
 (def (locked? x)
   (. x (locked?)))
@@ -931,6 +907,34 @@
 
 
 
+(deftype chan
+  (def has-value false)
+  (def (new self)
+    (. self has-value := false)
+    (. self value := nil)
+    (. self _mut := (Mutex)))
+
+  ;; put an item in the channel
+  (def (put self val)
+    ;; grab a lock to this channel's lock
+    (lock! self._mut)
+    ;; set it's value
+    (. self value := val))
+
+
+  ;; take an item out of the channel
+  (def (pop self)
+    ;; wait until there is an item in the channel
+    (wait-until (locked? self._mut))
+    (let [value self.value]
+      (. self has-value := false)
+      (unlock! self._mut)
+      (return value))))
+
+
+
+
+
 (def native/c++ "c++")
 (def native/so-ext ".so")
 
@@ -949,5 +953,3 @@
                   " -fPIC -frtti -std=c++17 "
                   " -Wall -Wextra -fpic -O3 "
                   (join files " ")))))
-
-

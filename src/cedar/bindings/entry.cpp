@@ -35,9 +35,13 @@ using namespace cedar;
 void bind_os(void);
 void bind_mutex(void);
 void bind_stringutil(void);
+void bind_uv(void);
+void bind_tcp(void);
 
 void cedar::bind_stdlib(void) {
   bind_os();
   bind_mutex();
   bind_stringutil();
+  bind_uv();
+  bind_tcp();
 }

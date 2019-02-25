@@ -69,18 +69,6 @@ namespace cedar {
 
       machine(void);
       ~machine(void);
-
-      /*
-       * given some object reference,
-       * compile it into this specific target
-       */
-      ref eval(ref);
-      /*
-      ref eval_lambda(lambda *);
-      */
-
-      ref eval_file(cedar::runes);
-      ref eval_string(cedar::runes);
     };
 
 

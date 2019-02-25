@@ -36,10 +36,10 @@
 
 
 namespace cedar {
+	class module;
 	namespace vm {
 
 		// forwared declaration
-		class machine;
 
 		struct compiler_ctx {
       bool inside_catch = false;
@@ -87,7 +87,7 @@ namespace cedar {
 				 * the address of the start of the bytecode
 				 * representation of that object
 				 */
-				ref compile(ref, machine*);
+				ref compile(ref, module*);
 
 				void compile_lambda_expression(ref, bytecode &, scope_ptr sc, compiler_ctx*);
 				void compile_number(ref, bytecode &, scope_ptr, compiler_ctx*);
@@ -101,6 +101,6 @@ namespace cedar {
 
 		// a bytecode compilation pass that takes in the compiler
 		// oboejct
-		ref bytecode_pass(ref, compiler*);
+		ref bytecode_pass(ref, compiler*, module*);
 	}
 }

@@ -1,0 +1,14 @@
+(import tcp)
+
+(def server (tcp.Server (fn (sock) (println "connection"))))
+
+(println (. server (listen "0.0.0.0" 8080)))
+
+
+
+(def c (chan))
+
+(def x 0)
+(go (while true
+      (inc= x)
+      (put x c)))

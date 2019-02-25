@@ -646,6 +646,7 @@ void init_binding(cedar::vm::machine *m) {
 
 
 
+
   def_global("repr", bind_lambda(argc, argv, machine) {
     ERROR_IF_ARGS_PASSED_IS("repr", !=, 1);
     return new string(argv[0].to_string(false));

@@ -181,6 +181,19 @@ static cedar_binding(os_getppid) {
   return (i64)getppid();
 }
 
+static cedar_binding(os_getenv) {
+  if (argc != 1) throw cedar::make_exception("os.getenv requires 1 argument");
+  if (argv[0].get_type() != string_type) {
+    throw cedar::make_exception("os.getenv requires a string as an argument");
+  }
+  std::string path = argv[0].to_string(true);
+  const char *env = getenv(path.c_str());
+  if (env) {
+    return new string(env);
+  }
+  return nullptr;
+}
+
 void bind_os(void) {
   module *mod = new module("os");
 
@@ -195,6 +208,7 @@ void bind_os(void) {
   mod->def("rm", os_rm);
   mod->def("getpid", os_getpid);
   mod->def("getppid", os_getppid);
+  mod->def("getenv", os_getenv);
 
   define_builtin_module("os", mod);
 }

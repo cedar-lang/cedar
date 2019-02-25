@@ -669,6 +669,31 @@ static void init_lambda_type() {
     return nullptr;
   });
 
+
+
+  auto lambda_str_bind = bind_lambda(argc, argv, ctx) {
+    lambda *self = argv[0].as<lambda>();
+
+    cedar::runes c;
+
+    c += "<fn ";
+
+    if (self->name.is_nil()) {
+      c += "(unnamed ";
+      char pbuf[20];
+      sprintf(pbuf, "%p", self->code);
+      c += pbuf;
+      c += ")";
+    } else {
+      c += self->name.to_string(false);
+    }
+    c += ">";
+    return new string(c);
+  };
+
+  lambda_type->set_field("str", lambda_str_bind);
+  lambda_type->set_field("repr", lambda_str_bind);
+
   def_global("Lambda", lambda_type);
 }  // init_lambda_type
 

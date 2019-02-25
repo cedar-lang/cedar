@@ -32,8 +32,6 @@
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <sys/socket.h>
-#include <sys/types.h>
 #include <unistd.h>
 #include <uv.h>
 #include <chrono>
@@ -85,19 +83,11 @@ cedar::type::method lambda_wrap(ref func) {
 
 
 int main(int argc, char **argv) {
-
   srand((unsigned int)time(nullptr));
 
   init();
 
   def_global("*cedar-version*", new cedar::string(CEDAR_VERSION));
-
-
-  def_global("*cwd*", cedar::new_obj<cedar::string>(apathy::Path::cwd().string()));
-
-  auto core_path = apathy::Path(CORE_DIR);
-  core_path.append("main.cdr");
-
 
 
   try {
@@ -122,7 +112,6 @@ int main(int argc, char **argv) {
           // TODO: implement evaluate argument
         case 'e': {
           cedar::runes expr = optarg;
-          cvm.eval_string(expr);
           return 0;
           break;
         };
@@ -134,6 +123,15 @@ int main(int argc, char **argv) {
     }
 
 
+    module *repl_mod = new module("*repl*");
+
+    // there are also args, so make that vector...
+    ref args = new cedar::vector();
+    for (int i = optind; i < argc; i++) {
+      args = cedar::idx_append(args, new cedar::string(argv[i]));
+    }
+    require("os")->def("args", args);
+
     if (optind == argc) {
       interactive = true;
     }
@@ -141,54 +139,45 @@ int main(int argc, char **argv) {
     if (optind < argc) {
       std::string path = argv[optind];
 
-
-      def_global("*main*", cedar::new_obj<cedar::string>(path));
-
-      def_global("*file*", cedar::new_obj<cedar::string>(path));
-
       // there are also args, so make that vector...
       ref args = new cedar::vector();
 
       optind++;
       for (int i = optind; i < argc; i++) {
-        args = cedar::idx_append(args, new cedar::string(argv[i]));
+        args = self_call(args, "put", new string(argv[i]));
       }
-      def_global("*args*", args);
-      require(path);
-
-    } else {
-      def_global("*main*", ref{nullptr});
+      repl_mod = require(path);
     }
 
+
+
+
+
+    // run the async event loop now
+    // run_loop();
+
+    ///////////////////////////////////////////////////////////////
+    // repl logic begins here
+    // TODO: make the repl either live on another thread *or*
+    //       implement it inside libuv using the language itself
+    ///////////////////////////////////////////////////////////////
 
     struct rusage usage;
 
     if (interactive) {
-
-      module *repl_mod = new module("*repl*");
-
-
-
       repl_mod->def("*file*", cedar::new_obj<cedar::string>(apathy::Path::cwd().string()));
-
       cedar::reader repl_reader;
-
       while (interactive) {
         std::string ps1;
-
-
         if (resources) {
           getrusage(RUSAGE_SELF, &usage);
-
           double used_b = usage.ru_maxrss;
           double used_mb = used_b / 1000.0 / 1000.0;
-
           std::stringstream stream;
           stream << std::fixed << std::setprecision(2) << used_mb;
           ps1 += stream.str();
           ps1 += " MiB used";
         }
-
 
         ps1 += "> ";
         char *buf = linenoise(ps1.data());
@@ -206,9 +195,7 @@ int main(int argc, char **argv) {
         linenoiseHistoryAdd(buf);
         free(buf);
         try {
-          printf("\x1B[32m");
           ref res = eval_string_in_module(b, repl_mod);
-          printf("\x1B[0m");
           repl_mod->def("$$", res);
           std::cout << "\x1B[33m" << res << "\x1B[0m" << std::endl;
         } catch (std::exception &e) {

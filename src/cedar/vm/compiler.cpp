@@ -28,6 +28,7 @@
 #include <cedar/object/nil.h>
 #include <cedar/object/number.h>
 #include <cedar/object/string.h>
+#include <cedar/object/module.h>
 #include <cedar/object/symbol.h>
 #include <cedar/object/vector.h>
 #include <cedar/passes.h>
@@ -63,17 +64,23 @@ void vm::scope::set(ref &symbol, int ind) { m_bindings[symbol.symbol_hash()] = i
 vm::compiler::compiler() {}
 vm::compiler::~compiler() {}
 
-ref vm::compiler::compile(ref obj, vm::machine *machine) {
-  // run the value through some optimization and
-  // modification to the AST of the object before
-  // compiling to bytecode
-  auto controller = passcontroller(obj, this);
+ref vm::compiler::compile(ref obj, module *mod) {
+  // make a top level bytecode object
+  auto code = new vm::bytecode();
+  // make the top level scope for this expression
+  auto sc = std::make_shared<scope>(nullptr);
+  compiler_ctx context;
+  compile_object(obj, *code, sc, &context);
 
-  controller.pipe(vm::bytecode_pass, "bytecode emission");
+  code->write_op(OP_RETURN);
+  code->write_op(OP_EXIT);
+  // finalize the code (sum up stack effect)
+  code->finalize();
+  // build a lambda around the code
+  auto lambda = new cedar::lambda(code);
 
-  ref compiled = controller.get();
-
-  return compiled;
+  ref_cast<cedar::lambda>(lambda)->m_closure = nullptr;
+  return lambda;
 }
 
 // helper function for the list compiler for checking if
@@ -95,7 +102,7 @@ static bool list_is_call_to(cedar::runes func_name, ref &obj) {
 // lambda in the vm::compiler instance. Not passing the
 // expected expression will result in undefined behavior
 
-ref cedar::vm::bytecode_pass(ref obj, vm::compiler *c) {
+ref cedar::vm::bytecode_pass(ref obj, vm::compiler *c, module *m) {
   // make a top level bytecode object
   auto code = new vm::bytecode();
   // make the top level scope for this expression

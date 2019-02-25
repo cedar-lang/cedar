@@ -26,6 +26,7 @@
 
 #include <cedar/object.h>
 #include <cedar/scheduler.h>
+#include <future>
 
 namespace cedar {
 
@@ -64,10 +65,13 @@ namespace cedar {
 
    public:
     bool done = false;
+    ref return_value = nullptr;
     int fid = 0;
 
     fiber(lambda *);
     ~fiber(void);
+
+    void print_callstack();
 
     // run the fiber for at most max_ms miliseconds
     void run(scheduler *sched, run_context *state, int max_ms);

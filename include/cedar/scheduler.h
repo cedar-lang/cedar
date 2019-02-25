@@ -44,10 +44,10 @@ namespace cedar {
 
   // the intro initialization function
   void init(void);
-  void join_scheduler(void);
-
 
   void add_job(fiber *);
+
+  void run_loop(void);
 
 
   // a job is a representation of a fiber's state as
@@ -106,6 +106,7 @@ namespace cedar {
     std::mutex job_mutex;
 
    public:
+    std::thread::id thread;
     uv_loop_t *loop;
     bool schedule(void);
 

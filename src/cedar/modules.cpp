@@ -22,18 +22,18 @@
  * SOFTWARE.
  */
 
+#include <apathy.h>
 #include <cedar/modules.h>
-#include <cedar/parser.h>
-#include <cedar/vm/compiler.h>
 #include <cedar/object/lambda.h>
 #include <cedar/object/module.h>
 #include <cedar/object/string.h>
 #include <cedar/object/symbol.h>
-#include <unordered_map>
-#include <mutex>
+#include <cedar/parser.h>
+#include <cedar/vm/compiler.h>
 #include <stdio.h>
-#include <apathy.h>
 #include <cedar/util.hpp>
+#include <mutex>
+#include <unordered_map>
 
 using namespace cedar;
 
@@ -43,8 +43,11 @@ static std::vector<std::string> get_path(void) {
     // return the default path
     std::vector<std::string> path;
     path.push_back(".");
+    path.push_back("./core");
     path.push_back("/usr/local/lib/cedar");
+    path.push_back("/usr/local/lib/cedar/core");
     path.push_back(apathy::Path("~/.local/lib/cedar").absolute().string());
+    path.push_back(apathy::Path("~/.local/lib/cedar/core").absolute().string());
     return path;
   }
 
@@ -54,7 +57,7 @@ static std::vector<std::string> get_path(void) {
 
 
 static std::mutex mod_mutex;
-static std::unordered_map<std::string, module*> modules;
+static std::unordered_map<std::string, module *> modules;
 
 
 
@@ -117,22 +120,30 @@ void cedar::define_builtin_module(std::string name, module *mod) {
 
 
 
+
 ref cedar::eval_string_in_module(cedar::runes src, module *mod) {
   reader reader;
   reader.lex_source(src);
 
-  vm::compiler c;
   bool valid = true;
 
   ref val;
   while (true) {
     ref obj = reader.read_one(&valid);
     if (!valid) break;
-    ref compiled_lambda = c.compile(obj, nullptr);
-    lambda *raw_program = ref_cast<cedar::lambda>(compiled_lambda);
-    raw_program->mod = mod;
-    val = eval_lambda(raw_program);
+    val = eval(obj, mod);
   }
 
   return val;
+}
+
+
+ref cedar::eval(ref obj, module *mod) {
+  vm::compiler c;
+  ref compiled_lambda = c.compile(obj, mod);
+  lambda *raw_program = ref_cast<cedar::lambda>(compiled_lambda);
+  raw_program->mod = mod;
+
+  ref v = eval_lambda(raw_program);
+  return v;
 }

@@ -11,9 +11,11 @@ link_directories(/usr/local/lib)
 include_directories(/usr/local/include)
 
 
-add_subdirectory(${CMAKE_SOURCE_DIR}/dep/libuv)
 
 set (CMAKE_CXX_STANDARD 17)
+
+
+add_subdirectory(${CMAKE_SOURCE_DIR}/dep/libuv)
 
 
 set(CMAKE_CXX_FLAGS_DEBUG "-g -O0 -DBUILD_MODE=Debug")
@@ -31,15 +33,16 @@ add_compile_options(-frtti)
 include_directories(${CMAKE_SOURCE_DIR}/include)
 
 include(${CMAKE_SOURCE_DIR}/src/cedar/CMakeLists.txt)
-target_compile_options(cedar-lib PRIVATE -g -Wall -Wextra -Wno-unused-parameter -Wno-strict-aliasing)
+# target_compile_options(cedar-lib PRIVATE -g -Wall -Wextra -Wno-unused-parameter -Wno-strict-aliasing)
+# target_compile_options(cedar-lib_a PRIVATE -g -Wall -Wextra -Wno-unused-parameter -Wno-strict-aliasing)
 
-add_executable(cedar-bin src/main.cpp)
+# add_executable(cedar-bin src/main.cpp)
 
-target_link_libraries(cedar-bin cedar-lib uv_a ${CMAKE_DL_LIBS} -pthread)
-set_target_properties(cedar-bin PROPERTIES OUTPUT_NAME cedar)
+# target_link_libraries(cedar-bin cedar-lib_a uv_a ${CMAKE_DL_LIBS} -pthread)
+# set_target_properties(cedar-bin PROPERTIES OUTPUT_NAME cedar)
 
-target_compile_options(cedar-bin PRIVATE -Wall -Wextra -Wno-unused-parameter -Wno-strict-aliasing)
+target_compile_options(cedar PRIVATE -Wall -Wextra -Wno-unused-parameter -Wno-strict-aliasing)
 
 
-install(TARGETS cedar-bin DESTINATION bin CONFIGURATIONS Release)
-install(TARGETS cedar-lib DESTINATION lib CONFIGURATIONS Release)
+install(TARGETS cedar DESTINATION bin CONFIGURATIONS Release)
+#install(TARGETS cedar-lib DESTINATION lib CONFIGURATIONS Release)

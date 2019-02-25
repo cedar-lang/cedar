@@ -145,14 +145,28 @@ fiber::fiber(lambda *entry) {
 }
 
 
-fiber::~fiber(void) {
-  /*
-  for (frame *f = call_stack; f != nullptr;) {
-    frame *c = f;
-    dispose_frame(f);
-    f = c->caller;
+fiber::~fiber(void) {}
+
+
+
+void fiber::print_callstack(void) {
+  static int name_id = get_symbol_intern_id("*name*");
+  printf("Fiber #%d\n", fid);
+  int i = 0;
+  for (frame *f = call_stack; f != nullptr; f = f->caller) {
+    if (i == 0) {
+      printf("* ");
+    } else {
+      printf("  ");
+    }
+    printf("frame #%d: ", i++);
+    std::cout << ref(f->code);
+
+    std::cout << " in ";
+    ref mod_name = f->code->mod->getattr_fast(name_id);
+    std::cout << mod_name;
+    printf("\n");
   }
-  */
 }
 
 
@@ -258,6 +272,10 @@ loop:
 
   op = *IP();
   IP()++;
+  /*
+  print_callstack();
+  printf("\n");
+  */
 
   goto *threaded_labels[op];
 
@@ -518,16 +536,11 @@ loop:
     frame *old_frame = pop_call_frame();
     dispose_frame(old_frame);
 
-    /*
-    for (frame *f = call_stack; f != nullptr; f = f->caller) {
-      printf("%p -> ", f);
-    }
-    printf("\n");
-    */
-
     if (call_stack == nullptr) {
       state->value = val;
       state->done = true;
+      done = true;
+      return_value = val;
       return;
     }
 
