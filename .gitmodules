@@ -1,3 +1,7 @@
 [submodule "dep/bdwgc"]
 	path = dep/bdwgc
 	url = https://github.com/ivmai/bdwgc
+
+[submodule "dep/libuv"]
+	path = dep/libuv
+	url = https://github.com/libuv/libuv
