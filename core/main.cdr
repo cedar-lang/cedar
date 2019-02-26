@@ -354,10 +354,11 @@
 (defmacro inc (n) (list '+ n 1))
 (defmacro dec (n) (list '- n 1))
 
+(def bits (require "bits"))
 
 (def (even? x)
   (if (number? x)
-    (= 0 (bit-and x 0x01))
+    (= 0 (bits.and x 0x01))
     (throw "even? needs a number")))
 
 (def (odd? x)
@@ -432,8 +433,8 @@
 
 (defmacro quasiquote (form)
     (qq/transform-quasiquote-arg form))
-;;;;;;;;;;;;;;;;;;;;;;;;;; QUASIQUOTE IS VALID NOW ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;;;;;;;;;;;;;;;;;;;;;;;;;; QUASIQUOTE IS VALID NOW ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defmacro first (x)
   `(. ~x (first)))
@@ -514,21 +515,38 @@
 
 
 
-
+;; fire off a fiber and don't return anything
+;; TODO: decide if this should return the fiber or not
 (defmacro go (& body)
   `(go* (fn nil (do ~@body))))
 
 
 
+(def importutil (require "importutil"))
 
+;; expand a single import option
+(def (import-opt-expand-1 mod-name arg val)
+  (cond (or (= arg 'for) (= arg :for))
+        (cond (= (type val) Vector) (cons 'do (map (fn (n)
+                                                     `(def ~n (. ~mod-name ~n)))
+                                                 val))
+              ;; handle merge
+              (= val '*) `(do (importutil.merge-here ~mod-name))
+              ;; when importing a single thing from the module, have it act
+              ;; as if you are importing a vector of that thing instead.
+              ;; so...
+              ;;     (import foo for bar) -> (import foo for [bar])
+              (= (type val) Symbol) (import-opt-expand-1 mod-name arg [val])
+              :else (throw (str "Unknown import argument on 'for': " val)))
+        :else (throw (str "Unknown import argument " arg))))
+
+;; expand import options as if they were a dict
 (def (import-opt-expand name opts)
-  (when opts
-    (let [opt (first opts)
-          t (type (first opts))]
-      (cons (cond (= Vector t) (cons 'do (map (fn (x) `(def ~x (. ~name ~x)))
-                                           opt))
-                  true 1)
-            (import-opt-expand name (rest opts))))))
+  (let [table (map (fn (o) (apply vector o)) (partition 2 opts))]
+    (map (fn (a) (import-opt-expand-1 name (0 a) (1 a)))
+        table)))
+
+
 
 (defmacro import (name & opts)
   `(do (def ~name (require ~(str name)))
@@ -908,9 +926,7 @@
 
 
 (deftype chan
-  (def has-value false)
   (def (new self)
-    (. self has-value := false)
     (. self value := nil)
     (. self _mut := (Mutex)))
 
@@ -927,29 +943,8 @@
     ;; wait until there is an item in the channel
     (wait-until (locked? self._mut))
     (let [value self.value]
-      (. self has-value := false)
       (unlock! self._mut)
       (return value))))
 
 
 
-
-
-(def native/c++ "c++")
-(def native/so-ext ".so")
-
-(def (native/compile & args)
-  (let [opts (apply dict args)
-        name (:name opts)
-        files (:files opts)
-        extra-args (or (:args opts) [])]
-    (os/shell (str native/c++
-                  " -o " (str name native/so-ext)
-                  " -lcedar "
-                  " -shared -I/usr/local/include "
-                  (if (not (= 0 (len extra-args)))
-                    (join extra-args " ")
-                    "")
-                  " -fPIC -frtti -std=c++17 "
-                  " -Wall -Wextra -fpic -O3 "
-                  (join files " ")))))

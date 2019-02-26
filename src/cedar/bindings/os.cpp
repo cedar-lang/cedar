@@ -28,6 +28,7 @@
 #include <cedar/object/string.h>
 #include <cedar/object/vector.h>
 #include <cedar/object/module.h>
+#include <cedar/object/fiber.h>
 #include <cedar/modules.h>
 #include <cedar/objtype.h>
 #include <cedar/vm/binding.h>
@@ -194,6 +195,22 @@ static cedar_binding(os_getenv) {
   return nullptr;
 }
 
+
+static ref os_panic(int argc, ref *argv, call_context *ctx) {
+  if (argc != 1) throw cedar::make_exception("os.panic requires 1 argument");
+
+  auto *f = ctx->coro;
+
+
+  std::cout << "panic: " << argv[0].to_string(true) << std::endl;
+  std::cout << "\n";
+  f->print_callstack();
+  std::cout << "\n";
+  exit(-1);
+
+  return nullptr;
+}
+
 void bind_os(void) {
   module *mod = new module("os");
 
@@ -209,6 +226,7 @@ void bind_os(void) {
   mod->def("getpid", os_getpid);
   mod->def("getppid", os_getppid);
   mod->def("getenv", os_getenv);
+  mod->def("panic", os_panic);
 
   define_builtin_module("os", mod);
 }

@@ -123,7 +123,7 @@ int main(int argc, char **argv) {
     }
 
 
-    module *repl_mod = new module("*repl*");
+    module *repl_mod = new module("user");
 
     // there are also args, so make that vector...
     ref args = new cedar::vector();
@@ -152,7 +152,6 @@ int main(int argc, char **argv) {
 
 
 
-
     // run the async event loop now
     // run_loop();
 
@@ -165,7 +164,8 @@ int main(int argc, char **argv) {
     struct rusage usage;
 
     if (interactive) {
-      repl_mod->def("*file*", cedar::new_obj<cedar::string>(apathy::Path::cwd().string()));
+      repl_mod->def("*file*", cedar::new_obj<cedar::string>(
+                                  apathy::Path::cwd().string()));
       cedar::reader repl_reader;
       while (interactive) {
         std::string ps1;
@@ -177,7 +177,12 @@ int main(int argc, char **argv) {
           stream << std::fixed << std::setprecision(2) << used_mb;
           ps1 += stream.str();
           ps1 += " MiB used";
+        } else {
+          std::string mod =
+              repl_mod->getattr(new symbol("*name*")).to_string(true);
+          ps1 += mod;
         }
+
 
         ps1 += "> ";
         char *buf = linenoise(ps1.data());
@@ -220,7 +225,9 @@ int main(int argc, char **argv) {
 
 
 // print out the usage
-static void usage(void) { printf("usage: cedar [-ih] [-e expression] [files] [args...]\n"); }
+static void usage(void) {
+  printf("usage: cedar [-ih] [-e expression] [files] [args...]\n");
+}
 
 
 

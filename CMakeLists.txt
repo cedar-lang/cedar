@@ -2,6 +2,10 @@
 cmake_minimum_required(VERSION 3.5 FATAL_ERROR)
 project(cedar C CXX)
 
+# build dependencies before setting up project deets
+add_subdirectory(${CMAKE_SOURCE_DIR}/dep/libuv)
+# add_subdirectory(${CMAKE_SOURCE_DIR}/dep/bdwgc)
+
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
 endif()
@@ -9,13 +13,14 @@ endif()
 
 link_directories(/usr/local/lib)
 include_directories(/usr/local/include)
+include_directories(dep/bdwgc/include)
+include_directories(dep/libuv/include)
 
 
 
 set (CMAKE_CXX_STANDARD 17)
 
 
-add_subdirectory(${CMAKE_SOURCE_DIR}/dep/libuv)
 
 
 set(CMAKE_CXX_FLAGS_DEBUG "-g -O0 -DBUILD_MODE=Debug")
@@ -45,4 +50,4 @@ target_compile_options(cedar PRIVATE -Wall -Wextra -Wno-unused-parameter -Wno-st
 
 
 install(TARGETS cedar DESTINATION bin CONFIGURATIONS Release)
-#install(TARGETS cedar-lib DESTINATION lib CONFIGURATIONS Release)
+install(TARGETS cedar-lib DESTINATION lib CONFIGURATIONS Release)

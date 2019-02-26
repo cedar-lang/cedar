@@ -153,7 +153,7 @@ bool scheduler::schedule(void) {
     run_context ctx;
 
     // run the job for 2 ms
-    job->task->run(this, &ctx, -1);
+    job->task->run(this, &ctx, 2);
     job->last_ran = time_ms();
 
 
@@ -172,19 +172,14 @@ bool scheduler::schedule(void) {
   return true;
 }
 
-int scheduler::run(void) {
-  while (schedule()) {
-  }
-  return jobc;
-}
-
-
-int scheduler::run(u64 ms) {
-  u64 start = time_ms();
-  while (time_ms() - start <= ms) {
-    if (!schedule()) break;
-  }
-  return jobc;
+/**
+ * tick the scheduler once, meaning schedule a fiber then run the UV loop
+ * once
+ */
+bool scheduler::tick(void) {
+  schedule();
+  uv_run(loop, UV_RUN_ONCE);
+  return true;
 }
 
 
@@ -213,9 +208,6 @@ std::thread scheduler_thread;
 void event_idle_schedule(uv_idle_t *handle) {
   auto *sched = (scheduler *)handle->data;
   sched->schedule();
-  if (false) {
-    uv_idle_stop(handle);
-  }
 }
 
 namespace cedar {
@@ -237,10 +229,9 @@ void cedar::init(void) {
     max_procs = std::stol(CDRMAXPROCS);
   }
 
+
   scheduler_thread = std::thread([](void) {
     register_thread();
-
-
     // create the scheduler's libuv loop
     primary_scheduler.loop = new uv_loop_t();
     primary_scheduler.thread = std::this_thread::get_id();
@@ -254,19 +245,24 @@ void cedar::init(void) {
     // in order to schedule fibers in the libuv idle time.
     idler = new uv_idle_t();
     idler->data = &primary_scheduler;
-    // add the idler to the scheduler's event loop
-    uv_idle_init(primary_scheduler.loop, idler);
-    // start the idle scheduler
-    uv_idle_start(idler, event_idle_schedule);
+
+    while (true) {
+      bool has_jobs = primary_scheduler.tick();
+      if (!has_jobs) break;
+    }
+
 
     uv_loop_close(primary_scheduler.loop);
-
-    uv_run(primary_scheduler.loop, UV_RUN_DEFAULT);
+    // uv_run(primary_scheduler.loop, UV_RUN_DEFAULT);
 
     delete primary_scheduler.loop;
+    deregister_thread();
   });
 
+
+
   core_mod = require("core");
+  scheduler_thread.detach();
 }
 
 
@@ -295,39 +291,30 @@ void cedar::add_job(fiber *f) {
  * such a call
  */
 ref cedar::eval_lambda(lambda *fn) {
+  fiber f(fn);
 
-  return fiber(fn).run();
-
-
-  fiber *f = new fiber(fn);
-  f->done = false;
-
-  return f->run();
-
-  add_job(f);
-
-
+  return f.run();
+  f.done = false;
+  add_job(&f);
 
   std::thread::id cur_thread = std::this_thread::get_id();
 
   /* we're only allowed to run if we're on the thread of
    * the event loop. Otherwise we have to just sit and wait */
   bool allowed_to_run = cur_thread == primary_scheduler.thread;
-  /* Grab a local reference to the loop */
-  auto *loop = primary_scheduler.loop;
 
   /* Run the event loop until the fiber is done and has returned */
-  while (!f->done) {
+  while (!f.done) {
     if (allowed_to_run) {
-      uv_run(loop, UV_RUN_ONCE);
+      primary_scheduler.tick();
     } else {
       /* this is the sitting and waiting mentioned above */
-      usleep(200);
+      usleep(20);
     }
   }
 
   /* and then return the temporary fiber's value */
-  return f->return_value;
+  return f.return_value;
 }
 
 

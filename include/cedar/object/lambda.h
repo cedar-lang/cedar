@@ -77,6 +77,7 @@ namespace cedar {
 
     module *mod = nullptr;
     ref name;
+    ref self;
 
     i32 arg_index = 0;
     i32 argc = 0;

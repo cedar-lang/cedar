@@ -86,21 +86,35 @@ ref object::getattr_fast(int i) {
     return b->val;
   }
 
+  ref val = nullptr;
+
   if (m_type != nullptr) {
-    ref val = nullptr;
+    val = nullptr;
     if (auto *b = m_type->m_fields.buck(i); b != nullptr) {
-      return b->val;
+      val = b->val;
+      goto FOUND;
     }
     for (auto *t : m_type->m_parents) {
       if (auto *b = t->m_fields.buck(i); b != nullptr) {
-        return b->val;
+        val = b->val;
+        goto FOUND;
       }
     }
 
-    return object_type->get_field_fast(i);
+    val = object_type->get_field_fast(i);
+    goto FOUND;
   }
 
   throw cedar::make_exception("attribute '", get_symbol_id_runes(i), "' on object not found");
+
+FOUND:
+
+  if (val.get_type() == lambda_type) {
+    lambda *fn = ref_cast<lambda>(val)->copy();
+    fn->self = this;
+    return fn;
+  }
+  return val;
 }
 
 attr_map::bucket *object::getattrbucket(int i) {

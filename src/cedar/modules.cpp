@@ -110,7 +110,7 @@ module *cedar::require(std::string name) {
       return require_file(f);
     }
   }
-  return nullptr;
+  throw cedar::make_exception("unable to find module, '", name, "' in path");
 }
 
 // simple function to allow modules to be added externally

@@ -99,11 +99,13 @@ token lexer::lex() {
     return buf;
   };
 
-  if (c == ';') {
+  if (c == ';' || c == '#') {
+    if (c == '#' && peek() != '!') goto skip_comment;
     while (peek() != '\n' && (int32_t)peek() != -1) next();
 
     return lex();
   }
+skip_comment:
 
   // skip over spaces by calling again
   if (isspace(c) || c == ',') return lex();

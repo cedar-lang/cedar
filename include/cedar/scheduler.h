@@ -102,10 +102,12 @@ namespace cedar {
     int jobc = 0;
     job *jobs = nullptr;
 
+
     std::queue<job *> work;
     std::mutex job_mutex;
 
    public:
+    bool ready = false;
     std::thread::id thread;
     uv_loop_t *loop;
     bool schedule(void);
@@ -123,11 +125,10 @@ namespace cedar {
 
     void set_state(run_state);
 
-    // run is an infinite loop that sits and schedules
-    // jobs (fibers) in a queue and return the number of jobs
-    int run(void);
-    // run the scheduler for a max number of milliseconds
-    int run(u64);
+
+
+    // tick the scheduler and return if the scheduler still has jobs
+    bool tick(void);
   };
 
 

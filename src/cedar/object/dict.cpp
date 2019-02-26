@@ -29,6 +29,7 @@
 #include <cedar/object/dict.h>
 #include <cedar/object/list.h>
 #include <cedar/object/symbol.h>
+#include <cedar/object/vector.h>
 #include <cedar/ref.h>
 #include <cedar/util.hpp>
 #include <cedar/objtype.h>
@@ -171,7 +172,8 @@ ref dict::keys(void) {
   ref l = nullptr;
   for (bucket *b : m_buckets) {
     while (b != nullptr) {
-      l = new list(new list(b->key, b->val), l);
+      auto v = new vector({b->key, b->val});
+      l = new list(v, l);
       b = b->next;
     }
   }

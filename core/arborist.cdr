@@ -1,17 +1,18 @@
-;; Arborist is a basic testing and assertion library for cedar in the cedar
-;; standard library. It's very simple and allows for assertions at the very
-;; least.
-;; TODO: Add things like...
-;;       'okay': check if the arg is truthy
-;;       'fail': always fail
-;;       'pass': always pass
-;;
-
 (import os)
 
-(defn assert (x)
-  (if x
-    ;; x is truthy, return x))
-    (return x)
-    ;; otherwise, we need to panic and print out that the assertion failed
-    (println "Assertion Failed")))
+(def c++ "c++")
+(def so ".so")
+
+(def (compile name files & args)
+  (let [opts (apply dict args)
+        extra-args (or (:args opts) [])]
+    (os.shell (str c++
+                  " -o " (str name so)
+                  " -lcedar -lgc "
+                  " -shared -I/usr/local/include "
+                  (if (not (= 0 (len extra-args)))
+                    (join extra-args " ")
+                    "")
+                  " -fPIC -frtti -std=c++17 "
+                  " -Wall -Wextra -fpic -O3 "
+                  (join files " ")))))

@@ -4,6 +4,7 @@
 
 #define GC_THREADS
 #include <gc/gc.h>
+#include <gc/gc_inline.h>
 
 
 extern "C" void GC_allow_register_threads();

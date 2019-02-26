@@ -27,23 +27,21 @@
 // dlopen and dlsym binding defined in src/main.cpp
 
 #include <cedar.h>
+#include <cedar/globals.h>
+#include <cedar/modules.h>
 #include <cedar/object/bytes.h>
 #include <cedar/thread.h>
 #include <cedar/vm/binding.h>
-#include <cedar/globals.h>
-#include <curl/curl.h>
 #include <fcntl.h>
 #include <math.h>
 #include <stdio.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
-#include <thread>
-#include <cedar/modules.h>
 #include <regex>
+#include <thread>
 
 #include <gc/gc.h>
-
 
 
 
@@ -53,8 +51,10 @@ using namespace cedar;
 
 ref true_value = nullptr;
 
-#define ERROR_IF_ARGS_PASSED_IS(name, op, c) \
-  if (argc op c) throw cedar::make_exception("(" #name " ...) requires ", c, " arg", (c == 1 ? "" : "s"), "given ", argc);
+#define ERROR_IF_ARGS_PASSED_IS(name, op, c)                            \
+  if (argc op c)                                                        \
+    throw cedar::make_exception("(" #name " ...) requires ", c, " arg", \
+                                (c == 1 ? "" : "s"), "given ", argc);
 
 cedar_binding(cedar_hash) {
   ERROR_IF_ARGS_PASSED_IS("cedar/hash", !=, 1);
@@ -68,7 +68,9 @@ cedar_binding(cedar_id) {
 
 cedar_binding(cedar_is) {
   ERROR_IF_ARGS_PASSED_IS("is", !=, 2);
-  if (argv[0].is_obj() && argv[1].is_obj()) return argv[0].reinterpret<u64>() == argv[0].reinterpret<u64>() ? true_value : nullptr;
+  if (argv[0].is_obj() && argv[1].is_obj())
+    return argv[0].reinterpret<u64>() == argv[0].reinterpret<u64>() ? true_value
+                                                                    : nullptr;
   return argv[0] == argv[0] ? true_value : nullptr;
 }
 
@@ -85,11 +87,9 @@ cedar_binding(cedar_sub) {
   if (argc == 1) {
     return ref{-1} * argv[0];
   }
-
   if (argc == 0) {
     return 0;
   }
-
   ref acc = argv[0];
   for (int i = 1; i < argc; i++) {
     acc = acc - argv[i];
@@ -134,7 +134,8 @@ cedar_binding(cedar_pow) {
   auto b = argv[1];
 
   if (a.get_type() != number_type || b.get_type() != number_type) {
-    throw cedar::make_exception("** (pow) requires two numbers, given ", a, " and ", b);
+    throw cedar::make_exception("** (pow) requires two numbers, given ", a,
+                                " and ", b);
   }
   return pow(a.to_float(), b.to_float());
 }
@@ -142,7 +143,9 @@ cedar_binding(cedar_pow) {
 
 cedar_binding(cedar_equal) {
   static ref fls = new symbol("false");
-  if (argc < 2) throw cedar::make_exception("(= ...) requires at least two arguments, given ", argc);
+  if (argc < 2)
+    throw cedar::make_exception(
+        "(= ...) requires at least two arguments, given ", argc);
   ref first = argv[0];
   for (int i = 1; i < argc; i++) {
     if (argv[i] != first) return fls;
@@ -173,7 +176,9 @@ cedar_binding(cedar_println) {
 
 
 cedar_binding(cedar_cons) {
-  if (argc != 2) throw cedar::make_exception("(cons ...) requires two argument, given ", argc);
+  if (argc != 2)
+    throw cedar::make_exception("(cons ...) requires two argument, given ",
+                                argc);
 
   return new list(argv[0], argv[1]);
 }
@@ -193,7 +198,9 @@ cedar_binding(cedar_newlist) {
 }
 
 cedar_binding(cedar_newdict) {
-  if ((argc & 1) == 1) throw cedar::make_exception("(dict ...) requires an even number of arguments, given ", argc);
+  if ((argc & 1) == 1)
+    throw cedar::make_exception(
+        "(dict ...) requires an even number of arguments, given ", argc);
 
   ref d = cedar::new_obj<cedar::dict>();
   for (int i = 0; i < argc; i += 2) {
@@ -203,7 +210,10 @@ cedar_binding(cedar_newdict) {
 }
 
 cedar_binding(cedar_get) {
-  if (argc < 2) throw cedar::make_exception("(get coll field [default]) requires two or three arguments, given ", argc);
+  if (argc < 2)
+    throw cedar::make_exception(
+        "(get coll field [default]) requires two or three arguments, given ",
+        argc);
   ref d = argv[0];
   ref k = argv[1];
   try {
@@ -215,14 +225,18 @@ cedar_binding(cedar_get) {
 }
 
 cedar_binding(cedar_set) {
-  if (argc != 3) throw cedar::make_exception("(set ...) requires two arguments, given ", argc);
+  if (argc != 3)
+    throw cedar::make_exception("(set ...) requires two arguments, given ",
+                                argc);
   // set the 0th argument's dict entry at the 1st argument to the second
   // argument
   return idx_set(argv[0], argv[1], argv[2]);
 }
 
 cedar_binding(cedar_dict_keys) {
-  if (argc != 1) throw cedar::make_exception("(keys ...) requires one argument, given ", argc);
+  if (argc != 1)
+    throw cedar::make_exception("(keys ...) requires one argument, given ",
+                                argc);
   ref d = argv[0];
   if (auto *dp = ref_cast<dict>(d); dp != nullptr) {
     return dp->keys();
@@ -231,21 +245,13 @@ cedar_binding(cedar_dict_keys) {
 }
 
 cedar_binding(cedar_size) {
-  if (argc != 1) throw cedar::make_exception("(size ...) requires one arguments, given ", argc);
+  if (argc != 1)
+    throw cedar::make_exception("(size ...) requires one arguments, given ",
+                                argc);
   return idx_size(argv[0]);
 }
 
 
-cedar_binding(cedar_newbytes) {
-  immer::flex_vector<unsigned char> buf;
-
-  for (int i = 0; i < argc; i++) {
-    if (!argv[i].is_int()) throw cedar::make_exception("(bytes ...) requires a series of integers only");
-    buf = buf.push_back(argv[i].to_int());
-  }
-  auto *b = new bytes(buf);
-  return b;
-}
 
 cedar_binding(cedar_objcount) { return cedar::object_count; }
 
@@ -265,12 +271,45 @@ cedar_binding(cedar_os_open) {
   ref path = argv[0];
   ref opts = argv[1];
   if (!path.is<string>() || !opts.is<number>()) {
-    throw cedar::make_exception("os-open requires types (os-open :string :number)");
+    throw cedar::make_exception(
+        "os-open requires types (os-open :string :number)");
   }
   int flags = opts.to_int();
   std::string path_s = path.to_string(true);
   return (i64)open(path_s.c_str(), flags, 0666);
 }
+
+
+static ref obj_dir(int argc, ref *argv, call_context *ctx) {
+  if (argc != 1) {
+    throw cedar::make_exception("importutil.merge-here requires 1 argument");
+  }
+
+  object *from = ref_cast<object>(argv[0]);
+
+  if (from == nullptr) {
+    return new vector();
+  }
+
+  ref v = new vector();
+
+  // TODO please implement an iterator for attr_map... is
+  //      an awful hack for what needs to be done here...
+  for (int i = 0; i < 8; i++) {
+    attr_map::bucket *b;
+    for (b = from->m_attrs.m_buckets[i]; b != nullptr; b = b->next) {
+
+      symbol *s = new symbol();
+      s->id = b->key;
+      v = self_call(v, "put", s);
+      // from->setattr_fast(b->key, b->val);
+    }
+  }
+
+  return v;
+}
+
+
 
 cedar_binding(cedar_os_write) {
   ERROR_IF_ARGS_PASSED_IS("os-write", !=, 2);
@@ -304,61 +343,26 @@ cedar_binding(cedar_os_chmod) {
   return (i64)fchmod(argv[0].to_int(), argv[1].to_int());
 }
 
-cedar_binding(cedar_binary_or) {
-  ERROR_IF_ARGS_PASSED_IS("bit-or", <, 2);
-  i64 res = argv[0].to_int();
-  for (int i = 1; i < argc; i++) res |= argv[i].to_int();
-  return res;
-}
 
-cedar_binding(cedar_binary_and) {
-  ERROR_IF_ARGS_PASSED_IS("bit-and", <, 2);
-  i64 res = argv[0].to_int();
-  for (int i = 1; i < argc; i++) res &= argv[i].to_int();
-  return res;
-}
-
-cedar_binding(cedar_binary_xor) {
-  ERROR_IF_ARGS_PASSED_IS("bit-xor", !=, 2);
-  i64 res = argv[0].to_int() & argv[1].to_int();
-  return res;
-}
-
-cedar_binding(cedar_binary_shift_left) {
-  ERROR_IF_ARGS_PASSED_IS("bit-shift-left", !=, 2);
-  i64 res = argv[0].to_int() << argv[1].to_int();
-  return res;
-}
-
-cedar_binding(cedar_binary_shift_right) {
-  ERROR_IF_ARGS_PASSED_IS("bit-shift-right", !=, 2);
-  i64 res = argv[0].to_int() >> argv[1].to_int();
-  return res;
-}
-
-
-cedar_binding(cedar_binary_shift_right_logic) {
-  ERROR_IF_ARGS_PASSED_IS("bit-shift-right-logic", !=, 2);
-  i64 res = ((u64)argv[0].to_int()) >> (u64)argv[1].to_int();
-  return res;
-}
 
 cedar_binding(cedar_newvector) {
-  ref v = new_obj<vector>();
-  for (int i = 0; i < argc; i++) v = idx_append(v, argv[i]);
-  return v;
+  immer::flex_vector<ref> vec;
+  for (int i = 0; i < argc; i++) vec = vec.push_back(argv[i]);
+  return new vector(vec);
 }
 
 cedar_binding(cedar_keyword) {
   ERROR_IF_ARGS_PASSED_IS("cedar/keyword", !=, 1);
-  if (!argv[0].is<string>()) throw cedar::make_exception("cedar/keyword requires a :string");
+  if (!argv[0].is<string>())
+    throw cedar::make_exception("cedar/keyword requires a :string");
   cedar::runes s = ":";
   s += argv[0].to_string(true);
   return new_obj<keyword>(s);
 }
 cedar_binding(cedar_symbol) {
   ERROR_IF_ARGS_PASSED_IS("cedar/symbol", !=, 1);
-  if (!argv[0].is<string>()) throw cedar::make_exception("cedar/symbol requires a :string");
+  if (!argv[0].is<string>())
+    throw cedar::make_exception("cedar/symbol requires a :string");
   cedar::runes s = argv[0].to_string(true);
   return new_obj<symbol>(s);
 }
@@ -425,7 +429,8 @@ cedar_binding(cedar_apply) {
     fnc->prime_args(i, args.data());
     return eval_lambda(fnc);
   } else {
-    throw cedar::make_exception("(apply ...) to '", f, "' failed because it's not a function");
+    throw cedar::make_exception("(apply ...) to '", f,
+                                "' failed because it's not a function");
   }
 }
 
@@ -433,16 +438,6 @@ cedar_binding(cedar_rand) {
   double r = static_cast<double>(rand()) / static_cast<double>(RAND_MAX);
   return r;
 }
-
-cedar_binding(cedar_is_seq) {
-  ERROR_IF_ARGS_PASSED_IS("seq?", !=, 1);
-  return ref_cast<sequence>(argv[0]) == nullptr ? nullptr : true_value;
-}
-cedar_binding(cedar_seq) {
-  ERROR_IF_ARGS_PASSED_IS("seq", !=, 1);
-  return ref_cast<sequence>(argv[0]);
-}
-
 
 cedar_binding(cedar_catch) {
   ERROR_IF_ARGS_PASSED_IS("catch", !=, 2);
@@ -514,49 +509,6 @@ size_t write_data(void *ptr, size_t size, size_t nmemb, struct url_data *data) {
   return size * nmemb;
 }
 
-char *handle_url(const char *url) {
-  CURL *curl;
-
-  struct url_data data;
-  data.size = 0;
-  data.data = (char *)malloc(4096); /* reasonable size initial buffer */
-  if (NULL == data.data) {
-    fprintf(stderr, "Failed to allocate memory.\n");
-    return NULL;
-  }
-
-  data.data[0] = '\0';
-
-  CURLcode res;
-
-  curl = curl_easy_init();
-  if (curl) {
-    curl_easy_setopt(curl, CURLOPT_URL, url);
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_data);
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &data);
-    res = curl_easy_perform(curl);
-    if (res != CURLE_OK) {
-      fprintf(stderr, "curl_easy_perform() failed: %s\n", curl_easy_strerror(res));
-    }
-
-    curl_easy_cleanup(curl);
-  }
-  return data.data;
-}
-
-
-cedar_binding(cedar_curl) {
-  ERROR_IF_ARGS_PASSED_IS("curl", !=, 1);
-  ref p = argv[0];
-  if (p.get_type() != string_type) {
-    throw cedar::make_exception("curl requires string path");
-  }
-
-  std::string path = p.to_string(true);
-  cedar::runes content = handle_url(path.c_str());
-
-  return new string(content);
-};
 
 
 type *reader_type;
@@ -564,7 +516,9 @@ type *reader_type;
 
 
 
-std::vector<cedar::runes> regex_matches(std::string r, std::string s, std::regex_constants::syntax_option_type opts) {
+std::vector<cedar::runes> regex_matches(
+    std::string r, std::string s,
+    std::regex_constants::syntax_option_type opts) {
   std::vector<cedar::runes> v;
 
   std::regex rgx(r, std::regex_constants::ECMAScript | opts);
@@ -586,12 +540,7 @@ std::vector<cedar::runes> regex_matches(std::string r, std::string s, std::regex
 
 
 void init_binding(cedar::vm::machine *m) {
-
   true_value = new symbol("true");
-  // initialize threads
-
-  // init_thread_type(m);
-  // init_mutex_type(m);
 
   def_global("list", cedar_newlist);
   def_global("dict", cedar_newdict);
@@ -617,32 +566,21 @@ void init_binding(cedar::vm::machine *m) {
   def_global("<=", cedar_lte);
   def_global(">", cedar_gt);
   def_global(">=", cedar_gte);
-  def_global("bit-or", cedar_binary_or);
-  def_global("bit-and", cedar_binary_and);
-  def_global("bit-xor", cedar_binary_xor);
-  def_global("bit-shift-left", cedar_binary_shift_left);
-  def_global("bit-shift-right", cedar_binary_shift_right);
-  def_global("bit-shift-right-logic", cedar_binary_shift_right_logic);
   def_global("os-open", cedar_os_open);
   def_global("os-write", cedar_os_write);
   def_global("os-read", cedar_os_read);
   def_global("os-close", cedar_os_close);
   def_global("os-chmod", cedar_os_chmod);
   def_global("cedar/keyword", cedar_keyword);
-  def_global("cedar/objcount", cedar_objcount);
   def_global("read-string", cedar_readstring);
   def_global("read", cedar_read);
   def_global("cedar/symbol", cedar_symbol);
   def_global("str", cedar_str);
   def_global("throw", cedar_throw);
   def_global("apply", cedar_apply);
-  def_global("seq", cedar_seq);
-  def_global("seq?", cedar_is_seq);
-  def_global("bytes", cedar_newbytes);
   def_global("cedar/rand", cedar_rand);
   def_global("catch*", cedar_catch);
-  def_global("curl", cedar_curl);
-
+  def_global("dir", obj_dir);
 
 
 
@@ -660,10 +598,13 @@ void init_binding(cedar::vm::machine *m) {
   });
 
 
-  def_global("ex/type", bind_lambda(argc, argv, machine) { return argv[0]->m_type; });
+  def_global("ex/type",
+             bind_lambda(argc, argv, machine) { return argv[0]->m_type; });
 
 
-  def_global("getattr*", bind_lambda(argc, argv, machine) { return argv[0].getattr(argv[1]); });
+  def_global("getattr*", bind_lambda(argc, argv, machine) {
+    return argv[0].getattr(argv[1]);
+  });
   def_global("setattr*", bind_lambda(argc, argv, machine) {
     argv[0].setattr(argv[1], argv[2]);
     return argv[2];
@@ -704,16 +645,14 @@ void init_binding(cedar::vm::machine *m) {
     }
     ref b = argv[1];
     if (b.get_type() != string_type) {
-      throw cedar::make_exception("resolve-source-file requires string base hint");
+      throw cedar::make_exception(
+          "resolve-source-file requires string base hint");
     }
     cedar::runes path_hint = p.as<string>()->get_content();
     apathy::Path base = b.as<string>()->get_content();
-
-
     if (base.is_file()) {
       base = base.up();
     }
-
     return new string(path_resolve(path_hint, base));
   });
 
@@ -724,41 +663,28 @@ void init_binding(cedar::vm::machine *m) {
     if (p.get_type() != string_type) {
       throw cedar::make_exception("read-file requires string path");
     }
-
     std::string path = p.to_string(true);
-
-
     apathy::Path pth = path;
-
     if (!pth.is_file()) {
       throw cedar::make_exception("file not found");
     }
-
     return new string(util::read_file(path.c_str()));
   });
 
 
-
-
   def_global("re-match", bind_lambda(argc, argv, machine) {
     ERROR_IF_ARGS_PASSED_IS("re-match", !=, 2);
-
     ref re = argv[0];
     ref str = argv[1];
-
     if (re.get_type() != string_type || str.get_type() != string_type) {
       throw cedar::make_exception("(re-match ...) requires strings");
     }
-
     std::string reg = re.to_string(true);
     std::string src = str.to_string(true);
-
     ref v = new vector();
-
     for (auto &c : regex_matches(reg, src, std::regex_constants::icase)) {
       v = self_call(v, "put", new string(c));
     }
-
     return v;
   });
 
@@ -772,26 +698,27 @@ void init_binding(cedar::vm::machine *m) {
   });
 
 
+
   def_global("gc", bind_lambda(argc, argv, machine) {
     GC_gcollect();
     return nullptr;
   });
 
 
+
   def_global("go*", bind_lambda(argc, argv, machine) {
     ref fn = argv[0];
-
     if (fn.get_type() == lambda_type) {
       fiber *fi = new fiber(fn.as<lambda>());
       add_job(fi);
+      return fi;
     }
-    return nullptr;
+    throw cedar::make_exception("go* requires a lambda as an argument");
   });
 
 
 
 #define BIND_CONSTANT(name, val) def_global(new_obj<symbol>(#name), val)
-
   BIND_CONSTANT(S_IRWXU, 700);  /* RWX mask for owner */
   BIND_CONSTANT(S_IRUSR, 400);  /* R for owner */
   BIND_CONSTANT(S_IWUSR, 200);  /* W for owner */
@@ -812,9 +739,6 @@ void init_binding(cedar::vm::machine *m) {
   FOREACH_OPEN_OPTION(V);
 #undef V
 
-
-
-
   reader_type = new type("Reader");
 
   type_init_default_bindings(reader_type);
@@ -828,11 +752,14 @@ void init_binding(cedar::vm::machine *m) {
     inline reader_obj() { m_type = reader_type; }
   };
 
-  reader_type->setattr("__alloc__", bind_lambda(argc, argv, machine) { return new reader_obj(); });
+  reader_type->setattr("__alloc__", bind_lambda(argc, argv, machine) {
+    return new reader_obj();
+  });
 
 
   reader_type->set_field("new", bind_lambda(argc, argv, machine) {
-    if (argc != 2 || argv[1].get_type() != string_type) throw cedar::make_exception("Reader/new requires a string argument");
+    if (argc != 2 || argv[1].get_type() != string_type)
+      throw cedar::make_exception("Reader/new requires a string argument");
 
 
     reader_obj *self = argv[0].as<reader_obj>();
@@ -871,6 +798,4 @@ void init_binding(cedar::vm::machine *m) {
   });
 
   def_global(new symbol("Reader"), reader_type);
-
-
 }

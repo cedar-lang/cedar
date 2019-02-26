@@ -23,16 +23,16 @@
  */
 
 #include <cedar/object/dict.h>
-#include <cedar/objtype.h>
 #include <cedar/object/module.h>
+#include <cedar/objtype.h>
 
+#include <cedar/globals.h>
 #include <cedar/object/keyword.h>
 #include <cedar/object/list.h>
 #include <cedar/object/string.h>
 #include <cedar/object/symbol.h>
 #include <cedar/object/vector.h>
 #include <cedar/vm/machine.h>
-#include <cedar/globals.h>
 
 /**
  * every type in cedar is an object, so it has attributes and other things
@@ -61,7 +61,8 @@ ref type::get_field(ref k) {
 
 ref type::get_field_fast(int i) {
   //
-  return m_fields.at(i);
+  ref val = m_fields.at(i);
+  return val;
 }
 
 void type::set_field(ref k, ref val) {
@@ -136,8 +137,7 @@ void cedar::type_init_default_bindings(type *t) {
   t->setattr("repr", type_str_lambda);
 
 
-  t->setattr("name",
-             check_arity("name", 1, bind_lambda(argc, argv, machine) {
+  t->setattr("name", check_arity("name", 1, bind_lambda(argc, argv, machine) {
                type *self = argv[0].as<type>();
                return new string(self->m_name);
              }));
@@ -329,36 +329,36 @@ static void init_list_type() {
     return len;
   });
 
-  list_type->set_field(
-      "put", check_arity("put", 2, bind_lambda(argc, argv, machine) {
-        return new list(argv[1], argv[0]);
-      }));
+  list_type->set_field("put",
+                       check_arity("put", 2, bind_lambda(argc, argv, machine) {
+                         return new list(argv[1], argv[0]);
+                       }));
 
-  list_type->set_field(
-      "peek", check_arity("peek", 1, bind_lambda(argc, argv, machine) {
-        list *self = argv[0].as<list>();
-        return self->first();
-      }));
+  list_type->set_field("peek",
+                       check_arity("peek", 1, bind_lambda(argc, argv, machine) {
+                         list *self = argv[0].as<list>();
+                         return self->first();
+                       }));
 
-  list_type->set_field(
-      "pop", check_arity("pop", 1, bind_lambda(argc, argv, machine) {
-        list *self = argv[0].as<list>();
-        return self->rest();
-      }));
+  list_type->set_field("pop",
+                       check_arity("pop", 1, bind_lambda(argc, argv, machine) {
+                         list *self = argv[0].as<list>();
+                         return self->rest();
+                       }));
 
-  list_type->set_field(
-      "get", check_arity("get", 2, bind_lambda(argc, argv, machine) {
-        i64 len = 0;
-        i64 ind = argv[1].to_int();
-        ref l = argv[0];
-        while (!l.is_nil()) {
-          if (len == ind) break;
-          len++;
-          l = l.rest();
-        }
+  list_type->set_field("get",
+                       check_arity("get", 2, bind_lambda(argc, argv, machine) {
+                         i64 len = 0;
+                         i64 ind = argv[1].to_int();
+                         ref l = argv[0];
+                         while (!l.is_nil()) {
+                           if (len == ind) break;
+                           len++;
+                           l = l.rest();
+                         }
 
-        return l.first();
-      }));
+                         return l.first();
+                       }));
 
   list_type->setattr("__alloc__",
                      bind_lambda(argc, argv, machine) { return new list(); });
@@ -541,13 +541,13 @@ static void init_vector_type() {
   vector_type->set_field(
       "pop", check_arity("pop", 1, bind_lambda(argc, argv, machine) {
         vector *self = argv[0].as<vector>();
-        return new vector(self->items.erase(self->items.size()-1));
+        return new vector(self->items.erase(self->items.size() - 1));
       }));
 
   vector_type->set_field(
       "peek", check_arity("peek", 1, bind_lambda(argc, argv, machine) {
         vector *self = argv[0].as<vector>();
-        return self->items[self->items.size()-1];
+        return self->items[self->items.size() - 1];
       }));
 
 
@@ -678,15 +678,31 @@ static void init_lambda_type() {
 
     c += "<fn ";
 
+
     if (self->name.is_nil()) {
-      c += "(unnamed ";
-      char pbuf[20];
-      sprintf(pbuf, "%p", self->code);
-      c += pbuf;
-      c += ")";
+      c += "anonymous ";
     } else {
       c += self->name.to_string(false);
+      c += " ";
     }
+
+    c += "{";
+
+    if (self->code_type == lambda::function_binding_type) {
+      c += ":native true, ";
+      char pbuf[20];
+      sprintf(pbuf, ":addr %p,", (void *)&self->function_binding);
+    }
+
+
+
+    if (!self->self.is_nil()) {
+      c += ":bound-to ";
+      c += ref(self->self.get_type()).to_string(false);
+      c += ", ";
+    }
+
+    c += "}";
     c += ">";
     return new string(c);
   };
@@ -714,9 +730,8 @@ static void init_fiber_type() {
   fiber_type->setattr(
       "__alloc__", bind_lambda(argc, argv, machine) { return new object(); });
 
-  fiber_type->set_field("new", bind_lambda(argc, argv, machine) {
-    return nullptr;
-  });
+  fiber_type->set_field("new",
+                        bind_lambda(argc, argv, machine) { return nullptr; });
 
   def_global(new symbol("Fiber"), fiber_type);
 }  // init_fiber_type
@@ -736,9 +751,8 @@ static void init_module_type() {
 
   fiber_type->setattr(
       "__alloc__", bind_lambda(argc, argv, machine) { return new module(); });
-  fiber_type->set_field("new", bind_lambda(argc, argv, machine) {
-    return nullptr;
-  });
+  fiber_type->set_field("new",
+                        bind_lambda(argc, argv, machine) { return nullptr; });
   def_global(new symbol("Module"), module_type);
 }  // init_fiber_type
 
