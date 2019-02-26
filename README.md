@@ -35,7 +35,7 @@ Cedar's syntax will highlight correctly with practically any lisp, but because
 it's grammar and syntax best resembles Clojure's `.edn` format, its usally best
 to use that here. In vim, I simply set it's filetype to clojure:
 
-``vim
+```vim
 au BufRead,BufNewFile *.cdr set filetype=clojure
 ```
 
