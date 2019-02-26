@@ -23,8 +23,8 @@ gen:
 install:
 	cd $(BINDIR); ninja install
 	mkdir -p /usr/local/lib/cedar
-	@rm -rf /usr/local/lib/cedar/core
-	cp -r core /usr/local/lib/cedar/
+	@rm -rf /usr/local/lib/cedar
+	cp -r lib /usr/local/lib/cedar/
 	cp -r include/ /usr/local/include/
 
 clean:

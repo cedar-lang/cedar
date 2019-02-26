@@ -43,11 +43,10 @@ static std::vector<std::string> get_path(void) {
     // return the default path
     std::vector<std::string> path;
     path.push_back(".");
-    path.push_back("./core");
+    path.push_back("./lib");
     path.push_back("/usr/local/lib/cedar");
-    path.push_back("/usr/local/lib/cedar/core");
     path.push_back(apathy::Path("~/.local/lib/cedar").absolute().string());
-    path.push_back(apathy::Path("~/.local/lib/cedar/core").absolute().string());
+    path.push_back(apathy::Path("~/.local/lib/cedar").absolute().string());
     return path;
   }
 

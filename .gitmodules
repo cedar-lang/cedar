@@ -5,3 +5,8 @@
 [submodule "dep/libuv"]
 	path = dep/libuv
 	url = https://github.com/libuv/libuv
+
+
+[submodule "lib"]
+	path = lib
+	url = https://github.com/cedar-lang/lib
