@@ -13,3 +13,7 @@ $ make
 # install
 $ sudo make install
 ```
+
+
+---
+[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fnickwanninger%2Fcedar.svg?type=large)](https://app.fossa.io/projects/git%2Bgithub.com%2Fnickwanninger%2Fcedar?ref=badge_large)
