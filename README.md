@@ -10,5 +10,6 @@ $ git clone --recursive git@github.com:nickwanninger/cedar.git
 $ cd cedar
 # compile
 $ make
+# install
 $ sudo make install
 ```
