@@ -29,4 +29,3 @@ install:
 
 clean:
 	rm -rf $(BINDIR)
-
