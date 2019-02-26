@@ -6,7 +6,7 @@ Cedar is an interesting lisp interpreter that focuses on concurrency and immutab
 ### Building
 ```sh
 # to clone with dependencies
-$ git clone --recursive git@github.com:nickwanninger/cedar.git
+$ git clone --recursive git@github.com:cedar-lang/cedar.git
 $ cd cedar
 # compile
 $ make
