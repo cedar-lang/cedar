@@ -9,15 +9,11 @@ BINDIR = bin
 
 debug:
 	@mkdir -p $(BINDIR)
-	@cd $(BINDIR); cmake -G "Ninja"  -DCORE_DIR=$(shell pwd)/core -DCMAKE_BUILD_TYPE=Debug ../; ninja
-
-release:
-	@mkdir -p $(BINDIR)
-	@cd $(BINDIR); cmake -G "Ninja" -DCORE_DIR=$(shell pwd)/core -DCMAKE_BUILD_TYPE=Release ../; ninja
+	@cd $(BINDIR); cmake -G "Ninja" -DCMAKE_BUILD_TYPE=Debug ../; ninja
 
 default:
 	@mkdir -p $(BINDIR)
-	@cd $(BINDIR); cmake -G "Ninja" -DCORE_DIR=/usr/local/lib/cedar/core -DCMAKE_BUILD_TYPE=Release ../; ninja
+	@cd $(BINDIR); cmake -G "Ninja" -DCMAKE_BUILD_TYPE=Release ../; ninja
 
 gen:
 	@python3 tools/scripts/generate_cedar_h.py
