@@ -6,7 +6,6 @@
 	path = dep/libuv
 	url = https://github.com/libuv/libuv
 
-
 [submodule "dep/replxx"]
 	path = dep/replxx
 	url = https://github.com/AmokHuginnsson/replxx
