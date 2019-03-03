@@ -108,7 +108,6 @@ namespace cedar {
    public:
     int jobc = 0;
     bool ready = false;
-    std::thread::id thread;
     uv_loop_t *loop;
     run_state state;
     int sid = 0;
@@ -120,7 +119,6 @@ namespace cedar {
     void remove_job(job *);
     void set_state(run_state);
     bool tick(void);
-
     bool same_thread(void);
   };
 

@@ -54,7 +54,7 @@ static int next_sid;
 scheduler::scheduler(void) {
   // TODO: initialize thread-local state
   sid = next_sid++;
-  thread = std::this_thread::get_id();
+  m_thread = std::this_thread::get_id();
 }
 
 scheduler::~scheduler(void) {
@@ -215,7 +215,6 @@ static void init_scheduler(void) {
     register_thread();
     // create the scheduler's libuv loop
     primary_scheduler.loop = new uv_loop_t();
-    primary_scheduler.thread = std::this_thread::get_id();
     uv_loop_init(primary_scheduler.loop);
     // store the primary scheduler in the loop itself
     primary_scheduler.loop->data = &primary_scheduler;
@@ -228,10 +227,8 @@ static void init_scheduler(void) {
     idler->data = &primary_scheduler;
 
     while (true) {
-      /*
-        bool has_jobs = primary_scheduler.tick();
-        if (!has_jobs) break;
-        */
+      bool has_jobs = primary_scheduler.tick();
+      if (!has_jobs) break;
     }
 
 
@@ -244,9 +241,10 @@ static void init_scheduler(void) {
 
   scheduler_thread.detach();
   return;
+
+
   // create the scheduler's libuv loop
   primary_scheduler.loop = new uv_loop_t();
-  primary_scheduler.thread = std::this_thread::get_id();
   uv_loop_init(primary_scheduler.loop);
   // store the primary scheduler in the loop itself
   primary_scheduler.loop->data = &primary_scheduler;
@@ -303,27 +301,22 @@ ref cedar::eval_lambda(lambda *fn) {
   fiber r(fn);
   return r.run();
 
-
+  // fiber f = fn;
   fiber *f = new fiber(fn);
+
   /* we're only allowed to run if we're on the thread of
    * the event loop. Otherwise we have to just sit and wait */
-  bool run = sched_thread == std::this_thread::get_id();
   // printf("%d\n", run);
   f->done = false;
   add_job(f);
   while (!f->done) {
-    if (run) {
+    if (primary_scheduler.same_thread()) {
       primary_scheduler.tick();
     } else {
       usleep(10);
     }
   }
-
-  ref val = f->return_value;
-
-  delete f;
-
-  return val;
+  return f->return_value;
 }
 
 
