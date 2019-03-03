@@ -290,7 +290,6 @@ loop:
       if (current - start_time > max_time) {
         state->done = false;
         state->value = nullptr;
-        printf("BREAK\n");
         return;
       }
     }
