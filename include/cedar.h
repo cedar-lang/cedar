@@ -32,7 +32,6 @@
 #define CEDAR_HH
 
 #include "cedar/importutil.h"
-#include "cedar/channel.h"
 #include "cedar/version.h"
 #include "cedar/builtin_types.h"
 #include "cedar/types.h"
@@ -46,7 +45,6 @@
 #include "cedar/memory.h"
 #include "cedar/object.h"
 #include "cedar/runes.h"
-#include "cedar/with_meta.h"
 #include "cedar/fractional.h"
 #include "cedar/ref.h"
 #include "cedar/vm/compiler.h"
