@@ -55,8 +55,6 @@ namespace cedar {
   // viewed by the scheduler
   struct job {
     int jid = 0;
-    job *next;
-    job *prev;
     i64 sleeping_for = 0;
     u64 last_ran;
     u64 create_time;
@@ -114,6 +112,7 @@ namespace cedar {
 
     scheduler(void);
     ~scheduler(void);
+
     bool schedule(void);
     void add_job(fiber *);
     void remove_job(job *);

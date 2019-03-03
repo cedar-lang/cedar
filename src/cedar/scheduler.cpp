@@ -58,11 +58,6 @@ scheduler::scheduler(void) {
 }
 
 scheduler::~scheduler(void) {
-  for (job *j = jobs; j != nullptr;) {
-    job *c = j;
-    j = j->next;
-    remove_job(c);
-  }
 }
 
 static std::mutex jid_mutex;
