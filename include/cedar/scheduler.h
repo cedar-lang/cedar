@@ -29,6 +29,7 @@
 #include <uv.h>
 #include <future>
 #include <mutex>
+#include <thread>
 #include <queue>
 
 namespace cedar {
@@ -100,35 +101,27 @@ namespace cedar {
     // schedule a job and return true if there are more jobs
     // and return false if there are no more jobs to run
     job *jobs = nullptr;
-
-
     std::queue<job *> work;
     std::mutex job_mutex;
+    std::thread::id m_thread;
 
    public:
     int jobc = 0;
     bool ready = false;
     std::thread::id thread;
     uv_loop_t *loop;
-    bool schedule(void);
-
     run_state state;
     int sid = 0;
 
-
     scheduler(void);
     ~scheduler(void);
-
+    bool schedule(void);
     void add_job(fiber *);
-
     void remove_job(job *);
-
     void set_state(run_state);
-
-
-
-    // tick the scheduler and return if the scheduler still has jobs
     bool tick(void);
+
+    bool same_thread(void);
   };
 
 

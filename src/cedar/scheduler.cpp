@@ -40,12 +40,6 @@
 using namespace cedar;
 
 
-#define LOCK(m)                                           \
-  if (0) printf("WAITING " #m " at line %d\n", __LINE__); \
-  (m).lock();                                             \
-  if (0) printf("AQUIRED " #m " at line %d\n", __LINE__);
-
-
 static u64 time_ms(void) {
   auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
       std::chrono::system_clock::now().time_since_epoch());
@@ -84,7 +78,7 @@ void scheduler::add_job(fiber *f) {
   j->task = f;
   // grab a lock to the jid_mutex lock and take the next jid
   // for this job
-  LOCK(jid_mutex);
+  jid_mutex.lock();
   j->jid = next_jid++;
   jid_mutex.unlock();
 
@@ -94,7 +88,7 @@ void scheduler::add_job(fiber *f) {
   j->last_ran = 0;
   // increment the number of jobs in the scheduler
   jobc++;
-  LOCK(job_mutex);
+  job_mutex.lock();
   work.push(j);
   job_mutex.unlock();
 }
@@ -122,7 +116,7 @@ bool scheduler::schedule(void) {
     return false;
   }
   u64 time = time_ms();
-  LOCK(job_mutex);
+  job_mutex.lock();
   if (work.empty()) {
     job_mutex.unlock();
     return false;
@@ -150,7 +144,7 @@ bool scheduler::schedule(void) {
 
 
 
-  LOCK(job_mutex);
+  job_mutex.lock();
   if (done) {
     remove_job(job);
   } else {
@@ -173,15 +167,24 @@ bool scheduler::tick(void) {
   return true;
 }
 
-
-
-
 void scheduler::set_state(run_state s) {
-  LOCK(job_mutex);
+  job_mutex.lock();
   state = s;
   job_mutex.unlock();
 }
 
+bool scheduler::same_thread(void) {
+  return m_thread == std::this_thread::get_id();
+}
+
+
+////
+////
+////
+////
+////
+////
+////
 
 struct sched_thread {
   scheduler sched;
@@ -225,10 +228,10 @@ static void init_scheduler(void) {
     idler->data = &primary_scheduler;
 
     while (true) {
-    /*
-      bool has_jobs = primary_scheduler.tick();
-      if (!has_jobs) break;
-      */
+      /*
+        bool has_jobs = primary_scheduler.tick();
+        if (!has_jobs) break;
+        */
     }
 
 
