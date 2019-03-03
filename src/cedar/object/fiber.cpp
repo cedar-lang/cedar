@@ -749,7 +749,8 @@ loop:
         interval = dur_ref.to_int();
       }
       state->sleep_for = interval;
-      // std::cout << "sleep: " << dur_ref << std::endl;
+      // push a value for when we come back
+      PUSH(nullptr);
       return;
       DISPATCH;
     }
