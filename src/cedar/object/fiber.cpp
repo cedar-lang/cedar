@@ -739,11 +739,7 @@ loop:
       done = false;
       state->value = nullptr;
       state->done = false;
-
       i64 interval = 0;
-
-
-
       if (dur_ref.get_type() == number_type) {
         interval = dur_ref.to_int();
       }

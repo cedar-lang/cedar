@@ -54,7 +54,6 @@ static int next_sid;
 scheduler::scheduler(void) {
   // TODO: initialize thread-local state
   sid = next_sid++;
-  m_thread = std::this_thread::get_id();
 }
 
 scheduler::~scheduler(void) {
@@ -122,7 +121,7 @@ bool scheduler::schedule(void) {
 
   bool done = false;
 
-  if (true || time >= (job->last_ran + job->sleeping_for)) {
+  if (time >= (job->last_ran + job->sleeping_for)) {
     // printf("Scheduling Job %d %d\n", job->jid, jobc);
     job->run_count++;
     run_context ctx;
@@ -169,7 +168,7 @@ void scheduler::set_state(run_state s) {
 }
 
 bool scheduler::same_thread(void) {
-  return m_thread == std::this_thread::get_id();
+  return m_thread.get_id() == std::this_thread::get_id();
 }
 
 
@@ -186,9 +185,7 @@ struct sched_thread {
 };
 
 
-static std::vector<sched_thread> schdulers;
-static uv_idle_t *idler = nullptr;
-static scheduler primary_scheduler;
+static scheduler *primary_scheduler;
 std::thread scheduler_thread;
 std::thread::id sched_thread;
 
@@ -206,52 +203,34 @@ namespace cedar {
 
 
 static void init_scheduler(void) {
+  primary_scheduler = new scheduler();
   scheduler_thread = std::thread([](void) {
     register_thread();
     // create the scheduler's libuv loop
-    primary_scheduler.loop = new uv_loop_t();
-    uv_loop_init(primary_scheduler.loop);
+    primary_scheduler->loop = new uv_loop_t();
+    uv_loop_init(primary_scheduler->loop);
     // store the primary scheduler in the loop itself
-    primary_scheduler.loop->data = &primary_scheduler;
+    primary_scheduler->loop->data = &primary_scheduler;
     // set it to running
-    primary_scheduler.set_state(scheduler::running);
-    // in libuv, other events need to occur interleaved with
-    // fiber evaluation, so we need to use a uv_idle_t event
-    // in order to schedule fibers in the libuv idle time.
-    idler = new uv_idle_t();
-    idler->data = &primary_scheduler;
+    primary_scheduler->set_state(scheduler::running);
 
     while (true) {
-      bool has_jobs = primary_scheduler.tick();
+      bool has_jobs = primary_scheduler->tick();
       if (!has_jobs) break;
     }
 
-
-    uv_loop_close(primary_scheduler.loop);
+    uv_loop_close(primary_scheduler->loop);
     // uv_run(primary_scheduler.loop, UV_RUN_DEFAULT);
 
-    delete primary_scheduler.loop;
+    delete primary_scheduler->loop;
     deregister_thread();
   });
 
-  scheduler_thread.detach();
+  primary_scheduler->set_thread(std::move(scheduler_thread));
+
+
+
   return;
-
-
-  // create the scheduler's libuv loop
-  primary_scheduler.loop = new uv_loop_t();
-  uv_loop_init(primary_scheduler.loop);
-  // store the primary scheduler in the loop itself
-  primary_scheduler.loop->data = &primary_scheduler;
-  // set it to running
-  primary_scheduler.set_state(scheduler::running);
-  // in libuv, other events need to occur interleaved with
-  // fiber evaluation, so we need to use a uv_idle_t event
-  // in order to schedule fibers in the libuv idle time.
-  idler = new uv_idle_t();
-  idler->data = &primary_scheduler;
-  sched_thread = std::this_thread::get_id();
-  // scheduler_thread = std::this_thread;
 }
 
 
@@ -274,13 +253,13 @@ void cedar::init(void) {
 
 void cedar::run_loop(void) {
   while (true) {
-    primary_scheduler.tick();
+    primary_scheduler->tick();
   }
 }
 
 
 
-void cedar::add_job(fiber *f) { primary_scheduler.add_job(f); }
+void cedar::add_job(fiber *f) { primary_scheduler->add_job(f); }
 
 
 /**
@@ -293,25 +272,31 @@ void cedar::add_job(fiber *f) { primary_scheduler.add_job(f); }
  * such a call
  */
 ref cedar::eval_lambda(lambda *fn) {
+
+
+  scheduler s;
+  s.set_state(scheduler::running);
   fiber r(fn);
-  return r.run();
+  s.add_job(&r);
 
-  // fiber f = fn;
-  fiber *f = new fiber(fn);
+  while (!r.done) {
+    s.schedule();
+  }
 
-  /* we're only allowed to run if we're on the thread of
-   * the event loop. Otherwise we have to just sit and wait */
-  // printf("%d\n", run);
-  f->done = false;
-  add_job(f);
-  while (!f->done) {
-    if (primary_scheduler.same_thread()) {
-      primary_scheduler.tick();
+  return r.return_value;
+
+
+  primary_scheduler->add_job(&r);
+
+  while(!r.done) {
+    if (primary_scheduler->same_thread()) {
+      primary_scheduler->schedule();
     } else {
-      usleep(10);
+      // otherwise, sit and wait
+      usleep(100);
     }
   }
-  return f->return_value;
+  return r.return_value;
 }
 
 

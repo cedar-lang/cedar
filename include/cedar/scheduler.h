@@ -101,7 +101,7 @@ namespace cedar {
     job *jobs = nullptr;
     std::queue<job *> work;
     std::mutex job_mutex;
-    std::thread::id m_thread;
+    std::thread m_thread;
 
    public:
     int jobc = 0;
@@ -119,6 +119,11 @@ namespace cedar {
     void set_state(run_state);
     bool tick(void);
     bool same_thread(void);
+
+
+    inline void set_thread(std::thread&& n) {
+      m_thread = std::move(n);
+    }
   };
 
 
