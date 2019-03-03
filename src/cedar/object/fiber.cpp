@@ -547,7 +547,7 @@ loop:
       PRELUDE;
       auto ind = CODE_READ(u64);
       ref function_template = PROG()->code->constants[ind];
-      // (void)function_template.to_string(false);
+      (void)function_template.to_string(false);
       auto *template_ptr = (lambda *)function_template.get();
       ref function = template_ptr->copy();
       auto *fptr = ref_cast<cedar::lambda>(function);
