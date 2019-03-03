@@ -29,11 +29,10 @@
 #include <uv.h>
 #include <future>
 #include <mutex>
-#include <thread>
 #include <queue>
+#include <thread>
 
 namespace cedar {
-
 
   // forward declaration
   class fiber;
@@ -41,15 +40,9 @@ namespace cedar {
   class scheduler;
   class module;
 
-
-
   // the intro initialization function
   void init(void);
-
   void add_job(fiber *);
-
-  void run_loop(void);
-
 
   // a job is a representation of a fiber's state as
   // viewed by the scheduler
@@ -81,6 +74,7 @@ namespace cedar {
   };
 
 
+
   ref call_function(lambda *, int argc, ref *argv, call_context *ctx);
 
   // a scheduler is the primary controller of a thread's event loop
@@ -101,7 +95,6 @@ namespace cedar {
     job *jobs = nullptr;
     std::queue<job *> work;
     std::mutex job_mutex;
-    std::thread m_thread;
 
    public:
     int jobc = 0;
@@ -115,15 +108,8 @@ namespace cedar {
 
     bool schedule(void);
     void add_job(fiber *);
-    void remove_job(job *);
     void set_state(run_state);
     bool tick(void);
-    bool same_thread(void);
-
-
-    inline void set_thread(std::thread&& n) {
-      m_thread = std::move(n);
-    }
   };
 
 
