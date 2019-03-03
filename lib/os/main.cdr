@@ -1,0 +1,18 @@
+;; Import the builtin OS module
+(import os-internal for *)
+
+(defn- id [x] x)
+
+(deftype path
+  ;; path constructor
+  (defn new [self path]
+    (def self.path path))
+
+  (defn absolute [self]
+    self.path)
+
+  ;; string representations for the path object
+  (defn repr [self]
+    (str "(os.path " (repr self.path) ")"))
+  (defn str [self]
+    self.path))

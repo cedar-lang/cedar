@@ -2,13 +2,21 @@
 cmake_minimum_required(VERSION 3.5 FATAL_ERROR)
 project(cedar C CXX)
 
-# build dependencies before setting up project deets
-add_subdirectory(${CMAKE_SOURCE_DIR}/dep/libuv)
-# add_subdirectory(${CMAKE_SOURCE_DIR}/dep/bdwgc)
-
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
 endif()
+set (CMAKE_CXX_STANDARD 17)
+
+set(CMAKE_CXX_FLAGS_DEBUG "-g -O0 -DBUILD_MODE=Debug")
+set(CMAKE_CXX_FLAGS_RELEASE "-O3 -g -DBUILD_MODE=Release")
+
+set(CMAKE_C_FLAGS_DEBUG "-g -O0 -DBUILD_MODE=Debug")
+set(CMAKE_C_FLAGS_RELEASE "-O3 -g -DBUILD_MODE=Release")
+
+# build dependencies before setting up project deets
+add_subdirectory(${CMAKE_SOURCE_DIR}/dep/libuv)
+add_subdirectory(${CMAKE_SOURCE_DIR}/dep/replxx)
+# add_subdirectory(${CMAKE_SOURCE_DIR}/dep/bdwgc)
 
 
 link_directories(/usr/local/lib)
@@ -17,23 +25,13 @@ include_directories(dep/bdwgc/include)
 include_directories(dep/libuv/include)
 
 
-
-set (CMAKE_CXX_STANDARD 17)
-
-
-
-
-set(CMAKE_CXX_FLAGS_DEBUG "-g -O0 -DBUILD_MODE=Debug")
-set(CMAKE_CXX_FLAGS_RELEASE "-O3 -g -DBUILD_MODE=Release")
-
 set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
 
+add_definitions(-DBUILD_DIR="${BUILD_DIR}")
 
-add_definitions(-DCORE_DIR="${CORE_DIR}")
-
+message(STATUS "Build Mode: ${CMAKE_BUILD_TYPE}")
 
 add_compile_options(-frtti)
-
 
 include_directories(${CMAKE_SOURCE_DIR}/include)
 

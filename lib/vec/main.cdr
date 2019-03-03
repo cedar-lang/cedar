@@ -1,0 +1,20 @@
+
+
+
+
+(defn dot [v1 v2]
+  (if (not (= (len v1) (len v2) 2))
+    (throw "vec.dot requires two vectors of length 2")
+    (+ (* (0 v1) (0 v2))
+       (* (1 v1) (1 v2)))))
+
+(def x 0)
+(def y 1)
+(def z 2)
+
+(defn cross [U V]
+  (if (not (= (len U) (len V) 3))
+    (throw "cross requires two vectors of length 3")
+    [(- (* (y U) (z V)) (* (z U) (y V)))
+     (- (* (z U) (x V)) (* (x U) (z V)))
+     (- (* (x U) (y V)) (* (y U) (x V)))]))

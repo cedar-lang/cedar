@@ -32,10 +32,15 @@
 namespace cedar {
 
 
+  using intern_t = u64;
+
 	class symbol : public object {
 		private:
 		public:
-      i32 id;
+
+      static intern_t intern(cedar::runes);
+      static runes unintern(intern_t);
+      u64 id;
 			symbol(void);
 			symbol(cedar::runes);
 			~symbol(void);
@@ -46,15 +51,16 @@ namespace cedar {
 			inline const char *object_type_name(void) { return "symbol"; };
 			u64 hash(void);
 
+
 		protected:
 			cedar::runes to_string(bool human = false);
 	};
 
-  i32 get_symbol_intern_id(cedar::runes);
+
+  std::vector<runes> split_dot_notation(cedar::runes content);
+
 
   inline ref newsymbol(cedar::runes r) {
     return new symbol(r);
   }
-
-  cedar::runes get_symbol_id_runes(int);
 }

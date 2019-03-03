@@ -51,21 +51,7 @@ static ref merge_here(int argc, ref *argv, call_context *ctx) {
 
   module *from = ref_cast<module>(argv[0]);
 
-  if (from == nullptr) {
-    throw cedar::make_exception(
-        "importutil.merge-here requires a module argument");
-  }
-
-
-  // TODO please implement an iterator for attr_map... is
-  //      an awful hack for what needs to be done here...
-  for (int i = 0; i < 8; i++) {
-    attr_map::bucket *b;
-    for (b = from->m_attrs.m_buckets[i]; b != nullptr; b = b->next) {
-      target->setattr_fast(b->key, b->val);
-    }
-  }
-
+  from->import_into(target);
   return nullptr;
 }
 

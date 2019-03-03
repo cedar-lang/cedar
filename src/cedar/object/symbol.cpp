@@ -10,8 +10,8 @@
  * copies of the Software, and to permit persons to whom the Software is
  * furnished to do so, subject to the following conditions:
  *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
  *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -24,21 +24,19 @@
 
 #include <cstdio>
 
-#include <string>
 #include <functional>
+#include <string>
 
+#include <cedar/memory.h>
 #include <cedar/object.h>
 #include <cedar/object/symbol.h>
-#include <cedar/memory.h>
-#include <cedar/util.hpp>
 #include <cedar/objtype.h>
+#include <cedar/util.hpp>
+#include <flat_hash_map.hpp>
 #include <mutex>
 #include <vector>
 
 using namespace cedar;
-
-
-
 
 
 static std::mutex intern_lock;
@@ -47,63 +45,69 @@ struct symbol_table_entry {
   cedar::runes sym;
 };
 
+static ska::flat_hash_map<u64, cedar::runes> symbol_table;
 
-std::vector<symbol_table_entry> symbol_table;
 
-cedar::runes cedar::get_symbol_id_runes(int i) {
-  intern_lock.lock();
-  cedar::runes s = symbol_table[i].sym;
-  intern_lock.unlock();
-  return s;
-}
 
-static int find_or_insert_symbol_table(cedar::runes sym) {
+
+
+static u64 find_or_insert_symbol_table(cedar::runes sym) {
   intern_lock.lock();
   u64 hash = std::hash<cedar::runes>()(sym);
-  for (size_t i = 0; i < symbol_table.size(); i++) {
-    if (hash == symbol_table[i].hash) {
-      intern_lock.unlock();
-      return i;
-    }
-  }
-  symbol_table.push_back({hash, sym});
+  symbol_table[hash] = sym;
   intern_lock.unlock();
-  return symbol_table.size() - 1;
+  return hash;
 }
 
 
-i32 cedar::get_symbol_intern_id(cedar::runes s) {
+
+intern_t symbol::intern(cedar::runes s) {
   return find_or_insert_symbol_table(s);
 }
-
-cedar::symbol::symbol(void) {
-  m_type = symbol_type;
+runes symbol::unintern(intern_t i) {
+  intern_lock.lock();
+  if (symbol_table.count(i) != 0) {
+    cedar::runes s = symbol_table.at(i);
+    intern_lock.unlock();
+    return s;
+  }
+  intern_lock.unlock();
+  throw cedar::make_exception("unable to find symbol intern id: ", i);
 }
+
+cedar::symbol::symbol(void) { m_type = symbol_type; }
+
+
 cedar::symbol::symbol(cedar::runes content) {
   m_type = symbol_type;
   id = find_or_insert_symbol_table(content);
 }
 
 
-cedar::symbol::~symbol() {
-}
+cedar::symbol::~symbol() {}
 
-cedar::runes symbol::to_string(bool) {
-	return symbol_table[id].sym;
-}
+cedar::runes symbol::to_string(bool) { return symbol_table[id]; }
 
 void symbol::set_content(cedar::runes content) {
   id = find_or_insert_symbol_table(content);
 }
 
-cedar::runes symbol::get_content(void) {
-	return to_string();
+cedar::runes symbol::get_content(void) { return to_string(); }
+
+std::vector<runes> cedar::split_dot_notation(cedar::runes sym) {
+  std::vector<runes> parts;
+  std::u32string delim = U".";
+  size_t pos = 0;
+  std::u32string s = sym;
+  runes token;
+  while ((pos = s.find(delim)) != std::string::npos) {
+    token = s.substr(0, pos);
+    parts.push_back(token);
+    s.erase(0, pos + delim.length());
+  }
+  parts.push_back(s);
+  return parts;
 }
 
-
-
-u64 symbol::hash(void) {
-	return symbol_table[id].hash;
-}
-
+u64 symbol::hash(void) { return id; }
 

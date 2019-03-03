@@ -32,7 +32,6 @@ extern "C" int GC_unregister_my_thread(void);
 using namespace cedar;
 
 int cedar::register_thread(void) {
-
   struct GC_stack_base stack_base;
   GC_get_stack_base(&stack_base);
 

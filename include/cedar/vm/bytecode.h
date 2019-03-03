@@ -73,13 +73,9 @@ namespace cedar {
 					code = new uint8_t[255];
 				}
 
-
 				void print(u8 *ip = nullptr);
-
-
 				ref& get_const(int);
 				int push_const(ref);
-
 				void finalize();
 
 				template<typename T>
@@ -87,13 +83,10 @@ namespace cedar {
 						return {};
 					}
 
-
-
 				template<typename T>
 					inline T read(uint64_t i) const {
 						return *(T*)(void*)(code+i);
 					}
-
 
 				template<typename T>
 					inline uint64_t write_to(uint64_t i, T val) const {
@@ -116,7 +109,6 @@ namespace cedar {
 						size += sizeof(T);
 						return addr;
 					}
-
 
           inline u64 write_op(u8 op) {
             return write((u8)op);

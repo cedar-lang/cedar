@@ -1,0 +1,20 @@
+
+(declare encode encode-map)
+
+
+(def (encode-dict-pair p)
+  (str (encode (first p)) ": " (encode (first (rest p)))))
+
+(def (encode-dict m)
+  (str "{"  (join (map encode-dict-pair (keys m)) ", ")  "}"))
+
+(def (encode x)
+  (let [tp (type x)]
+    (cond (or (= tp Vector)
+              (= tp List)) (str "[" (join (map encode x) ", ") "]")
+          (= tp Dict) (encode-dict x)
+          (= tp Keyword) (repr (rest (str x)))
+          (= tp Symbol) (repr (str x))
+          (= tp Nil) "null"
+          (= tp Number) (str x)
+          :default (repr (str x)))))

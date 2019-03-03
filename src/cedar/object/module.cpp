@@ -21,6 +21,8 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
+#include <cedar/globals.h>
+#include <cedar/modules.h>
 #include <cedar/object/module.h>
 #include <cedar/object/string.h>
 #include <cedar/objtype.h>
@@ -41,10 +43,66 @@ module::~module(void) {}
 
 
 void module::def(std::string name, ref val) {
-  setattr_fast(get_symbol_intern_id(name), val);
+  setattr_fast(symbol::intern(name), val);
 }
+
+
 void module::def(std::string name, bound_function val) {
-  int id = get_symbol_intern_id(name);
+  u64 id = symbol::intern(name);
   ref func = new lambda(val);
   setattr_fast(id, func);
 }
+
+
+void module::import_into(module *other) {
+  for (auto &kv : m_fields) {
+    if (kv.second.type == PUBLIC)
+      other->m_fields[kv.first] = kv.second;
+  }
+}
+
+
+void module::set_private(intern_t i, ref v) {
+  binding b;
+  b.type = PRIVATE;
+  b.val = v;
+  m_fields[i] = b;
+}
+
+
+ref module::find(u64 id, bool *valid, module *from) {
+  if (m_fields.count(id) == 1) {
+    binding b = m_fields.at(id);
+    // if the binding is private, it should only return if from is this
+    // if the binding is public, return it's val
+    if ((b.type == PRIVATE && from == this) || b.type == PUBLIC) {
+      if (valid != nullptr) *valid = true;
+      return b.val;
+    }
+  }
+
+  // if this module isn't the core, look in there for the symbol
+  if (this != core_mod && core_mod != nullptr) {
+    return core_mod->find(id, valid, from);
+  }
+
+  if (valid != nullptr) *valid = false;
+  return nullptr;
+}
+
+
+
+ref module::getattr_fast(u64 k) {
+  bool found = false;
+  ref v = find(k, &found, nullptr);
+  if (found) return v;
+  return object::getattr_fast(k);
+}
+
+void module::setattr_fast(u64 k, ref v) {
+  binding b;
+  b.type = PUBLIC;
+  b.val = v;
+  m_fields[k] = b;
+}
+

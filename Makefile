@@ -1,19 +1,19 @@
 
-.PHONY: clean install libinc gen
-
-BUILDMODE=Release
+.PHONY: clean install gen debug
 
 BINDIR = bin
 
 
 
-debug:
-	@mkdir -p $(BINDIR)
-	@cd $(BINDIR); cmake -G "Ninja" -DCMAKE_BUILD_TYPE=Debug ../; ninja
-
 default:
 	@mkdir -p $(BINDIR)
-	@cd $(BINDIR); cmake -G "Ninja" -DCMAKE_BUILD_TYPE=Release ../; ninja
+	@cd $(BINDIR); cmake -G "Ninja"  -DCMAKE_BUILD_TYPE=Release -DBUILD_DIR=${PWD} ../; ninja
+
+debug:
+	@printf "DEBUG\n"
+	@mkdir -p $(BINDIR)
+	@cd $(BINDIR); cmake -G "Ninja" -DBUILD_DIR=${PWD} -DCMAKE_BUILD_TYPE=Debug ../; ninja
+
 
 gen:
 	@python3 tools/scripts/generate_cedar_h.py

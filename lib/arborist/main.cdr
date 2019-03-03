@@ -3,7 +3,8 @@
 (def c++ "c++")
 (def so ".so")
 
-(def (compile name files & args)
+(defn compile
+  [name files & args]
   (let [opts (apply dict args)
         extra-args (or (:args opts) [])]
     (os.shell (str c++

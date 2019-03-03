@@ -25,11 +25,22 @@
 #pragma once
 
 #include <cedar/object.h>
+#include <cedar/object/symbol.h>
+#include <flat_hash_map.hpp>
 
 namespace cedar {
 
 
   class module : public object {
+   private:
+    enum binding_type { PRIVATE, PUBLIC };
+    struct binding {
+      binding_type type = PRIVATE;
+      ref val;
+    };
+
+    ska::flat_hash_map<intern_t, binding> m_fields;
+
    public:
     module(void);
     module(std::string);
@@ -37,6 +48,19 @@ namespace cedar {
 
     void def(std::string, ref);
     void def(std::string, bound_function);
+
+    // set a private module field. Will only be accessed via a `find` from
+    // within the same module. The way private is inforced is by making getattr
+    // not resolve to private fields. Now there is a problem where public fields
+    // can be shadowed by private ones, but I will work around that later... :)
+    void set_private(intern_t, ref);
+
+    void import_into(module *);
+
+
+    ref find(intern_t, bool *, module *from = nullptr);
+    virtual ref getattr_fast(u64);
+    virtual void setattr_fast(u64, ref);
   };
 
 }  // namespace cedar

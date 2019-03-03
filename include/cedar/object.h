@@ -63,7 +63,7 @@ namespace cedar {
   class attr_map {
     public:
       struct bucket {
-        int key;
+        u64 key;
         ref val;
         bucket *next = nullptr;
       };
@@ -74,13 +74,13 @@ namespace cedar {
 
       void init(void);
 
-      bool has(int);
+      bool has(u64);
 
-      bucket *buck(int);
-      ref at(int);
-      void set(int, ref);
+      bucket *buck(u64);
+      ref at(u64);
+      void set(u64, ref);
       int size(void);
-      void rehash(int);
+      void rehash(u64);
   };
 
 
@@ -95,19 +95,19 @@ namespace cedar {
     object *next;
 
 
-    ref getattr_fast(int);
-    void setattr_fast(int, ref);
+    virtual ref getattr_fast(u64);
+    virtual void setattr_fast(u64, ref);
 
     ref getattr(ref);
     void setattr(ref, ref);
     void setattr(runes, bound_function);
 
-    attr_map::bucket *getattrbucket(int);
+    attr_map::bucket *getattrbucket(u64);
 
     // self call an attr with some symbol id
     // and sets the bool pointer to true if it
     // succeeded
-    ref self_call(int, bool*);
+    ref self_call(u64, bool*);
 
     virtual u64 hash(void);
 

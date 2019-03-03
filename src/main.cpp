@@ -32,6 +32,7 @@
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/resource.h>
 #include <unistd.h>
 #include <uv.h>
 #include <chrono>
@@ -39,22 +40,21 @@
 #include <iomanip>  // setprecision
 #include <iostream>
 #include <map>
+#include <regex>
 #include <stdexcept>
 #include <string>
 #include <thread>
 #include <typeinfo>
-
-#include <sys/resource.h>
-
 #define GC_THREADS
 #include <cedar/thread.h>
 #include <gc/gc.h>
-
 #include <cedar/util.hpp>
 
-cedar::vm::machine cvm;
+#include <replxx/replxx.hxx>
 
-std::thread start_daemon_thread(short);
+using Replxx = replxx::Replxx;
+
+
 
 using ref = cedar::ref;
 
@@ -62,6 +62,10 @@ static void help(void);
 static void usage(void);
 
 using namespace cedar;
+
+
+std::thread start_daemon_thread(short);
+void hook_color(std::string const &str, Replxx::colors_t &colors, module *mod);
 
 cedar::type::method lambda_wrap(ref func) {
   if (lambda *fn = ref_cast<lambda>(func); fn != nullptr) {
@@ -76,13 +80,9 @@ cedar::type::method lambda_wrap(ref func) {
 }
 
 
-#ifndef CORE_DIR
-#define CORE_DIR "/usr/local/lib/cedar/core"
-#endif
-
-
 
 int main(int argc, char **argv) {
+
   srand((unsigned int)time(nullptr));
 
   init();
@@ -92,11 +92,10 @@ int main(int argc, char **argv) {
 
   try {
     bool interactive = false;
-    bool resources = false;
 
 
     char c;
-    while ((c = getopt(argc, argv, "ihRe:")) != -1) {
+    while ((c = getopt(argc, argv, "ihe:")) != -1) {
       switch (c) {
         case 'h':
           help();
@@ -104,9 +103,6 @@ int main(int argc, char **argv) {
 
         case 'i':
           interactive = true;
-          break;
-        case 'R':
-          resources = true;
           break;
 
           // TODO: implement evaluate argument
@@ -130,7 +126,7 @@ int main(int argc, char **argv) {
     for (int i = optind; i < argc; i++) {
       args = cedar::idx_append(args, new cedar::string(argv[i]));
     }
-    require("os")->def("args", args);
+    // require("os")->def("args", args);
 
     if (optind == argc) {
       interactive = true;
@@ -146,11 +142,9 @@ int main(int argc, char **argv) {
       for (int i = optind; i < argc; i++) {
         args = self_call(args, "put", new string(argv[i]));
       }
+      require("os")->def("args", args);
       repl_mod = require(path);
     }
-
-
-
 
     // run the async event loop now
     // run_loop();
@@ -161,52 +155,78 @@ int main(int argc, char **argv) {
     //       implement it inside libuv using the language itself
     ///////////////////////////////////////////////////////////////
 
-    struct rusage usage;
+    std::thread repl_thread;
+
 
     if (interactive) {
+      // repl_thread = std::thread([&](void) -> void {
+      // register_thread();
+
+      Replxx rx;
+
+      printf("cedar lisp v" CEDAR_VERSION "\n");
+
+      rx.history_load("~/.cedar_history");
+
+
+
+      using namespace std::placeholders;
+      rx.set_highlighter_callback(std::bind(&hook_color, _1, _2, repl_mod));
+
+
       repl_mod->def("*file*", cedar::new_obj<cedar::string>(
                                   apathy::Path::cwd().string()));
       cedar::reader repl_reader;
       while (interactive) {
         std::string ps1;
-        if (resources) {
-          getrusage(RUSAGE_SELF, &usage);
-          double used_b = usage.ru_maxrss;
-          double used_mb = used_b / 1000.0 / 1000.0;
-          std::stringstream stream;
-          stream << std::fixed << std::setprecision(2) << used_mb;
-          ps1 += stream.str();
-          ps1 += " MiB used";
-        } else {
-          std::string mod =
-              repl_mod->getattr(new symbol("*name*")).to_string(true);
-          ps1 += mod;
-        }
-
 
         ps1 += "> ";
-        char *buf = linenoise(ps1.data());
+
+        char const *buf = nullptr;
+        do {
+          buf = rx.input(ps1);
+        } while ((buf == nullptr) && (errno == EAGAIN));
+
         if (buf == nullptr) {
-          printf("\x1b[1A");
           break;
         }
-        cedar::runes b = buf;
+        std::string input = buf;
 
-        if (b.size() == 0) {
-          free(buf);
+        /*
+        std::string input;
+        std::cout << ps1;
+
+        char b[100];
+        std::cin >> b;
+        input = b;
+        */
+
+        if (input.empty()) {
           continue;
         }
+        rx.history_add(input);
 
-        linenoiseHistoryAdd(buf);
-        free(buf);
         try {
-          ref res = eval_string_in_module(b, repl_mod);
+          cedar::runes r = input;
+          ref res = eval_string_in_module(r, repl_mod);
           repl_mod->def("$$", res);
           std::cout << "\x1B[33m" << res << "\x1B[0m" << std::endl;
+
         } catch (std::exception &e) {
           std::cerr << "Uncaught Exception: " << e.what() << std::endl;
         }
       }
+
+      // rx.history_save("~/.cedar_history");
+      //});
+    }
+
+
+    // run_loop();
+
+    if (repl_thread.joinable()) {
+      printf("JOIN REPL THREAD\n");
+      repl_thread.join();
     }
 
   } catch (std::exception &e) {
@@ -221,7 +241,138 @@ int main(int argc, char **argv) {
   return 0;
 }
 
+////////
+//
+//
+//
+//
+//
+//
+//
+//
+//
+////////
 
+
+
+int utf8_strlen(char const *s, int utf8len) {
+  int codepointLen = 0;
+  unsigned char m4 = 128 + 64 + 32 + 16;
+  unsigned char m3 = 128 + 64 + 32;
+  unsigned char m2 = 128 + 64;
+  for (int i = 0; i < utf8len; ++i, ++codepointLen) {
+    char c = s[i];
+    if ((c & m4) == m4) {
+      i += 3;
+    } else if ((c & m3) == m3) {
+      i += 2;
+    } else if ((c & m2) == m2) {
+      i += 1;
+    }
+  }
+  return (codepointLen);
+}
+
+
+void hook_color(std::string const &context, Replxx::colors_t &colors,
+                module *mod) {
+
+  using cl = Replxx::Color;
+
+  static auto cols = std::vector<cl>{cl::BLUE, cl::RED, cl::GREEN};
+  /*
+  cedar::runes c = context;
+  int pi = 0;
+  for (u32 i = 0; i < c.size(); i++) {
+
+    bool is_paren = false;
+    if (c[i] == '(') {
+      pi++;
+      is_paren = true;
+    } else if (c[i] == ')') {
+      pi--;
+      is_paren = true;
+    }
+
+    if (is_paren) colors.at(i) = cl::BLUE;
+  }
+  */
+
+  // return;
+
+  std::vector<std::pair<std::string, cl>> regex_color{
+      // single chars
+      {"\\`", cl::BRIGHTCYAN},
+      {"\\'", cl::BRIGHTBLUE},
+      {"\\\"", cl::BRIGHTBLUE},
+      {"\\-", cl::BRIGHTBLUE},
+      {"\\+", cl::BRIGHTBLUE},
+      {"\\=", cl::BRIGHTBLUE},
+      {"\\/", cl::BRIGHTBLUE},
+      {"\\*", cl::BRIGHTBLUE},
+      {"\\^", cl::BRIGHTBLUE},
+      {"\\.", cl::BRIGHTMAGENTA},
+      /*
+      {"\\(", cl::NORMAL},
+      {"\\)", cl::NORMAL},
+      {"\\[", cl::BRIGHTMAGENTA},
+      {"\\]", cl::BRIGHTMAGENTA},
+      {"\\{", cl::BRIGHTMAGENTA},
+      {"\\}", cl::BRIGHTMAGENTA},
+      */
+      // commands
+      {"nil", cl::MAGENTA},
+      {"true", cl::BLUE},
+      {"false", cl::BLUE},
+      {"fn", cl::BLUE},
+      // numbers
+      {"[\\-|+]{0,1}[0-9]+", cl::YELLOW},           // integers
+      {"[\\-|+]{0,1}[0-9]*\\.[0-9]+", cl::YELLOW},  // decimals
+      // strings
+      {"\"(?:[^\"\\\\]|\\\\.)*\"", cl::BRIGHTGREEN},  // double quotes
+      {"\\w+", cl::ERROR},
+      {":\\w+", cl::RED},
+  };
+
+  // highlight matching regex sequences
+  for (auto const &e : regex_color) {
+    size_t pos{0};
+    std::string str = context;
+    std::smatch match;
+
+    while (std::regex_search(str, match, std::regex(e.first))) {
+      std::string c{match[0]};
+      std::string prefix(match.prefix().str());
+      pos += utf8_strlen(prefix.c_str(), static_cast<int>(prefix.length()));
+      int len(utf8_strlen(c.c_str(), static_cast<int>(c.length())));
+
+
+      cl color = e.second;
+      // having a color of "error" signals that it's a word
+      if (color == cl::ERROR) {
+        color = cl::NORMAL;
+
+        bool found = false;
+        auto i = symbol::intern(c);
+        mod->find(i, &found);
+
+        if (found || is_global(i)) {
+          color = cl::BLUE;
+        } else if (vm::is_macro(i)) {
+          color = cl::BRIGHTMAGENTA;
+        }
+      }
+
+
+      for (int i = 0; i < len; ++i) {
+        colors.at(pos + i) = color;
+      }
+
+      pos += len;
+      str = match.suffix();
+    }
+  }
+}
 
 
 // print out the usage
@@ -241,7 +392,6 @@ static void help(void) {
   printf("  -i Run in an interactive repl\n");
   printf("  -h Show this help menu\n");
   printf("  -e Evaluate an expression\n");
-  printf("  -R Display resource usage at the REPL (debug)\n");
   printf("\n");
 }
 

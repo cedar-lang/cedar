@@ -56,7 +56,7 @@ namespace cedar {
     void set_field(ref, ref);
     void set_field(cedar::runes, bound_function);
     ref get_field(ref);
-    ref get_field_fast(int);
+    ref get_field_fast(u64);
 
     type(cedar::runes);
     ~type(void);

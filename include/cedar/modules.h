@@ -40,8 +40,10 @@ namespace cedar {
 
   void define_builtin_module(std::string, module*);
 
-  ref eval_string_in_module(cedar::runes, module*);
+  ref eval_string_in_module(cedar::runes&, module*);
   ref eval(ref, module*);
+
+
 };
 
 #endif

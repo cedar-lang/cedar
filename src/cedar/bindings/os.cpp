@@ -228,5 +228,5 @@ void bind_os(void) {
   mod->def("getenv", os_getenv);
   mod->def("panic", os_panic);
 
-  define_builtin_module("os", mod);
+  define_builtin_module("os-internal", mod);
 }

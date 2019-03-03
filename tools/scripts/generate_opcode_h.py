@@ -48,6 +48,7 @@ new_op('LOAD_GLOBAL', 'imm_int', effect=1)
 # SET_GLOBAL pops the name off the stack, then the value off the stack
 #  GLOBALS[POP()] = POP(); PUSH(GLOBALS[...]);
 new_op('SET_GLOBAL', 'imm_int', effect=0)
+new_op('SET_PRIVATE', 'imm_int', effect=0)
 
 new_op('CONS', effect=-1)
 new_op('APPEND', effect=-1)
@@ -82,6 +83,8 @@ new_op('EVAL', effect=0)
 
 new_op('SLEEP', effect=-1)
 new_op('GET_MODULE', effect=1)
+
+new_op('ADD', effect=-1)
 
 def main(outfile):
     with open(outfile, 'w') as f:

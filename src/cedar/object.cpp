@@ -70,9 +70,9 @@ bool object::is_pair(void) {
 
 
 
-ref object::getattr_fast(int i) {
-  static int __class__ID = get_symbol_intern_id("__class__");
-  static int __addr__ID = get_symbol_intern_id("__addr__");
+ref object::getattr_fast(u64 i) {
+  static auto __class__ID = symbol::intern("__class__");
+  static auto __addr__ID = symbol::intern("__addr__");
 
   if (i == __class__ID) {
     return m_type;
@@ -100,15 +100,13 @@ ref object::getattr_fast(int i) {
         goto FOUND;
       }
     }
-
     val = object_type->get_field_fast(i);
     goto FOUND;
   }
 
-  throw cedar::make_exception("attribute '", get_symbol_id_runes(i), "' on object not found");
+  throw cedar::make_exception("attribute '", symbol::unintern(i), "' on object not found");
 
 FOUND:
-
   if (val.get_type() == lambda_type) {
     lambda *fn = ref_cast<lambda>(val)->copy();
     fn->self = this;
@@ -117,11 +115,11 @@ FOUND:
   return val;
 }
 
-attr_map::bucket *object::getattrbucket(int i) {
+attr_map::bucket *object::getattrbucket(u64 i) {
   return m_attrs.buck(i);
 }
 
-void object::setattr_fast(int k, ref v) { m_attrs.set(k, v); }
+void object::setattr_fast(u64 k, ref v) { m_attrs.set(k, v); }
 
 ref object::getattr(ref k) {
   if (symbol *s = ref_cast<symbol>(k); s != nullptr) {
@@ -139,11 +137,11 @@ void object::setattr(ref k, ref v) {
 
 void object::setattr(runes name, bound_function fn) {
   ref lam = new lambda(fn);
-  int id = get_symbol_intern_id(name);
+  auto id = symbol::intern(name);
   return setattr_fast(id, lam);
 }
 
-ref object::self_call(int id, bool *valid) {
+ref object::self_call(u64 id, bool *valid) {
   ref fn = getattr_fast(id);
   if (auto *l = ref_cast<lambda>(fn); l != nullptr) {
     ref self = this;
@@ -159,8 +157,8 @@ ref object::self_call(int id, bool *valid) {
 }
 
 cedar::runes object::to_string(bool human) {
-  static int str_id = get_symbol_intern_id("str");
-  static int repr_id = get_symbol_intern_id("repr");
+  static auto str_id =  symbol::intern("str");
+  static auto repr_id = symbol::intern("repr");
 
   bool valid;
   ref res = self_call(human ? str_id : repr_id, &valid);
@@ -186,19 +184,48 @@ cedar::runes object::to_string(bool human) {
   return s;
 }
 
+
+static constexpr u8 attr_map_size = 8;
+
 u64 object::hash(void) {
-  static int hash_id = get_symbol_intern_id("hash");
-  bool valid;
-  ref res = self_call(hash_id, &valid);
-  if (valid) return res.to_int();
+  static u64 obj_rand_hash_init = ((u64)rand() << 32) | rand();
+
+  u64 x = 0;
+  u64 y = 0;
+
+  i64 mult = 1000003UL;  // prime multiplier
+
+  x = 0x345678UL;
+
+  x += (u64)m_type + obj_rand_hash_init * mult;
+
+  if (m_attrs.m_buckets != nullptr) {
+    for (int i = 0; i < attr_map_size; i++) {
+      attr_map::bucket *b = m_attrs.m_buckets[i];
+      while (b != nullptr) {
+        attr_map::bucket *n = b->next;
+        y = b->key;
+        x = (x ^ y) * mult;
+        mult += (u64)(852520UL + 2);
+        y = b->val.hash();
+        x = (x ^ y) * mult;
+        mult += (u64)(852520UL);
+        x += 97531UL;
+        b = n;
+      }
+    }
+  }
+  return x;
 
   throw cedar::make_exception("Unable to hash unknown object of type ", m_type->to_string());
 }
 
 const char *object::object_type_name(void) { return "object"; };
 
+
+//
 // attr_map functions
-static constexpr u8 attr_map_size = 8;
+//
 
 attr_map::~attr_map(void) {
   if (m_buckets != nullptr) {
@@ -224,10 +251,10 @@ void attr_map::init(void) {
   }
 }
 
-ref attr_map::at(int i) {
+ref attr_map::at(u64 i) {
   init();
 
-  int ind = i & (attr_map_size - 1);
+  u64 ind = i & (attr_map_size - 1);
 
   bucket *b = m_buckets[ind];
 
@@ -237,12 +264,12 @@ ref attr_map::at(int i) {
     }
     b = b->next;
   }
-  throw cedar::make_exception("attribute '", get_symbol_id_runes(i), "' not found");
+  throw cedar::make_exception("attribute '", symbol::unintern(i), "' not found");
 };
 
-bool attr_map::has(int i) {
+bool attr_map::has(u64 i) {
   init();
-  int ind = i & (attr_map_size - 1);
+  u64 ind = i & (attr_map_size - 1);
   bucket *b = m_buckets[ind];
   while (b != nullptr) {
     if (b->key == i) {
@@ -253,9 +280,9 @@ bool attr_map::has(int i) {
   return false;
 };
 
-attr_map::bucket *attr_map::buck(int i) {
+attr_map::bucket *attr_map::buck(u64 i) {
   init();
-  int ind = i & (attr_map_size - 1);
+  u64 ind = i & (attr_map_size - 1);
   bucket *b = m_buckets[ind];
   while (b != nullptr) {
     if (b->key == i) {
@@ -266,10 +293,10 @@ attr_map::bucket *attr_map::buck(int i) {
   return nullptr;
 };
 
-void attr_map::set(int k, ref v) {
+void attr_map::set(u64 k, ref v) {
   init();
 
-  int ind = k & (attr_map_size - 1);
+  u64 ind = k & (attr_map_size - 1);
 
   bucket *b = m_buckets[ind];
 

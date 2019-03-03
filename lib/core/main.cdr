@@ -156,6 +156,10 @@
   (list 'def* name
         (list 'fn name args (cons 'do body))))
 
+(defmacro defn- (name args & body)
+  (list 'def-private* name
+        (list 'fn name args (cons 'do body))))
+
 (defn inc (n) (+ n 1))
 (defn dec (n) (- n 1))
 
@@ -206,17 +210,21 @@
              (fn (self coll)
                (get coll self nil))))
 
+
+
+(defn- def-macro-expand [args]
+  (let* ((name (first args))
+         (val  (rest args)))
+    (if (list? name)
+      (list (first name) (list 'fn (first name) (rest name) (cons 'do val)))
+      (list name (first val)))))
 ;; redefine the def* special form to allow a more
 ;; complicated scheme-like function definition
 ;; ex: (def foo :bar) => defines foo to :bar
 ;;     (def (id x) x) => defines the id function
 ;; why have this *and* the defn macro? Why not.
-(defmacro def (& args)
-  (let* ((name (first args))
-         (val  (rest args)))
-    (if (list? name)
-      (list 'def* (first name) (list 'fn (first name) (rest name) (cons 'do val)))
-      (list 'def* name (first val)))))
+(defmacro def (& args) (cons 'def* (def-macro-expand args)))
+(defmacro def- (& args) (cons 'def-private* (def-macro-expand args)))
 
 (defmacro cond (& a)
   (let* ((c (first a))
@@ -553,11 +561,14 @@
      ~@(import-opt-expand name opts)))
 
 
+
+
 (defmacro while (test & body)
   `(let* ()
      (when ~test
        ~@body
        (recur))))
+
 
 
 ;; Threads the expr through the forms. Inserts x as the
@@ -629,7 +640,7 @@
 (def (deftype-expr-expand name exprs)
   (let (res nil)
       (while (not (nil? exprs))
-        (let (curr (macroexpand (first exprs)))
+        (let* ((curr (macroexpand (first exprs))))
           (cond
             ;; list expressions inside a class must be defs for fields
             (list? curr) (cond (= 'def* (first curr)) (def res (cons `(. ~name (set-field (quote ~(second curr)) ~(first (rest (rest curr)))))

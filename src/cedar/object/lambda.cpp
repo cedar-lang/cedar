@@ -73,6 +73,13 @@ cedar::lambda::~lambda() {}
 
 
 u64 lambda::hash(void) {
+  if (code_type == bytecode_type) {
+    u64 hash = 5381;
+    for (u64 i = 0; i < code->get_size(); i++) {
+      hash = ((hash << 5) + hash) + code->code[i];
+    }
+    return hash;
+  }
   //
   return reinterpret_cast<u64>(code_type == bytecode_type ? (void *)code : &function_binding);
 }

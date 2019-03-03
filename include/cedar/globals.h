@@ -37,12 +37,14 @@ namespace cedar {
 
   extern module *core_mod;
 
-  void def_global(int, ref);
+  void def_global(u64, ref);
   void def_global(ref, ref);
   void def_global(runes, ref);
   void def_global(runes, bound_function);
 
-  ref get_global(int);
+  bool is_global(u64);
+
+  ref get_global(u64);
   ref get_global(ref);
   ref get_global(runes);
 };

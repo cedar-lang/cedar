@@ -23,20 +23,16 @@
  */
 
 #include <cstdio>
-
 #include <string>
 #include <functional>
-
 #include <cedar/object.h>
 #include <cedar/objtype.h>
 #include <cedar/object/keyword.h>
 #include <cedar/memory.h>
 #include <cedar/util.hpp>
-
 #include <vector>
 
 using namespace cedar;
-
 
 // WARNING: the symbol table is interned, and therefor is not Garbage Collected or refcounted.
 // This is because there is no real way to check if something is refering to a symbol or not...

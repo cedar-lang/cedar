@@ -13,26 +13,28 @@
 #define OP_SET_LOCAL                0x06
 #define OP_LOAD_GLOBAL              0x07
 #define OP_SET_GLOBAL               0x08
-#define OP_CONS                     0x09
-#define OP_APPEND                   0x0a
-#define OP_CALL                     0x0b
-#define OP_CALL_EXCEPTIONAL         0x0c
-#define OP_MAKE_FUNC                0x0d
-#define OP_ARG_POP                  0x0e
-#define OP_RETURN                   0x0f
-#define OP_EXIT                     0x10
-#define OP_SKIP                     0x11
-#define OP_JUMP                     0x12
-#define OP_JUMP_IF_FALSE            0x13
-#define OP_RECUR                    0x14
-#define OP_DUP                      0x15
-#define OP_SWAP                     0x16
-#define OP_GET_ATTR                 0x17
-#define OP_SET_ATTR                 0x18
-#define OP_DEF_MACRO                0x19
-#define OP_EVAL                     0x1a
-#define OP_SLEEP                    0x1b
-#define OP_GET_MODULE               0x1c
+#define OP_SET_PRIVATE              0x09
+#define OP_CONS                     0x0a
+#define OP_APPEND                   0x0b
+#define OP_CALL                     0x0c
+#define OP_CALL_EXCEPTIONAL         0x0d
+#define OP_MAKE_FUNC                0x0e
+#define OP_ARG_POP                  0x0f
+#define OP_RETURN                   0x10
+#define OP_EXIT                     0x11
+#define OP_SKIP                     0x12
+#define OP_JUMP                     0x13
+#define OP_JUMP_IF_FALSE            0x14
+#define OP_RECUR                    0x15
+#define OP_DUP                      0x16
+#define OP_SWAP                     0x17
+#define OP_GET_ATTR                 0x18
+#define OP_SET_ATTR                 0x19
+#define OP_DEF_MACRO                0x1a
+#define OP_EVAL                     0x1b
+#define OP_SLEEP                    0x1c
+#define OP_GET_MODULE               0x1d
+#define OP_ADD                      0x1e
 
 /* Instruction opcode foreach macro for code generation */
 /* Arg order: (name, bytecode, type, stack effect */
@@ -46,6 +48,7 @@
   V(SET_LOCAL, OP_SET_LOCAL, imm_int, 0) \
   V(LOAD_GLOBAL, OP_LOAD_GLOBAL, imm_int, 1) \
   V(SET_GLOBAL, OP_SET_GLOBAL, imm_int, 0) \
+  V(SET_PRIVATE, OP_SET_PRIVATE, imm_int, 0) \
   V(CONS, OP_CONS, no_arg, -1) \
   V(APPEND, OP_APPEND, no_arg, -1) \
   V(CALL, OP_CALL, imm_int, 0) \
@@ -65,6 +68,7 @@
   V(DEF_MACRO, OP_DEF_MACRO, imm_int, 0) \
   V(EVAL, OP_EVAL, no_arg, 0) \
   V(SLEEP, OP_SLEEP, no_arg, -1) \
-  V(GET_MODULE, OP_GET_MODULE, no_arg, 1)
+  V(GET_MODULE, OP_GET_MODULE, no_arg, 1) \
+  V(ADD, OP_ADD, no_arg, -1)
 
 #endif

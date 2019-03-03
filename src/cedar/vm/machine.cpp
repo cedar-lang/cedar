@@ -45,12 +45,13 @@
 #include <cedar/util.hpp>
 #include <thread>
 #include <cedar/globals.h>
-
+#include <flat_hash_map.hpp>
 #include <gc/gc.h>
-#include <unordered_map>
+
+
 using namespace cedar;
 
-static std::unordered_map<int, ref> macros;
+static ska::flat_hash_map<int, ref> macros;
 
 bool vm::is_macro(int id) {
   if (macros.count(id)) {
@@ -66,7 +67,7 @@ lambda *vm::get_macro(int id) {
 
 void vm::set_macro(int id, ref mac) {
   if (ref_cast<lambda>(mac) == nullptr) {
-    throw cedar::make_exception("unable to add macro ", get_symbol_id_runes(id), " to non-lambda ", mac);
+    throw cedar::make_exception("unable to add macro ", symbol::unintern(id), " to non-lambda ", mac);
   }
 
   macros[id] = mac;
@@ -83,24 +84,18 @@ ref vm::macroexpand_1(ref obj) {
         lambda *mac = vm::get_macro(sid);
         int argc = 0;
         std::vector<ref> argv;
-
         ref args = obj.rest();
-
         while (!args.is_nil()) {
           argv.push_back(args.first());
           argc++;
           args = args.rest();
         }
-
-
         call_context ctx;
         ref expanded = call_function(mac, argc, argv.data(), &ctx);
-
         return expanded;
       }
     }
   }
-
   return obj;
 }
 

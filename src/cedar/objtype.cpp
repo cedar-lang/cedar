@@ -59,7 +59,8 @@ ref type::get_field(ref k) {
                               m_name);
 }
 
-ref type::get_field_fast(int i) {
+
+ref type::get_field_fast(u64 i) {
   //
   ref val = m_fields.at(i);
   return val;
@@ -74,7 +75,7 @@ void type::set_field(ref k, ref val) {
 }
 
 void type::set_field(cedar::runes k, bound_function val) {
-  int i = get_symbol_intern_id(k);
+  auto i = symbol::intern(k);
   ref lam = new lambda(val);
   m_fields.set(i, lam);
 }

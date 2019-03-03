@@ -99,7 +99,6 @@ namespace cedar {
    private:
     // schedule a job and return true if there are more jobs
     // and return false if there are no more jobs to run
-    int jobc = 0;
     job *jobs = nullptr;
 
 
@@ -107,6 +106,7 @@ namespace cedar {
     std::mutex job_mutex;
 
    public:
+    int jobc = 0;
     bool ready = false;
     std::thread::id thread;
     uv_loop_t *loop;

@@ -25,10 +25,10 @@
 #include <cedar/object/keyword.h>
 #include <cedar/object/lambda.h>
 #include <cedar/object/list.h>
+#include <cedar/object/module.h>
 #include <cedar/object/nil.h>
 #include <cedar/object/number.h>
 #include <cedar/object/string.h>
-#include <cedar/object/module.h>
 #include <cedar/object/symbol.h>
 #include <cedar/object/vector.h>
 #include <cedar/passes.h>
@@ -59,7 +59,9 @@ int vm::scope::find(ref &symbol) { return find(symbol.symbol_hash()); }
 
 void vm::scope::set(uint64_t symbol, int ind) { m_bindings[symbol] = ind; }
 
-void vm::scope::set(ref &symbol, int ind) { m_bindings[symbol.symbol_hash()] = ind; }
+void vm::scope::set(ref &symbol, int ind) {
+  m_bindings[symbol.symbol_hash()] = ind;
+}
 
 vm::compiler::compiler() {}
 vm::compiler::~compiler() {}
@@ -88,7 +90,8 @@ ref vm::compiler::compile(ref obj, module *mod) {
 static bool list_is_call_to(cedar::runes func_name, ref &obj) {
   cedar::list *list = ref_cast<cedar::list>(obj);
   if (list)
-    if (auto func_name_given = ref_cast<cedar::symbol>(list->first()); func_name_given) {
+    if (auto func_name_given = ref_cast<cedar::symbol>(list->first());
+        func_name_given) {
       return func_name_given->get_content() == func_name;
     }
   return false;
@@ -125,7 +128,8 @@ ref cedar::vm::bytecode_pass(ref obj, vm::compiler *c, module *m) {
 
 //////////////////////////////////////////////////////
 
-void vm::compiler::compile_object(ref obj, vm::bytecode &code, scope_ptr sc, compiler_ctx *ctx) {
+void vm::compiler::compile_object(ref obj, vm::bytecode &code, scope_ptr sc,
+                                  compiler_ctx *ctx) {
   if (obj.isa(list_type)) {
     return compile_list(obj, code, sc, ctx);
   }
@@ -151,15 +155,16 @@ void vm::compiler::compile_object(ref obj, vm::bytecode &code, scope_ptr sc, com
 }
 
 
-void vm::compiler::compile_list(ref obj, vm::bytecode &code, scope_ptr sc, compiler_ctx *ctx) {
-
+void vm::compiler::compile_list(ref obj, vm::bytecode &code, scope_ptr sc,
+                                compiler_ctx *ctx) {
   //
   if (list_is_call_to("defmacro*", obj)) {
     ref name = obj.rest().first();
     ref func = obj.rest().rest().first();
     compile_object(func, code, sc, ctx);
     symbol *s = ref_cast<symbol>(name);
-    if (s == nullptr) throw cedar::make_exception("invalid defmacro. name must be a symbol");
+    if (s == nullptr)
+      throw cedar::make_exception("invalid defmacro. name must be a symbol");
     code.write_op(OP_DEF_MACRO, s->id);
     return;
   }
@@ -187,18 +192,57 @@ void vm::compiler::compile_list(ref obj, vm::bytecode &code, scope_ptr sc, compi
     return;
   }
 
+
+  if (list_is_call_to("def-private*", obj)) {
+    auto name_obj = obj.rest().first();
+    auto val_obj = obj.rest().rest().first();
+    if (name_obj.get_type() != symbol_type) {
+      throw cedar::make_exception("def-private* requires a symbol as a name");
+    }
+    // std::cout << "priv " << name_obj << " = " << val_obj << std::endl;
+    compile_object(val_obj, code, sc, ctx);
+    auto intern = symbol::intern(name_obj.to_string(true));
+    code.write_op(OP_SET_PRIVATE, intern);
+    return;
+  }
+
   //
   // def* is a special form that attempts to change a local closure binding
   // and if it can't, will set in the global scope
   //
   if (list_is_call_to("def*", obj)) {
     auto name_obj = obj.rest().first();
+    auto val_obj = obj.rest().rest().first();
     if (name_obj.get_type() != symbol_type) {
       throw cedar::make_exception("Invalid syntax in def special form: ", obj);
     }
 
     u8 opcode = 0;
     i64 index = 0;
+
+    std::vector<runes> dot_parts = split_dot_notation(name_obj.to_string(true));
+
+
+    // if the symbol is a dot notation, we need to go through and set the
+    // field correctly on the referenced object
+    if (dot_parts.size() > 1) {
+      // the first thing we need to do is compile the base symbol lookup
+      compile_symbol(new symbol(dot_parts[0]), code, sc, ctx);
+
+      // then walk down the list up to the end and getattr
+      for (u32 i = 1; i < dot_parts.size() - 1; i++) {
+        code.write_op(OP_GET_ATTR, symbol::intern(dot_parts[i]));
+      }
+
+      // then compile the value
+      compile_object(val_obj, code, sc, ctx);
+      // and setattr...
+      auto intern = symbol::intern(dot_parts.back());
+      code.write_op(OP_SET_ATTR, intern);
+      return;
+    }
+
+
 
     if (const int ind = sc->find(name_obj); ind != -1) {
       // is a local assignment
@@ -211,11 +255,9 @@ void vm::compiler::compile_list(ref obj, vm::bytecode &code, scope_ptr sc, compi
       opcode = OP_SET_GLOBAL;
       index = global_ind;
     }
-
-    auto val_obj = obj.rest().rest().first();
     // compile the value onto the stack
     compile_object(val_obj, code, sc, ctx);
-
+    // and write the storage opcode for it
     code.write_op(opcode, index);
     return;
   }
@@ -223,14 +265,14 @@ void vm::compiler::compile_list(ref obj, vm::bytecode &code, scope_ptr sc, compi
   if (list_is_call_to("sleep", obj)) {
     ref arg = obj.rest().first();
     compile_object(arg, code, sc, ctx);
-    code.write((u8)OP_SLEEP);
+    code.write_op(OP_SLEEP);
     return;
   }
 
   if (list_is_call_to("return", obj)) {
     ref arg = obj.rest().first();
     compile_object(arg, code, sc, ctx);
-    code.write((u8)OP_RETURN);
+    code.write_op(OP_RETURN);
     return;
   }
 
@@ -253,6 +295,25 @@ void vm::compiler::compile_list(ref obj, vm::bytecode &code, scope_ptr sc, compi
     return;
   }
 
+
+  if (list_is_call_to("+", obj)) {
+    obj = obj.rest();
+
+    if (obj.is_nil()) {
+      compile_object(0, code, sc, ctx);
+      return;
+    }
+    compile_object(obj.first(), code, sc, ctx);
+    obj = obj.rest();
+    while (true) {
+      compile_object(obj.first(), code, sc, ctx);
+      code.write_op(OP_ADD);
+      if (obj.rest().is_nil()) break;
+      obj = obj.rest();
+    }
+    return;
+  }
+
   // dot special form
   if (list_is_call_to(".", obj)) {
     ref curr = obj.rest();
@@ -268,7 +329,7 @@ void vm::compiler::compile_list(ref obj, vm::bytecode &code, scope_ptr sc, compi
       if (a.is<symbol>()) {
         // compile getattr
         auto *s = a.as<symbol>();
-        int id = s->id;
+        auto id = s->id;
 
         // a symbol may be followed by a := in order to set the value
         // so we need to check it and set instead of get
@@ -280,7 +341,8 @@ void vm::compiler::compile_list(ref obj, vm::bytecode &code, scope_ptr sc, compi
             code.write_op(OP_SET_ATTR, id);
             break;
           } else {
-            throw cedar::make_exception("Unknown keyword '", next, "' in dot syntax: ", obj);
+            throw cedar::make_exception("Unknown keyword '", next,
+                                        "' in dot syntax: ", obj);
           }
         }
         code.write_op(OP_GET_ATTR, id);
@@ -294,10 +356,12 @@ void vm::compiler::compile_list(ref obj, vm::bytecode &code, scope_ptr sc, compi
         code.write_op(OP_DUP, 1);
 
         if (!method_ref.is<symbol>()) {
-          throw cedar::make_exception("invalid syntax in dot special form: ", obj, " method call '", method_ref, "' must be a symbol");
+          throw cedar::make_exception(
+              "invalid syntax in dot special form: ", obj, " method call '",
+              method_ref, "' must be a symbol");
         }
 
-        int id = method_ref.as<symbol>()->id;
+        auto id = method_ref.as<symbol>()->id;
 
         code.write_op(OP_GET_ATTR, id);
         code.write_op(OP_SWAP);
@@ -312,7 +376,8 @@ void vm::compiler::compile_list(ref obj, vm::bytecode &code, scope_ptr sc, compi
 
         code.write_op(OP_CALL, argc);
       } else {
-        throw cedar::make_exception("invalid syntax in dot special form: ", obj);
+        throw cedar::make_exception("invalid syntax in dot special form: ",
+                                    obj);
       }
       curr = curr.rest();
     }
@@ -362,7 +427,7 @@ void vm::compiler::compile_list(ref obj, vm::bytecode &code, scope_ptr sc, compi
     ref func_name = obj.first();
     symbol *s = ref_cast<symbol>(func_name);
     if (s != nullptr) {
-      int sid = s->id;
+      auto sid = s->id;
 
       if (vm::is_macro(sid)) {
         ref expanded = macroexpand_1(obj);
@@ -414,7 +479,8 @@ void vm::compiler::compile_list(ref obj, vm::bytecode &code, scope_ptr sc, compi
 
 
 
-void vm::compiler::compile_vector(ref vec_ref, vm::bytecode &code, scope_ptr sc, compiler_ctx *ctx) {
+void vm::compiler::compile_vector(ref vec_ref, vm::bytecode &code, scope_ptr sc,
+                                  compiler_ctx *ctx) {
   // load the vector constructor
   static ref vec_sym = new symbol("Vector");
 
@@ -423,12 +489,13 @@ void vm::compiler::compile_vector(ref vec_ref, vm::bytecode &code, scope_ptr sc,
   vector *vec = ref_cast<vector>(vec_ref);
 
   if (vec == nullptr) {
-    throw cedar::make_exception("compile_vector requires a vector... given ", vec_ref);
+    throw cedar::make_exception("compile_vector requires a vector... given ",
+                                vec_ref);
   }
 
-  int size = vec->size();
+  auto size = vec->size();
 
-  for (int i = 0; i < size; i++) {
+  for (auto i = 0; i < size; i++) {
     elems.push_back(vec->at(i));
   }
 
@@ -445,14 +512,15 @@ void vm::compiler::compile_vector(ref vec_ref, vm::bytecode &code, scope_ptr sc,
 
 
 
-void vm::compiler::compile_number(ref obj, vm::bytecode &code, scope_ptr, compiler_ctx *) {
+void vm::compiler::compile_number(ref obj, vm::bytecode &code, scope_ptr,
+                                  compiler_ctx *) {
   if (obj.is_flt()) {
-    code.write((uint8_t)OP_FLOAT);
+    code.write_op(OP_FLOAT);
     code.write(obj.to_float());
     return;
   }
   if (obj.is_int()) {
-    code.write((uint8_t)OP_INT);
+    code.write_op(OP_INT);
     code.write(obj.to_int());
     return;
   }
@@ -461,10 +529,10 @@ void vm::compiler::compile_number(ref obj, vm::bytecode &code, scope_ptr, compil
 
 
 
-void vm::compiler::compile_constant(ref obj, bytecode &code, scope_ptr, compiler_ctx *) {
+void vm::compiler::compile_constant(ref obj, bytecode &code, scope_ptr,
+                                    compiler_ctx *) {
   auto const_index = code.push_const(obj);
-  code.write((uint8_t)OP_CONST);
-  code.write((uint64_t)const_index);
+  code.write_op(OP_CONST, const_index);
 }
 
 
@@ -473,7 +541,8 @@ void vm::compiler::compile_constant(ref obj, bytecode &code, scope_ptr, compiler
 // symbol in it's map, it will be a local closure index and will be a fast O(1)
 // lookup. If it isn't found in the map, the symbol lookup will defer to the
 // global lookup system and be slightly slower
-void vm::compiler::compile_symbol(ref sym, bytecode &code, scope_ptr sc, compiler_ctx *ctx) {
+void vm::compiler::compile_symbol(ref sym, bytecode &code, scope_ptr sc,
+                                  compiler_ctx *ctx) {
   auto nsym = [&](cedar::runes s) { return new_obj<symbol>(s); };
 
   cedar::runes str = sym.to_string();
@@ -482,9 +551,10 @@ void vm::compiler::compile_symbol(ref sym, bytecode &code, scope_ptr sc, compile
   static ref mod_sym = new symbol("*module*");
 
   if (sym == mod_sym) {
-    code.write((u8)OP_GET_MODULE);
+    code.write_op(OP_GET_MODULE);
     return;
   }
+
 
   bool is_dot = false;
   for (auto it : str) {
@@ -515,7 +585,8 @@ void vm::compiler::compile_symbol(ref sym, bytecode &code, scope_ptr sc, compile
         rest += it;
     }
 
-    if (rest.size() == 0) throw cedar::make_exception("invalid dot notation: ", sym);
+    if (rest.size() == 0)
+      throw cedar::make_exception("invalid dot notation: ", sym);
 
     ref d = nsym(obj);
     ref key = nsym(rest);
@@ -529,15 +600,13 @@ void vm::compiler::compile_symbol(ref sym, bytecode &code, scope_ptr sc, compile
   // if the symbol is found in the enclosing closure/freevars, just push the
   // constant time 'lookup' instruction
   if (const int ind = sc->find(sym); ind != -1) {
-    code.write((uint8_t)OP_LOAD_LOCAL);
-    code.write((uint64_t)ind);
+    code.write_op(OP_LOAD_LOCAL, ind);
     return;
   }
   symbol *symb = sym.as<symbol>();
 
   // grab the symbol from the global scope
-  code.write((uint8_t)OP_LOAD_GLOBAL);
-  code.write((i64)symb->id);
+  code.write_op(OP_LOAD_GLOBAL, symb->id);
 }
 
 
@@ -546,14 +615,13 @@ void vm::compiler::compile_symbol(ref sym, bytecode &code, scope_ptr sc, compile
 // lambda compilation is complicated becuase of the closure system behind the
 // scenes. Closures need to be known at compile time, so top level lambda
 // expressions need to construct the closure on their call, not construction
-void vm::compiler::compile_lambda_expression(ref expr, bytecode &code, scope_ptr sc, compiler_ctx *ctx) {
+void vm::compiler::compile_lambda_expression(ref expr, bytecode &code,
+                                             scope_ptr sc, compiler_ctx *ctx) {
   static auto amp_sym = newsymbol("&");
-
   static auto fn_sym = newsymbol("fn");
   static auto gen_sym = newsymbol("gen");
 
   ref func_sig_symbol = expr.first();
-
 
   ctx->lambda_depth++;
 
@@ -572,7 +640,8 @@ void vm::compiler::compile_lambda_expression(ref expr, bytecode &code, scope_ptr
     if (args.is<symbol>()) {
       name = args;
     } else {
-      throw cedar::make_exception("unknown name option on lambda literal: ", args);
+      throw cedar::make_exception("unknown name option on lambda literal: ",
+                                  args);
     }
     expr = expr.rest();
     args = expr.rest().first();
@@ -590,7 +659,9 @@ void vm::compiler::compile_lambda_expression(ref expr, bytecode &code, scope_ptr
     if (arg == amp_sym) {
       vararg = true;
       args = args.rest();
-      if (args.is_nil()) throw cedar::make_exception("invalid vararg syntax in function: ", expr);
+      if (args.is_nil())
+        throw cedar::make_exception("invalid vararg syntax in function: ",
+                                    expr);
       if (!args.rest().is_nil())
         throw cedar::make_exception(
             "invalid vararg syntax in function - only one vararg argument name "
@@ -604,7 +675,8 @@ void vm::compiler::compile_lambda_expression(ref expr, bytecode &code, scope_ptr
       ctx->closure_size++;
       argc++;
       if (vararg && !args.rest().is_nil()) {
-        throw cedar::make_exception("function variable arguments invalid: ", expr);
+        throw cedar::make_exception("function variable arguments invalid: ",
+                                    expr);
       }
 
     } else {
@@ -619,27 +691,28 @@ void vm::compiler::compile_lambda_expression(ref expr, bytecode &code, scope_ptr
   auto body = expr.rest().rest().first();
 
   compile_object(body, *new_code, new_scope, ctx);
-  new_code->write((uint8_t)OP_RETURN);
+  new_code->write_op(OP_RETURN);
 
   ctx->lambda_depth--;
 
-  // new_code->write((u8)OP_EXIT);
   new_code->finalize();
   auto *new_lambda = new lambda(new_code);
   new_lambda->vararg = vararg;
   new_lambda->argc = argc;
   new_lambda->arg_index = arg_index;
   new_lambda->name = name;
+  new_lambda->defining = expr;
 
   const int const_ind = code.push_const(new_lambda);
-  code.write((uint8_t)OP_MAKE_FUNC);
-  code.write((uint64_t)const_ind);
+  code.write_op(OP_MAKE_FUNC, const_ind);
 }
 
 
 
 
-void vm::compiler::compile_quasiquote(ref obj, vm::bytecode &bc, vm::scope_ptr sc, vm::compiler_ctx *ctx) {
+void vm::compiler::compile_quasiquote(ref obj, vm::bytecode &bc,
+                                      vm::scope_ptr sc, vm::compiler_ctx *ctx) {
+  printf("HERE\n");
   // std::cout << obj << std::endl;
   if (obj.is_nil()) {
     bc.write((u8)OP_NIL);

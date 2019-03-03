@@ -48,7 +48,7 @@ cedar::string::~string() {}
 
 
 struct string_char_conversion {
-  char c;
+  rune c;
   runes r;
 };
 
@@ -69,12 +69,10 @@ cedar::runes string::to_string(bool human) {
   };
 
 
-  auto get_char_runes = [&] (char c) -> runes {
+  auto get_char_runes = [&] (rune c) -> runes {
     for (auto & m : mappings) {
       if (m.c == c) return m.r;
     }
-
-
     runes str;
     str += c;
     return str;
@@ -83,7 +81,7 @@ cedar::runes string::to_string(bool human) {
   cedar::runes str;
   if (!human) {
     str += "\"";
-    for (auto & c : m_content) {
+    for (rune  c : m_content) {
       str += get_char_runes(c);
     }
     str += "\"";

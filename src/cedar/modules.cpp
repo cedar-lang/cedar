@@ -31,22 +31,30 @@
 #include <cedar/parser.h>
 #include <cedar/vm/compiler.h>
 #include <stdio.h>
+#include <boost/filesystem.hpp>
 #include <cedar/util.hpp>
+#include <flat_hash_map.hpp>
 #include <mutex>
 #include <unordered_map>
 
+#ifndef BUILD_DIR
+#define BUILD_DIR ""
+#endif
+
+
 using namespace cedar;
+
 
 static std::vector<std::string> get_path(void) {
   const char *path = getenv("CEDARPATH");
   if (path == nullptr) {
     // return the default path
     std::vector<std::string> path;
+
+
     path.push_back(".");
     path.push_back("./lib");
     path.push_back("/usr/local/lib/cedar");
-    path.push_back(apathy::Path("~/.local/lib/cedar").absolute().string());
-    path.push_back(apathy::Path("~/.local/lib/cedar").absolute().string());
     return path;
   }
 
@@ -56,31 +64,41 @@ static std::vector<std::string> get_path(void) {
 
 
 static std::mutex mod_mutex;
-static std::unordered_map<std::string, module *> modules;
+static ska::flat_hash_map<std::string, module *> modules;
 
 
 
 static module *require_file(apathy::Path p) {
-  std::unique_lock<std::mutex> lock(mod_mutex);
   std::string path = p.string();
 
+  // lock the module mutex
+  mod_mutex.lock();
+  // check if the file has already been imported
   if (modules.count(path) != 0) {
-    return modules.at(path);
+    // if it has, grab it
+    auto m = modules.at(path);
+    // unlock
+    mod_mutex.unlock();
+    return m;
   }
+  // yield the mutex
+  mod_mutex.unlock();
 
-  cedar::runes src = util::read_file(path.c_str());
+  // read the file
+  std::ifstream fp(path);
+  std::string str((std::istreambuf_iterator<char>(fp)),
+                  std::istreambuf_iterator<char>());
 
+  cedar::runes src = str;
 
   module *mod = new module(path);
-
-
-  static int file_id = get_symbol_intern_id("*file*");
+  static auto file_id = symbol::intern("*file*");
   mod->setattr_fast(file_id, new string(path));
-
   eval_string_in_module(src, mod);
 
+  mod_mutex.lock();
   modules[path] = mod;
-
+  mod_mutex.unlock();
   return mod;
 }
 
@@ -95,22 +113,18 @@ module *cedar::require(std::string name) {
   for (std::string p : path) {
     apathy::Path f = p;
     f.append(name);
-    if (f.is_directory()) {
-      return require_file(f.append("main.cdr"));
-    }
-    if (f.is_file()) {
-      return require_file(f);
-    }
+    if (f.is_directory()) return require_file(f.append("main.cdr"));
+    if (f.is_file()) return require_file(f);
     // well the above stuff didn't work...
     // so lets try adding .cdr to the end :)
     f = p;
     f.append(name + ".cdr");
-    if (f.is_file()) {
-      return require_file(f);
-    }
+    if (f.is_file()) return require_file(f);
   }
   throw cedar::make_exception("unable to find module, '", name, "' in path");
 }
+
+
 
 // simple function to allow modules to be added externally
 void cedar::define_builtin_module(std::string name, module *mod) {
@@ -119,20 +133,16 @@ void cedar::define_builtin_module(std::string name, module *mod) {
 
 
 
-
-ref cedar::eval_string_in_module(cedar::runes src, module *mod) {
+ref cedar::eval_string_in_module(cedar::runes &src, module *mod) {
   reader reader;
   reader.lex_source(src);
-
   bool valid = true;
-
   ref val;
   while (true) {
     ref obj = reader.read_one(&valid);
     if (!valid) break;
     val = eval(obj, mod);
   }
-
   return val;
 }
 
@@ -142,7 +152,6 @@ ref cedar::eval(ref obj, module *mod) {
   ref compiled_lambda = c.compile(obj, mod);
   lambda *raw_program = ref_cast<cedar::lambda>(compiled_lambda);
   raw_program->mod = mod;
-
   ref v = eval_lambda(raw_program);
   return v;
 }

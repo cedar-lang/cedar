@@ -282,7 +282,7 @@ cedar_binding(cedar_os_open) {
 
 static ref obj_dir(int argc, ref *argv, call_context *ctx) {
   if (argc != 1) {
-    throw cedar::make_exception("importutil.merge-here requires 1 argument");
+    throw cedar::make_exception("dir requires 1 argument");
   }
 
   object *from = ref_cast<object>(argv[0]);
@@ -293,16 +293,19 @@ static ref obj_dir(int argc, ref *argv, call_context *ctx) {
 
   ref v = new vector();
 
+  if (from->m_attrs.m_buckets == nullptr) {
+    printf("here\n");
+    return v;
+  }
+
   // TODO please implement an iterator for attr_map... is
   //      an awful hack for what needs to be done here...
   for (int i = 0; i < 8; i++) {
     attr_map::bucket *b;
     for (b = from->m_attrs.m_buckets[i]; b != nullptr; b = b->next) {
-
       symbol *s = new symbol();
       s->id = b->key;
       v = self_call(v, "put", s);
-      // from->setattr_fast(b->key, b->val);
     }
   }
 

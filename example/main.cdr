@@ -1,4 +1,4 @@
-
+(import os)
 
 (def (fact n)
   (cond (<= n 1) 1
@@ -12,20 +12,12 @@
     (+ (ofib (- n 2)) (ofib (- n 1)))))
 
 
-
-
-
-
-
-
-
 (def (walk start)
   (lazily (cons start (walk (inc start)))))
 
 
-
 (def (hexchar x)
-  (get "0123456789ABCDEF" (bit-and x 0x0F)))
+  (get "0123456789ABCDEF" (bits.and x 0x0F)))
 
 (def (trim-zeros s)
   (if (= (first s) "0")
@@ -34,32 +26,11 @@
 (def (hex x)
   (let (s "" i 0)
     (while (< i 16)
-      (def s (str (hexchar (bit-and x 0x0F)) s))
+      (def s (str (hexchar (bits.and x 0x0F)) s))
       (def x (bit-shift-right x 4))
       (def i (inc i)))
     (trim-zeros s)))
 
-
-(def (vmap func v)
-  (do
-    (when (not (vector? v)) (throw "vmap requires a vector"))
-    (let (len (count v)
-          i 0)
-      (while (< i len)
-        (def v (set v i (func (get v i))))
-        (def i (inc i)))
-      v)))
-
-
-
-
-
-(def (vrange n)
-  (let (i 0
-        v [])
-    (if (< i n)
-      (recur (inc i) (cons i v))
-      v)))
 
 (def (memoize f)
   (let (mem {}
@@ -69,136 +40,6 @@
         (if (= r not-found-sym)
           (set mem args (apply f args))
           r)))))
-
-
-
-(def (lazy-filter pred coll)
-  (if (nil? coll) nil
-    (let (f (first coll)
-          r (rest coll))
-      (if (pred f)
-        (lazily (cons f (lazy-filter pred r)))
-        (lazy-filter pred r)))))
-
-;;  primes = sieve [2..]
-;; sieve (p:ps) = p : sieve [x | x <- ps, mod x p /= 0]
-
-(def (prime-filter p)
-  (fn (x) (not= (mod x p) 0)))
-
-(def (sieve _ps)
-  (let (p  (first _ps)
-        ps (rest _ps))
-    (lazily (cons p (sieve (lazy-filter (prime-filter p) ps))))))
-
-
-(def primes (sieve (walk 2)))
-
-(def (apply-to f)
-  (fn (args)
-    (apply f args)))
-
-
-;; A little matrix multiply routine and friends
-(def (transpose s)
-  (apply vector (map (fn (x) (apply vector x))
-                     (apply zip s))))
-(def (nested-for f x y)
-  (map (fn (a)
-         (map (fn (b)
-                (f a b)) y)) x))
-
-(def (matmul-1 a b)
-  (nested-for (fn (x y)
-                (reduce + 0 (map (apply-to *) (zip x y)))) ;; f
-              a ;; x
-              (transpose b))) ;; y
-
-(def (matmul a b)
-  (apply vector (map (apply-to vector) (matmul-1 a b))))
-
-
-(def A [[1 2 3]
-        [4 5 6]
-        [7 8 9]])
-
-(def B [[1 0 0]
-        [0 1 0]
-        [0 0 1]])
-
-
-(def V1 (transpose [[1 2 3]]))
-
-(def V2 (transpose [[2 4 6]]))
-
-
-
-;; define a multi method that takes any
-;; object and switches over it's type
-(defmulti parse-ast type)
-
-
-(defmethod parse-ast List (obj)
-  {:op :call
-   :func (first obj)
-   :args (apply vector (map parse-ast (rest obj)))})
-
-(defmethod parse-ast Vector (obj)
-  {:op :vector
-   :elements (apply vector (map parse-ast obj))})
-
-(defmethod parse-ast :default (obj) {:op :const
-                                     :val obj})
-
-
-(defmethod parse-ast :default (obj)
-  {:type :const
-   :val obj})
-
-
-
-
-(def (gcd n d)
-  (while (not= d 0)
-    (let (t d)
-      (def d (mod n d))
-      (def n t)))
-  n)
-
-
-(deftype Fraction
-  (def (new self n d)
-    (let (g (gcd n d))
-      (. self n := (/ n g))
-      (. self d := (/ d g))))
-
-  ;; show operations
-  (def (repr self)
-    (str "(Fraction " self.n " " self.d ")"))
-  (def (str self)
-    (cond (= self.n 0)      "0"
-          (= self.n self.d) "1"
-          :default          (str self.n "/" self.d)))
-
-  (def (+ a b)
-    (Fraction (+ (* a.n b.d) (* a.d b.n))
-              (+ (* a.d b.d))))
-
-  (def (- a b)
-    (Fraction (- (* a.n b.d) (* a.d b.n))
-              (+ (* a.d b.d))))
-
-  (def (* a b)
-    (Fraction (* a.n b.n) (* a.d b.d)))
-
-  (def (/ a b)
-    (Fraction (* a.n b.d) (* a.d b.n))))
-
-
-(def (nth n coll)
-  (cond (= n 0) (first coll)
-        (recur (dec n) (rest coll))))
-
 (def (fib-iter max n i j)
   (if (= n max)
     j
@@ -213,33 +54,11 @@
     max
     (fib-iter max 1 0.0 1.0)))
 
-(def (sq x) (* x x))
-
-
-(def (each f coll)
-  (do (f (first coll))
-      (recur f (rest coll))))
 
 
 
-
-(declare json/encode json/encode-map)
-
-
-(def (json/encode-dict-pair p)
-  (str (json/encode (first p)) ": " (json/encode (rest p))))
-
-(def (json/encode-dict m)
-  (str "{"  (join (map json/encode-dict-pair (keys m)) ", ")  "}"))
-
-(def (json/encode x)
-  (let [tp (type x)]
-    (cond (or (= tp Vector)
-              (= tp List)) (str "[" (join (map json/encode x) ", ") "]")
-          (= tp Dict) (json/encode-dict x)
-          (= tp Keyword) (repr (rest (str x)))
-          (= tp Symbol) (repr (str x))
-          (= tp Nil) "null"
-          (= tp Number) (str x)
-          :default (repr (str x)))))
+(deftype tokenizer
+  (def i 0)
+  (defn new [self s]
+    (def self.string s)))
 

@@ -57,6 +57,7 @@ namespace cedar {
 			runes(const char*);
 			runes(const char32_t*);
 			runes(std::string);
+			runes(std::u32string);
 			runes(const cedar::runes&);
 
 			~runes(void);
@@ -96,6 +97,7 @@ namespace cedar {
 
 
 			operator std::string() const;
+			operator std::u32string() const;
 
 			rune operator[](size_t) const;
 			rune operator[](size_t);
@@ -124,7 +126,6 @@ struct std::hash<cedar::runes> {
 	std::size_t operator()(const cedar::runes& k) const
 	{
 		std::hash<cedar::runes::container> hash_func;
-
 		return hash_func(k.buf);
 	}
 };

@@ -26,22 +26,27 @@
 #include <cedar/object/lambda.h>
 #include <cedar/object/symbol.h>
 #include <cedar/ref.h>
-#include <mutex>
-#include <unordered_map>
-
 #include <sparsepp/spp.h>
+#include <flat_hash_map.hpp>
+#include <mutex>
 
 using namespace cedar;
 
 static std::mutex g_lock;
-static std::unordered_map<int, ref> globals;
+static ska::flat_hash_map<u64, ref> globals;
 
 
 
 module *cedar::core_mod = nullptr;
 
+bool cedar::is_global(u64 id) {
+  g_lock.lock();
+  bool is = globals.count(id) == 1;
+  g_lock.unlock();
+  return is;
+}
 
-void cedar::def_global(int id, ref val) {
+void cedar::def_global(u64 id, ref val) {
   g_lock.lock();
   globals[id] = val;
   g_lock.unlock();
@@ -49,42 +54,35 @@ void cedar::def_global(int id, ref val) {
 
 
 
-void cedar::def_global(ref k, ref val) {
-  def_global(k.as<symbol>()->id, val);
-}
+void cedar::def_global(ref k, ref val) { def_global(k.as<symbol>()->id, val); }
 
 
 
 void cedar::def_global(runes k, ref val) {
-  def_global(get_symbol_intern_id(k), val);
+  def_global(symbol::intern(k), val);
 }
 
 
 
 void cedar::def_global(runes k, bound_function f) {
-  int id = get_symbol_intern_id(k);
+  u64 id = symbol::intern(k);
   ref func = new lambda(f);
   def_global(id, func);
 }
 
 
 
-ref cedar::get_global(int id) {
+ref cedar::get_global(u64 id) {
   std::unique_lock<std::mutex> lock(g_lock);
 
-  try {
+  if (globals.count(id) != 0) {
     return globals.at(id);
-  } catch (std::exception & e) {
-    throw cedar::make_exception("Unable to find global variable ", get_symbol_id_runes(id));
   }
-
+  throw cedar::make_exception("Unable to find global variable ",
+                              symbol::unintern(id));
   return nullptr;
 }
 
-ref cedar::get_global(ref k) {
-  return get_global(k.as<symbol>()->id);
-}
+ref cedar::get_global(ref k) { return get_global(k.as<symbol>()->id); }
 
-ref cedar::get_global(runes k) {
-  return get_global(get_symbol_intern_id(k));
-}
+ref cedar::get_global(runes k) { return get_global(symbol::intern(k)); }

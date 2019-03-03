@@ -90,7 +90,7 @@ static u64 time_microseconds(void) {
 
 
 void fiber::adjust_stack(int required) {
-  if (stack_size < required || stack == nullptr) {
+  if (required >= 0 && (stack_size < required || stack == nullptr)) {
     auto *new_stack = new ref[required];
 
     if (stack != nullptr) {
@@ -152,7 +152,7 @@ fiber::~fiber(void) {}
 
 
 void fiber::print_callstack(void) {
-  static int name_id = get_symbol_intern_id("*name*");
+  static auto name_id = symbol::intern("*name*");
   printf("Fiber #%d\n", fid);
   int i = 0;
   for (frame *f = call_stack; f != nullptr; f = f->caller) {
@@ -225,11 +225,11 @@ void fiber::run(scheduler *sched, run_context *state, int max_ms) {
     SET_LABEL(OP_SET_LOCAL);
     SET_LABEL(OP_LOAD_GLOBAL);
     SET_LABEL(OP_SET_GLOBAL);
+    SET_LABEL(OP_SET_PRIVATE);
     SET_LABEL(OP_CONS);
     SET_LABEL(OP_APPEND);
     SET_LABEL(OP_CALL);
     SET_LABEL(OP_MAKE_FUNC);
-    // SET_LABEL(OP_ARG_POP);
     SET_LABEL(OP_RETURN);
     SET_LABEL(OP_EXIT);
     SET_LABEL(OP_SKIP);
@@ -244,6 +244,7 @@ void fiber::run(scheduler *sched, run_context *state, int max_ms) {
     SET_LABEL(OP_EVAL);
     SET_LABEL(OP_SLEEP);
     SET_LABEL(OP_GET_MODULE);
+    SET_LABEL(OP_ADD);
     created_thread_labels = true;
   }
 
@@ -258,20 +259,20 @@ void fiber::run(scheduler *sched, run_context *state, int max_ms) {
 
 
 
-#define PREDICT(NEXTOP)           \
-  do {                            \
-    u8 next = *IP();              \
-    if (next == NEXTOP) {         \
-      IP()++;                     \
-      goto DO_##NEXTOP;           \
-    }                             \
+#define PREDICT(NEXTOP)   \
+  do {                    \
+    u8 next = *IP();      \
+    if (next == NEXTOP) { \
+      IP()++;             \
+      goto DO_##NEXTOP;   \
+    }                     \
   } while (0);
 
   // #define PREDICT(NEXTOP)
-
   u8 op = 0;
-
   u64 ran = 0;
+
+
 loop:
 
   if (max_ms != -1 && sched != nullptr) {
@@ -289,6 +290,7 @@ loop:
       if (current - start_time > max_time) {
         state->done = false;
         state->value = nullptr;
+        printf("BREAK\n");
         return;
       }
     }
@@ -297,13 +299,30 @@ loop:
   op = *IP();
   IP()++;
 
+
+
+
+
+  /*
+  switch (op) {
+#define V(NAME, VAL, a, b)           \
+  case VAL:                          \
+    printf("%02x: %s\n", op, #NAME); \
+    break;
+    CEDAR_FOREACH_OPCODE(V)
+#undef V
+  }
+  */
+
   ran++;
 
   goto *threaded_labels[op];
   switch (op) {
     TARGET(OP_NOP) {
       PRELUDE;
-      fprintf(stderr, "UNHANDLED INSTRUCTION: %02x\n", op);
+      fprintf(stderr, "Unhandled instruction %02x in lambda ", op);
+      std::cout << PROG()->defining << std::endl;
+      exit(-1);
       DISPATCH;
     }
 
@@ -361,33 +380,33 @@ loop:
 
     TARGET(OP_LOAD_GLOBAL) {
       PRELUDE;
-      i64 ind = CODE_READ(i64);
-      CODE_SKIP(i64);
-      symbol s;
-      s.id = ind;
-      ref c = &s;
+      u64 ind = CODE_READ(u64);
+      CODE_SKIP(u64);
       ref val = nullptr;
 
-      if (PROG()->mod != nullptr) {
-        attr_map::bucket *b;
-        b = PROG()->mod->m_attrs.buck(ind);
-        if (b != nullptr) {
-          val = b->val;
-          PUSH(val);
+      module *m = PROG()->mod;
+
+      if (m != nullptr) {
+        bool has = false;
+        ref v = m->find(ind, &has, m);
+        if (has) {
+          PUSH(v);
           DISPATCH;
         }
       }
 
 
       if (core_mod != nullptr) {
-        attr_map::bucket *b = core_mod->m_attrs.buck(ind);
-        if (b != nullptr) {
-          val = b->val;
-          PUSH(val);
+        bool has = false;
+        ref v = core_mod->find(ind, &has, m);
+        if (has) {
+          PUSH(v);
           DISPATCH;
         }
       }
-
+      symbol s;
+      s.id = ind;
+      ref c = &s;
       val = get_global(c);
       PUSH(val);
       DISPATCH;
@@ -410,6 +429,15 @@ loop:
       DISPATCH;
     }
 
+    TARGET(OP_SET_PRIVATE) {
+      PRELUDE;
+      auto ind = CODE_READ(i64);
+      CODE_SKIP(i64);
+      ref v = POP();
+      PROG()->mod->set_private(ind, v);
+      PUSH(v);
+      DISPATCH;
+    }
 
 
     TARGET(OP_CONS) {
@@ -479,8 +507,8 @@ loop:
           DISPATCH;
         }
       } else if (stack[new_fp].is<type>()) {
-        static int __alloc__id = get_symbol_intern_id("__alloc__");
-        static int new_id = get_symbol_intern_id("new");
+        static auto __alloc__id = symbol::intern("__alloc__");
+        static auto new_id = symbol::intern("new");
         // if the function to be called was a type, we need to make an instance
         type *cls = stack[new_fp].as<type>();
         ref alloc_func_ref = cls->getattr_fast(__alloc__id);
@@ -501,12 +529,9 @@ loop:
           throw cedar::make_exception("`new` method for ", ref{cls},
                                       " is not a function");
         }
-
         lambda *new_func = new_func_ref.as<lambda>();
-
         // call the new function on the object
         call_function(new_func, argc + 1, stack + new_fp, &ctx);
-
         SP() = new_fp + 1;
         PREDICT(OP_RETURN);
         PREDICT(OP_SET_GLOBAL);
@@ -518,9 +543,6 @@ loop:
       SP() = new_fp + 1;
       DISPATCH;
     }
-
-
-
 
     TARGET(OP_MAKE_FUNC) {
       PRELUDE;
@@ -629,8 +651,8 @@ loop:
 
     TARGET(OP_GET_ATTR) {
       PRELUDE;
-      i64 id = CODE_READ(i64);
-      CODE_SKIP(i64);
+      u64 id = CODE_READ(u64);
+      CODE_SKIP(u64);
       auto val = POP();
       // create a stack allocated symbol
       symbol s;
@@ -735,6 +757,16 @@ loop:
     TARGET(OP_GET_MODULE) {
       PRELUDE;
       PUSH(PROG()->mod);
+      DISPATCH;
+    }
+
+
+
+    TARGET(OP_ADD) {
+      PRELUDE;
+      ref b = POP();
+      ref a = POP();
+      PUSH(a + b);
       DISPATCH;
     }
   }
