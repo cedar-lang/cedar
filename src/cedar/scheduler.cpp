@@ -225,12 +225,19 @@ void cedar::add_job(fiber *f) { schd->add_job(f); }
  * such a call
  */
 ref cedar::eval_lambda(lambda *fn) {
+
+  /* create a stack-local fiber that will be run to completion */
   fiber f(fn);
+  /* add a reference to that stack-local fiber to the scheduler */
   schd->add_job(&f);
+  /* make sure the scheduler is running */
   schd->set_state(scheduler::running);
+  /* loop until the fiber is done */
   while (!f.done) {
+    /* tick the scheduler along */
     schd->schedule();
   }
+  /* pull the return value out of the fiber once done */
   return f.return_value;
 }
 
