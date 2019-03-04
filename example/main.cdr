@@ -40,6 +40,8 @@
         (if (= r not-found-sym)
           (set mem args (apply f args))
           r)))))
+
+
 (def (fib-iter max n i j)
   (if (= n max)
     j
@@ -47,18 +49,8 @@
            (inc n)
            j
            (+ i j))))
-
-
 (def (fib max)
   (if (< max 2)
     max
-    (fib-iter max 1 0.0 1.0)))
-
-
-
-
-(deftype tokenizer
-  (def i 0)
-  (defn new [self s]
-    (def self.string s)))
+    (fib-iter max 1 0 1)))
 

@@ -64,6 +64,7 @@ namespace cedar {
   };
 
 
+  scheduler *this_scheduler(void);
 
   // the context that gets passed into a bound_function
   // call in the fiber loop

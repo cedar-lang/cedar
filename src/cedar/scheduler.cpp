@@ -36,8 +36,26 @@
 #include <chrono>
 #include <cstdlib>
 #include <mutex>
+#include <flat_hash_map.hpp>
 
 using namespace cedar;
+
+/**
+ * get the current thread's scheduler,
+ * and if there isn't one already, create it.
+ */
+scheduler *cedar::this_scheduler(void) {
+  static ska::flat_hash_map<std::thread::id, scheduler*> pool;
+  auto id = std::this_thread::get_id();
+  if (pool.count(id) == 0) {
+    std::cout << "Creating new scheduler on thread " << id << ".\n";
+    auto s = new scheduler();
+    s->set_state(scheduler::running);
+    pool[id] = s;
+    return s;
+  }
+  return pool[id];
+}
 
 static u64 time_ms(void) {
   auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -185,15 +203,13 @@ struct sched_thread {
 };
 
 
-static scheduler *schd;
+// static scheduler *schd;
 
 namespace cedar {
   void bind_stdlib(void);
 };
 
 static void init_scheduler(void) {
-  schd = new scheduler();
-  schd->set_state(scheduler::running);
   return;
 }
 
@@ -212,7 +228,7 @@ void cedar::init(void) {
 }
 
 
-void cedar::add_job(fiber *f) { schd->add_job(f); }
+void cedar::add_job(fiber *f) { this_scheduler()->add_job(f); }
 
 
 /**
@@ -225,9 +241,9 @@ void cedar::add_job(fiber *f) { schd->add_job(f); }
  * such a call
  */
 ref cedar::eval_lambda(lambda *fn) {
-
   /* create a stack-local fiber that will be run to completion */
   fiber f(fn);
+  scheduler *schd = this_scheduler();
   /* add a reference to that stack-local fiber to the scheduler */
   schd->add_job(&f);
   /* make sure the scheduler is running */
