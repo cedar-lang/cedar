@@ -85,7 +85,7 @@ namespace cedar {
 
 
 
-  class object : public gc {
+  class object {
    public:
     type *m_type;
 
