@@ -28,8 +28,8 @@
 #include <cedar/types.h>
 #include <uv.h>
 #include <future>
+#include <list>
 #include <mutex>
-#include <queue>
 #include <thread>
 
 namespace cedar {
@@ -47,13 +47,13 @@ namespace cedar {
   // a job is a representation of a fiber's state as
   // viewed by the scheduler
   struct job {
-    int jid = 0;
-    i64 sleeping_for = 0;
-    u64 last_ran;
-    u64 create_time;
-    int run_count = 0;
-    int wait_time = 0;
-    fiber *task;
+    int jid = 0; /* the job id for this job. Simply an enumerated identifier */
+    i64 sleep = 0;   /* how long this process should sleep for. This is relative
+                        to the last run time */
+    u64 last_ran;    /* when the job was last ran, in milliseconds */
+    u64 create_time; /* when the job was created in milliseconds */
+    int ticks = 0;   /* how many times this job has been switched into */
+    fiber *task; /* the actual task that needs to be run. Must never be null */
   };
 
 
@@ -93,7 +93,7 @@ namespace cedar {
     // schedule a job and return true if there are more jobs
     // and return false if there are no more jobs to run
     job *jobs = nullptr;
-    std::queue<job *> work;
+    std::list<job *> work;
     std::mutex job_mutex;
 
    public:

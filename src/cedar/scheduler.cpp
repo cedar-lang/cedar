@@ -85,14 +85,26 @@ void scheduler::add_job(fiber *f) {
 
   // increment the number of jobs in the scheduler
   jobc++;
-  printf("%zu items\n", work.size());
-  work.push(j);
+  // push the job to the back of the job pool, so other older jobs get to run
+  // before this one.
+  work.push_back(j);
 }
 
 
 
 
 bool scheduler::schedule(void) {
+  static int sched_time = 10;
+  static bool read_env = false;
+  static const char *SCHED_TIME_ENV = getenv("CDR_SCHED_TIME");
+  if (SCHED_TIME_ENV != nullptr && !read_env) {
+    sched_time = atol(SCHED_TIME_ENV);
+    if (sched_time < 2)
+      throw cedar::make_exception("$CDR_SCHED_TIME must be larger than 2ms");
+    read_env = true;
+  }
+
+
   using mutex_lock = std::unique_lock<std::mutex>;
   if (state != running) {
     return false;
@@ -100,7 +112,7 @@ bool scheduler::schedule(void) {
   job *proc;
   u64 time = time_ms();
 
-
+  /* grab a process to be run */
   {
     mutex_lock lock(job_mutex);
     if (work.empty()) {
@@ -108,30 +120,37 @@ bool scheduler::schedule(void) {
       return false;
     }
     proc = work.front();
-    work.pop();
+    work.pop_front();
   }
 
+  /*  */
   bool done = false;
 
-  if (time >= (proc->last_ran + proc->sleeping_for)) {
-    printf("scheduling job %d\n", proc->jid);
-    proc->run_count++;
+
+  /* check if this process needs to be run or not */
+  if (time >= (proc->last_ran + proc->sleep)) {
+    // printf("   scheduling %d for tick %d\n", proc->jid, proc->ticks);
     run_context ctx;
-    // run the job for 2 ms
-    proc->task->run(this, &ctx, 2);
+
+    // switch into the job for `shced_time` ms
+    proc->task->run(this, &ctx, sched_time);
     proc->last_ran = time_ms();
-    proc->sleeping_for = ctx.sleep_for;
+    proc->sleep = ctx.sleep_for;
+    proc->ticks++;
     done = ctx.done;
     proc->task->done = done;
   }
 
-  job_mutex.lock();
-  if (done) {
-    jobc--;
-  } else {
-    work.push(proc);
+  /* cleanup */
+  {
+    mutex_lock lock(job_mutex);
+    if (done) {
+      jobc--;
+      // printf("Finished job %5d in %5d ticks\n", proc->jid, proc->ticks);
+    } else {
+      work.push_back(proc);
+    }
   }
-  job_mutex.unlock();
   return true;
 }
 
@@ -206,18 +225,13 @@ void cedar::add_job(fiber *f) { schd->add_job(f); }
  * such a call
  */
 ref cedar::eval_lambda(lambda *fn) {
-  fiber *f = new fiber(fn);
-  schd->add_job(f);
+  fiber f(fn);
+  schd->add_job(&f);
   schd->set_state(scheduler::running);
-  while (!f->done) {
-    printf("here\n");
+  while (!f.done) {
     schd->schedule();
   }
-
-  printf("done here\n");
-  ref v = f->return_value;
-  delete f;
-  return v;
+  return f.return_value;
 }
 
 
