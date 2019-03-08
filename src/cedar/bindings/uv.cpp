@@ -64,6 +64,7 @@ static void _timer_cb(uv_timer_t* handle) {
 }
 
 static cedar_binding(uv_create_timer) {
+  /*
   uv_loop_t *loop = ctx->schd->loop;
 
   if (argc != 3) throw cedar::make_exception("uv.create-timer requires 2 args");
@@ -85,6 +86,7 @@ static cedar_binding(uv_create_timer) {
   uv_timer_init(loop, &t->m_timer);
 
   uv_timer_start(&t->m_timer, _timer_cb, timeout, repeat);
+  */
   return nullptr;
 }
 

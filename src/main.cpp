@@ -155,33 +155,20 @@ int main(int argc, char **argv) {
     //       implement it inside libuv using the language itself
     ///////////////////////////////////////////////////////////////
 
-    std::thread repl_thread;
 
 
-    if (interactive) {
-      // repl_thread = std::thread([&](void) -> void {
-      // register_thread();
-
+    if (false && interactive) {
       Replxx rx;
-
       printf("cedar lisp v" CEDAR_VERSION "\n");
-
       rx.history_load("~/.cedar_history");
-
-
-
       using namespace std::placeholders;
       rx.set_highlighter_callback(std::bind(&hook_color, _1, _2, repl_mod));
-
-
       repl_mod->def("*file*", cedar::new_obj<cedar::string>(
                                   apathy::Path::cwd().string()));
       cedar::reader repl_reader;
       while (interactive) {
         std::string ps1;
-
         ps1 += "> ";
-
         char const *buf = nullptr;
         do {
           buf = rx.input(ps1);
@@ -191,15 +178,6 @@ int main(int argc, char **argv) {
           break;
         }
         std::string input = buf;
-
-        /*
-        std::string input;
-        std::cout << ps1;
-
-        char b[100];
-        std::cin >> b;
-        input = b;
-        */
 
         if (input.empty()) {
           continue;
@@ -217,16 +195,11 @@ int main(int argc, char **argv) {
         }
       }
 
-      // rx.history_save("~/.cedar_history");
-      //});
     }
 
 
-    // run_loop();
-
-    if (repl_thread.joinable()) {
-      printf("JOIN REPL THREAD\n");
-      repl_thread.join();
+    while(!all_work_done()) {
+      usleep(200);
     }
 
   } catch (std::exception &e) {

@@ -46,7 +46,7 @@ namespace cedar {
 
     list(void);
     list(ref, ref);
-    list(std::vector<ref>);
+    list(std::vector<ref> const&);
     ~list(void);
     ref first(void);
     ref rest(void);

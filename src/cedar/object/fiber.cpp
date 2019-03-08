@@ -90,9 +90,9 @@ static u64 time_microseconds(void) {
 
 
 void fiber::adjust_stack(int required) {
+  if (required == 0) required = 32;
   if (required >= 0 && (stack_size < required || stack == nullptr)) {
-    auto *new_stack = new ref[required];
-
+    ref *new_stack = new ref[required];
     if (stack != nullptr) {
       for (int i = 0; i < stack_size; i++) {
         new_stack[i] = stack[i];
@@ -176,7 +176,7 @@ void fiber::print_callstack(void) {
 // be it a yield or a real return
 ref fiber::run(void) {
   run_context ctx;
-  run(nullptr, &ctx, -1);
+  run(&ctx, -1);
   return ctx.value;
 }
 
@@ -187,7 +187,7 @@ static bool created_thread_labels = false;
 
 
 // the primary run loop for fibers in cedar
-void fiber::run(scheduler *sched, run_context *state, int max_ms) {
+void fiber::run(run_context *state, int max_ms) {
   u64 max_time = max_ms * 1000;
   // this function should have very minimal initialization code at the start
   // in order to make the yield operations easier. It should just act on
@@ -275,7 +275,7 @@ void fiber::run(scheduler *sched, run_context *state, int max_ms) {
 
 loop:
 
-  if (max_ms != -1 && sched != nullptr) {
+  if (max_ms != -1) {
     /* only do a time check every instructions_per_check
      * instructions this is because this loop is *very*
      * performance sensitive and time_microseconds() takes a
@@ -283,7 +283,7 @@ loop:
      * TODO: possibly swich from using a time-based scheduler
      *       to using an instruction count based scheduler
      */
-    u64 instructions_per_check = 5000;
+    u64 instructions_per_check = 10000;
     if (ran > instructions_per_check) {
       ran = 0;
       u64 current = time_microseconds();
@@ -495,7 +495,6 @@ loop:
         } else if (new_program->code_type == lambda::function_binding_type) {
           call_context ctx;
           ctx.coro = this;
-          ctx.schd = sched;
           ctx.mod = PROG()->mod;
           ref val = new_program->function_binding(argc, argv, &ctx);
           SP() = new_fp;
@@ -514,7 +513,6 @@ loop:
 
         call_context ctx;
         ctx.coro = this;
-        ctx.schd = sched;
         ctx.mod = PROG()->mod;
 
         // allocate the instance
@@ -546,18 +544,17 @@ loop:
     TARGET(OP_MAKE_FUNC) {
       PRELUDE;
       auto ind = CODE_READ(u64);
+      CODE_SKIP(u64);
       ref function_template = PROG()->code->constants[ind];
       // (void)function_template.to_string(false);
       auto *template_ptr = (lambda *)function_template.get();
-      ref function = template_ptr->copy();
-      auto *fptr = ref_cast<cedar::lambda>(function);
+      lambda *function = template_ptr->copy();
       // inherit closures from parent, a new
       // child closure is created on call
-      fptr->m_closure = PROG()->m_closure;
+      function->m_closure = PROG()->m_closure;
       // when creating functions, inherit the module object
-      fptr->mod = PROG()->mod;
+      function->mod = PROG()->mod;
       PUSH(function);
-      CODE_SKIP(u64);
       DISPATCH;
     }
 

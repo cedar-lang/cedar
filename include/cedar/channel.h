@@ -23,61 +23,50 @@
  */
 
 #pragma once
+#ifndef _CHANNEL_H
+#define _CHANNEL_H
 
-#include <cedar/object.h>
-#include <cedar/scheduler.h>
-#include <future>
+#include <condition_variable>
+#include <list>
+#include <thread>
+
 
 namespace cedar {
-
-
-  // forward declarations
-  class lambda;
-  class scheduler;
-  namespace vm {
-    class machine;
-  }
-
-
-  struct frame {
-    frame *caller = nullptr;
-    lambda *code;
-    int sp;
-    int fp;
-    u8 *ip;
-  };
-
-  class fiber : public object {
+  template <class item>
+  class channel {
    private:
-    int stack_size = 0;
-    ref *stack = nullptr;
-    // the frame list is a linked list, where the first element
-    // is the newest call stack and the last frame in the list
-    // is the initial function. Nullptr means to return from the
-    // fiber and mark it as done
-    frame *call_stack = nullptr;
-
-    void adjust_stack(int);
-
-
-    frame *add_call_frame(lambda *);
-    frame *pop_call_frame(void);
+    std::list<item> queue;
+    std::mutex m;
+    std::condition_variable cv;
+    bool closed;
 
    public:
-    bool done = false;
-    ref return_value = nullptr;
-    int fid = 0;
-
-    fiber(lambda *);
-    ~fiber(void);
-
-    void print_callstack();
-
-    // run the fiber for at most max_ms miliseconds
-    void run(run_context *state, int max_ms);
-
-    // run the fiber until it returns, then return the value it yields
-    ref run(void);
+    channel() : closed(false) {}
+    void close() {
+      std::unique_lock<std::mutex> lock(m);
+      closed = true;
+      cv.notify_all();
+    }
+    bool is_closed() {
+      std::unique_lock<std::mutex> lock(m);
+      return closed;
+    }
+    void put(const item &i) {
+      std::unique_lock<std::mutex> lock(m);
+      if (closed) throw std::logic_error("put to closed channel");
+      queue.push_back(i);
+      cv.notify_one();
+    }
+    bool get(item &out, bool wait = true) {
+      std::unique_lock<std::mutex> lock(m);
+      if (wait) cv.wait(lock, [&]() { return closed || !queue.empty(); });
+      if (queue.empty()) return false;
+      out = queue.front();
+      queue.pop_front();
+      return true;
+    }
   };
 
 }  // namespace cedar
+
+#endif

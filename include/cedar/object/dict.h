@@ -29,7 +29,6 @@
 #include <cedar/object/sequence.h>
 #include <cedar/ref.h>
 #include <cedar/runes.h>
-#include <gc/gc_cpp.h>
 #include <unordered_map>
 #include <immer/map.hpp>
 
@@ -40,7 +39,7 @@ namespace cedar {
 
   class dict : public indexable {
    private:
-    struct bucket : public gc {
+    struct bucket {
       u64 hash = 0;
       ref key = nullptr;
       ref val = nullptr;

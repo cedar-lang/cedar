@@ -36,15 +36,15 @@ using namespace cedar;
 
 /////////////////////////////////////////////////////
 
-closure::closure(i32 size, std::shared_ptr<closure> parent, i32 index) : m_size(size), m_index(index) {
+closure::closure(i32 size, closure *parent, i32 index) : m_size(size), m_index(index) {
   m_parent = parent;
   m_vars = std::vector<ref>(size);
 }
 
 cedar::closure::~closure(void) {}
 
-std::shared_ptr<closure> closure::clone(void) {
-  auto c = std::make_shared<closure>(m_size, m_parent, m_index);
+closure *closure::clone(void) {
+  auto c = new closure(m_size, m_parent, m_index);
   return c;
 }
 
@@ -147,7 +147,7 @@ void lambda::set_args_closure(int a_argc, ref *a_argv) {
 // as would be expected for whatever calling convention this lambda has
 // ie: for varargs
 void lambda::prime_args(int a_argc, ref *a_argv) {
-  this->m_closure = std::make_shared<cedar::closure>(argc, m_closure, arg_index);
+  this->m_closure = new closure(argc, m_closure, arg_index);
   set_args_closure(a_argc, a_argv);
 }
 

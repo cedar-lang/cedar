@@ -7,10 +7,10 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 set (CMAKE_CXX_STANDARD 17)
 
-set(CMAKE_CXX_FLAGS_DEBUG "-g -O0 -DBUILD_MODE=Debug")
+set(CMAKE_CXX_FLAGS_DEBUG "-g -O0 -DBUILD_MODE=Debug -fsanitize=address -fno-omit-frame-pointer")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3 -g -DBUILD_MODE=Release")
 
-set(CMAKE_C_FLAGS_DEBUG "-g -O0 -DBUILD_MODE=Debug")
+set(CMAKE_C_FLAGS_DEBUG "-g -O0 -DBUILD_MODE=Debug -fsanitize=address -fno-omit-frame-pointer")
 set(CMAKE_C_FLAGS_RELEASE "-O3 -g -DBUILD_MODE=Release")
 
 # build dependencies before setting up project deets

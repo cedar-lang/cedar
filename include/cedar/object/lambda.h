@@ -51,14 +51,14 @@ namespace cedar {
    public:
     i32 m_size = 0;
     i32 m_index = 0;
-    std::shared_ptr<closure> m_parent;
+    closure *m_parent;
 
     std::vector<ref> m_vars;
     // constructor to allocate n vars of closure space
     //
-    closure(i32, std::shared_ptr<closure> = nullptr, i32 = 0);
+    closure(i32, closure * = nullptr, i32 = 0);
     ~closure(void);
-    std::shared_ptr<closure> clone(void);
+    closure *clone(void);
     ref &at(int);
   };
 
@@ -72,7 +72,7 @@ namespace cedar {
 
     lambda_type code_type = bytecode_type;
     vm::bytecode *code;
-    std::shared_ptr<closure> m_closure = nullptr;
+    closure *m_closure = nullptr;
 
 
     module *mod = nullptr;
@@ -87,7 +87,7 @@ namespace cedar {
     bound_function function_binding;
 
     lambda(void);
-    lambda(cedar::vm::bytecode*);
+    lambda(cedar::vm::bytecode *);
     lambda(cedar::bound_function);
     ~lambda(void);
 

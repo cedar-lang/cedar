@@ -36,9 +36,6 @@
 #include <new>
 #include <unordered_map>
 #include <cedar/vm/binding.h>
-#include <gc/gc.h>
-#include <gc/gc_cpp.h>
-
 
 
 namespace cedar {

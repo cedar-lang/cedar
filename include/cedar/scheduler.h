@@ -32,6 +32,14 @@
 #include <mutex>
 #include <thread>
 
+/*
+ * The cedar scheduler's job is to distribute work across several worker threads
+ *
+ * It does this by...
+ * TODO: Write how it works :)
+ */
+
+
 namespace cedar {
 
   // forward declaration
@@ -64,58 +72,23 @@ namespace cedar {
   };
 
 
-  scheduler *this_scheduler(void);
+  bool all_work_done(void);
 
   // the context that gets passed into a bound_function
   // call in the fiber loop
   struct call_context {
     fiber *coro;
-    scheduler *schd;
     module *mod;
   };
 
-
-
-  ref call_function(lambda *, int argc, ref *argv, call_context *ctx);
-
-  // a scheduler is the primary controller of a thread's event loop
-  // and it maintains control over the fibers running on the thread.
-  // it works on a mix between cooperative and preemptive multitasking
-  // using a job system and the fiber evaluators in cedar.
-  class scheduler {
+  class worker_thread {
    public:
-    enum run_state {
-      paused,
-      running,
-      stopped,
-    };
-
-   private:
-    // schedule a job and return true if there are more jobs
-    // and return false if there are no more jobs to run
-    job *jobs = nullptr;
-    std::list<job *> work;
-    std::mutex job_mutex;
-
-   public:
-    int jobc = 0;
-    bool ready = false;
-    uv_loop_t *loop;
-    run_state state;
-    int sid = 0;
-
-    scheduler(void);
-    ~scheduler(void);
-
-    bool schedule(void);
-    void add_job(fiber *);
-    void set_state(run_state);
-    bool tick(void);
+    std::thread native;
+    unsigned wid = 0;
   };
 
 
-  // evaluate a lambda to completion. Mainly used in situations
-  // where code runs outside the scheduler like macroexpand
   ref eval_lambda(lambda *);
+  ref call_function(lambda *, int argc, ref *argv, call_context *ctx);
 
 }  // namespace cedar

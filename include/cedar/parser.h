@@ -58,7 +58,6 @@
 
 namespace cedar {
 
-  using objref = ptr<object>;
 
   enum tok_type {
 #define V(name, code) name = code,
@@ -124,7 +123,7 @@ namespace cedar {
 
   class reader {
    private:
-    ptr<lexer> m_lexer;
+    lexer *m_lexer;
 
     std::vector<token> tokens;
     token tok;

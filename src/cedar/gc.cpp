@@ -11,6 +11,7 @@
 #include <gc/gc_allocator.h>
 
 #define GC_THREADS
+#define GC_DEBUG
 #include <gc/gc.h>
 
 extern "C" void GC_allow_register_threads();
@@ -26,13 +27,22 @@ static gc_startup init;
 
 
 
+#define USE_GC
+
+#ifdef USE_GC
+#define allocate GC_MALLOC
+#define deallocate GC_FREE
+#else
+#define allocate malloc
+#define deallocate free
+#endif
+
+
 void* operator new(size_t size) {
-  void *obj = GC_MALLOC(size);
-	return obj;
+  return allocate(size);
 }
 void* operator new[](size_t size) {
-  void *obj = GC_MALLOC(size);
-	return obj;
+  return allocate(size);
 }
 
 
@@ -40,19 +50,23 @@ void* operator new[](size_t size) {
 #define _NOEXCEPT _GLIBCXX_USE_NOEXCEPT
 #endif
 
-void operator delete(void* ptr) _NOEXCEPT {
-  GC_free(ptr);
+void operator delete(void* ptr)_NOEXCEPT {
+  deallocate(ptr);
+  // GC_free(ptr);
 }
 
 void operator delete[](void* ptr) _NOEXCEPT {
-  GC_free(ptr);
+  deallocate(ptr);
+  // GC_free(ptr);
 }
 
 
-void operator delete(void* ptr, std::size_t s) _NOEXCEPT {
-  GC_free(ptr);
+void operator delete(void* ptr, std::size_t s)_NOEXCEPT {
+  deallocate(ptr);
+  // GC_free(ptr);
 }
 
 void operator delete[](void* ptr, std::size_t s) _NOEXCEPT {
-  GC_free(ptr);
+  deallocate(ptr);
+  // GC_free(ptr);
 }

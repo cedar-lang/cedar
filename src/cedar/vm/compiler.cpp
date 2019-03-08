@@ -43,7 +43,7 @@ using namespace cedar;
 
 ////////////////////////////////////////////////////////////
 // scope::
-vm::scope::scope(std::shared_ptr<scope> parent) { m_parent = parent; }
+vm::scope::scope(scope *parent) { m_parent = parent; }
 
 int vm::scope::find(uint64_t symbol) {
   if (m_bindings.count(symbol) == 1) {
@@ -70,7 +70,7 @@ ref vm::compiler::compile(ref obj, module *mod) {
   // make a top level bytecode object
   auto code = new vm::bytecode();
   // make the top level scope for this expression
-  auto sc = std::make_shared<scope>(nullptr);
+  auto sc = new scope(nullptr);
   compiler_ctx context;
   compile_object(obj, *code, sc, &context);
 
@@ -109,7 +109,7 @@ ref cedar::vm::bytecode_pass(ref obj, vm::compiler *c, module *m) {
   // make a top level bytecode object
   auto code = new vm::bytecode();
   // make the top level scope for this expression
-  auto sc = std::make_shared<scope>(nullptr);
+  auto sc = new scope(nullptr);
 
   compiler_ctx context;
 
@@ -128,7 +128,7 @@ ref cedar::vm::bytecode_pass(ref obj, vm::compiler *c, module *m) {
 
 //////////////////////////////////////////////////////
 
-void vm::compiler::compile_object(ref obj, vm::bytecode &code, scope_ptr sc,
+void vm::compiler::compile_object(ref obj, vm::bytecode &code, scope *sc,
                                   compiler_ctx *ctx) {
   if (obj.isa(list_type)) {
     return compile_list(obj, code, sc, ctx);
@@ -155,7 +155,7 @@ void vm::compiler::compile_object(ref obj, vm::bytecode &code, scope_ptr sc,
 }
 
 
-void vm::compiler::compile_list(ref obj, vm::bytecode &code, scope_ptr sc,
+void vm::compiler::compile_list(ref obj, vm::bytecode &code, scope *sc,
                                 compiler_ctx *ctx) {
   //
   if (list_is_call_to("defmacro*", obj)) {
@@ -479,7 +479,7 @@ void vm::compiler::compile_list(ref obj, vm::bytecode &code, scope_ptr sc,
 
 
 
-void vm::compiler::compile_vector(ref vec_ref, vm::bytecode &code, scope_ptr sc,
+void vm::compiler::compile_vector(ref vec_ref, vm::bytecode &code, scope *sc,
                                   compiler_ctx *ctx) {
   // load the vector constructor
   static ref vec_sym = new symbol("Vector");
@@ -512,7 +512,7 @@ void vm::compiler::compile_vector(ref vec_ref, vm::bytecode &code, scope_ptr sc,
 
 
 
-void vm::compiler::compile_number(ref obj, vm::bytecode &code, scope_ptr,
+void vm::compiler::compile_number(ref obj, vm::bytecode &code, scope *,
                                   compiler_ctx *) {
   if (obj.is_flt()) {
     code.write_op(OP_FLOAT);
@@ -529,7 +529,7 @@ void vm::compiler::compile_number(ref obj, vm::bytecode &code, scope_ptr,
 
 
 
-void vm::compiler::compile_constant(ref obj, bytecode &code, scope_ptr,
+void vm::compiler::compile_constant(ref obj, bytecode &code, scope *,
                                     compiler_ctx *) {
   auto const_index = code.push_const(obj);
   code.write_op(OP_CONST, const_index);
@@ -541,7 +541,7 @@ void vm::compiler::compile_constant(ref obj, bytecode &code, scope_ptr,
 // symbol in it's map, it will be a local closure index and will be a fast O(1)
 // lookup. If it isn't found in the map, the symbol lookup will defer to the
 // global lookup system and be slightly slower
-void vm::compiler::compile_symbol(ref sym, bytecode &code, scope_ptr sc,
+void vm::compiler::compile_symbol(ref sym, bytecode &code, scope *sc,
                                   compiler_ctx *ctx) {
   auto nsym = [&](cedar::runes s) { return new_obj<symbol>(s); };
 
@@ -616,7 +616,7 @@ void vm::compiler::compile_symbol(ref sym, bytecode &code, scope_ptr sc,
 // scenes. Closures need to be known at compile time, so top level lambda
 // expressions need to construct the closure on their call, not construction
 void vm::compiler::compile_lambda_expression(ref expr, bytecode &code,
-                                             scope_ptr sc, compiler_ctx *ctx) {
+                                             scope *sc, compiler_ctx *ctx) {
   static auto amp_sym = newsymbol("&");
   static auto fn_sym = newsymbol("fn");
   static auto gen_sym = newsymbol("gen");
@@ -627,7 +627,7 @@ void vm::compiler::compile_lambda_expression(ref expr, bytecode &code,
 
   bool is_top_level_lambda = ctx->lambda_depth == 1;
 
-  auto new_scope = std::make_shared<scope>(sc);
+  auto new_scope = new scope(sc);
   auto new_code = new bytecode();
 
   if (is_top_level_lambda) {
@@ -710,8 +710,8 @@ void vm::compiler::compile_lambda_expression(ref expr, bytecode &code,
 
 
 
-void vm::compiler::compile_quasiquote(ref obj, vm::bytecode &bc,
-                                      vm::scope_ptr sc, vm::compiler_ctx *ctx) {
+void vm::compiler::compile_quasiquote(ref obj, vm::bytecode &bc, vm::scope *sc,
+                                      vm::compiler_ctx *ctx) {
   printf("HERE\n");
   // std::cout << obj << std::endl;
   if (obj.is_nil()) {
