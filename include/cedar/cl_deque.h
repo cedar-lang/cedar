@@ -54,11 +54,11 @@ template <typename T>
 class cl_deque {
   class circular_array {
    private:
-    size_t log_size = 0;
+    ssize_t log_size = 0;
     std::atomic<T>* segment;
 
    public:
-    circular_array(size_t sz) {
+    circular_array(ssize_t sz) {
       log_size = sz;
       segment = new std::atomic<T>[1 << log_size];
     }
@@ -69,13 +69,13 @@ class cl_deque {
      * load a value atomically from the segment
      */
     T get(long i) {
-      return segment[i  % size()].load(std::memory_order_relaxed);
+      return segment[i % size()].load(std::memory_order_relaxed);
     }
 
     /**
      * store a value atomically in the segment
      */
-    void put(size_t i, T x) {
+    void put(ssize_t i, T x) {
       segment[i % size()].store(x, std::memory_order_relaxed);
     }
 
@@ -85,17 +85,24 @@ class cl_deque {
      * that it modifies atomically (a pointer) and it moves the logic outside of
      * the the circular_array
      */
-    auto grow(size_t b, size_t t) {
+    auto grow(ssize_t b, ssize_t t) {
       // create a new circular array of twice the size
       auto* a = new circular_array(log_size + 1);
-      for (long i = t; i < b; i++) a->put(i, get(i));
+      for (ssize_t i = t; i < b; i++) a->put(i, get(i));
       return a;
     }
   };
 
 
   std::atomic<circular_array*> buffer;
-  std::atomic<size_t> top, bottom;
+  std::atomic<ssize_t> top, bottom;
+
+
+ private:
+  bool cas_top(ssize_t oldval, ssize_t newval) {
+    return top.compare_exchange_strong(
+        oldval, newval, std::memory_order_seq_cst, std::memory_order_relaxed);
+  }
 
  public:
   cl_deque() {
@@ -116,11 +123,11 @@ class cl_deque {
    * this function is meant to only be invoked by the owner
    */
   void push(T o) {
-    size_t b = bottom;
-    size_t t = top;
-    circular_array *a = buffer;
+    ssize_t b = bottom;
+    ssize_t t = top;
+    circular_array* a = buffer;
     long size = b - t;
-    if (size >= a->size()-1) {
+    if (size >= a->size() - 1) {
       a = a->grow(b, t);
       buffer.store(a, std::memory_order_relaxed);
     }
@@ -137,12 +144,12 @@ class cl_deque {
    * this function is meant to only be invoked by the owner
    */
   T pop(bool* success = nullptr) {
-    size_t b = bottom;
-    circular_array *a = buffer;
+    ssize_t b = bottom;
+    circular_array* a = buffer;
     b = b - 1;
     bottom = b;
-    size_t t = top;
-    size_t size = b - t;
+    ssize_t t = top;
+    ssize_t size = b - t;
     if (size < 0) {
       bottom = t;
       if (success) *success = false;
@@ -154,9 +161,7 @@ class cl_deque {
     if (size > 0) {
       return o;
     }
-    if (!top.compare_exchange_strong(t, t + 1, std::memory_order_seq_cst,
-                                     std::memory_order_relaxed)) {
-
+    if (!cas_top(t, t+1)) {
       if (success) *success = false;
       o = nullptr;
     }
@@ -172,18 +177,17 @@ class cl_deque {
    * process to steal the topmoset element
    */
   T steal(bool* success = nullptr) {
-    size_t t = top;
-    size_t b = bottom;
-    circular_array *a = buffer;
-    size_t size = b - t;
+    ssize_t t = top;
+    ssize_t b = bottom;
+    circular_array* a = buffer;
+    ssize_t size = b - t;
     if (size <= 0) {
       if (success) *success = false;
       return nullptr;
     }
     T o = a->get(t);
     if (success) *success = true;
-    if (!top.compare_exchange_strong(t, t + 1, std::memory_order_seq_cst,
-                                     std::memory_order_relaxed)) {
+    if (!cas_top(t, t+1)) {
       throw std::logic_error("Steal compare and swap failed");
     }
 
