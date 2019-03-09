@@ -140,6 +140,12 @@ static void spawn_worker_thread(void) {
 }
 
 
+job *worker_thread::get_work(void) {
+  // TODO: do the stealing
+  return nullptr;
+}
+
+
 
 /**
  * schedule a single job on the caller thread, it's up to the caller to manage

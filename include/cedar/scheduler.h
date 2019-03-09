@@ -30,6 +30,7 @@
 #include <future>
 #include <list>
 #include <mutex>
+#include <cedar/cl_deque.h>
 #include <thread>
 
 /*
@@ -82,9 +83,12 @@ namespace cedar {
   };
 
   class worker_thread {
+    cl_deque<job*> local_queue;
    public:
     std::thread native;
     unsigned wid = 0;
+
+    job *get_work(void);
   };
 
 

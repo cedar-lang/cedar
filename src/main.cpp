@@ -83,6 +83,19 @@ cedar::type::method lambda_wrap(ref func) {
 
 int main(int argc, char **argv) {
 
+
+  cl_deque<const char*> q;
+  q.push("1");
+  q.push("2");
+  q.push("3");
+
+  printf("stole %s\n", q.steal());
+  printf("popped %s\n", q.pop());
+  printf("popped %s\n", q.pop());
+  printf("popped %s\n", q.pop());
+
+  return 0;
+
   srand((unsigned int)time(nullptr));
 
   init();
