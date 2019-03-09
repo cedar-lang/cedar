@@ -54,11 +54,11 @@ template <typename T>
 class cl_deque {
   class circular_array {
    private:
-    int log_size = 0;
+    size_t log_size = 0;
     std::atomic<T>* segment;
 
    public:
-    circular_array(int sz) {
+    circular_array(size_t sz) {
       log_size = sz;
       segment = new std::atomic<T>[1 << log_size];
     }
@@ -75,7 +75,7 @@ class cl_deque {
     /**
      * store a value atomically in the segment
      */
-    void put(int i, T x) {
+    void put(size_t i, T x) {
       segment[i % size()].store(x, std::memory_order_relaxed);
     }
 
@@ -85,7 +85,7 @@ class cl_deque {
      * that it modifies atomically (a pointer) and it moves the logic outside of
      * the the circular_array
      */
-    auto grow(long b, long t) {
+    auto grow(size_t b, size_t t) {
       // create a new circular array of twice the size
       auto* a = new circular_array(log_size + 1);
       for (long i = t; i < b; i++) a->put(i, get(i));
@@ -95,7 +95,7 @@ class cl_deque {
 
 
   std::atomic<circular_array*> buffer;
-  std::atomic<int> top, bottom;
+  std::atomic<size_t> top, bottom;
 
  public:
   cl_deque() {
@@ -116,8 +116,8 @@ class cl_deque {
    * this function is meant to only be invoked by the owner
    */
   void push(T o) {
-    int b = bottom;
-    int t = top;
+    size_t b = bottom;
+    size_t t = top;
     circular_array *a = buffer;
     long size = b - t;
     if (size >= a->size()-1) {
@@ -137,12 +137,12 @@ class cl_deque {
    * this function is meant to only be invoked by the owner
    */
   T pop(bool* success = nullptr) {
-    int b = bottom;
+    size_t b = bottom;
     circular_array *a = buffer;
     b = b - 1;
     bottom = b;
-    int t = top;
-    int size = b - t;
+    size_t t = top;
+    size_t size = b - t;
     if (size < 0) {
       bottom = t;
       if (success) *success = false;
@@ -172,19 +172,16 @@ class cl_deque {
    * process to steal the topmoset element
    */
   T steal(bool* success = nullptr) {
-    int t = top;
-    int b = bottom;
+    size_t t = top;
+    size_t b = bottom;
     circular_array *a = buffer;
-    int size = b - t;
-    printf("%d\n", size);
+    size_t size = b - t;
     if (size <= 0) {
       if (success) *success = false;
       return nullptr;
     }
-
     T o = a->get(t);
     if (success) *success = true;
-
     if (!top.compare_exchange_strong(t, t + 1, std::memory_order_seq_cst,
                                      std::memory_order_relaxed)) {
       throw std::logic_error("Steal compare and swap failed");
