@@ -38,6 +38,7 @@
 
 #include <atomic>
 #include <stdexcept>
+#include <stdint.h>
 
 
 /**
@@ -54,11 +55,11 @@ template <typename T>
 class cl_deque {
   class circular_array {
    private:
-    ssize_t log_size = 0;
+    int64_t log_size = 0;
     std::atomic<T>* segment;
 
    public:
-    circular_array(ssize_t sz) {
+    circular_array(int64_t sz) {
       log_size = sz;
       segment = new std::atomic<T>[1 << log_size];
     }
@@ -75,7 +76,7 @@ class cl_deque {
     /**
      * store a value atomically in the segment
      */
-    void put(ssize_t i, T x) {
+    void put(int64_t i, T x) {
       segment[i % size()].store(x, std::memory_order_relaxed);
     }
 
@@ -85,21 +86,21 @@ class cl_deque {
      * that it modifies atomically (a pointer) and it moves the logic outside of
      * the the circular_array
      */
-    auto grow(ssize_t b, ssize_t t) {
+    auto grow(int64_t b, int64_t t) {
       // create a new circular array of twice the size
       auto* a = new circular_array(log_size + 1);
-      for (ssize_t i = t; i < b; i++) a->put(i, get(i));
+      for (int64_t i = t; i < b; i++) a->put(i, get(i));
       return a;
     }
   };
 
 
   std::atomic<circular_array*> buffer;
-  std::atomic<ssize_t> top, bottom;
+  std::atomic<int64_t> top, bottom;
 
 
  private:
-  bool cas_top(ssize_t oldval, ssize_t newval) {
+  bool cas_top(int64_t oldval, int64_t newval) {
     return top.compare_exchange_strong(
         oldval, newval, std::memory_order_seq_cst, std::memory_order_relaxed);
   }
@@ -123,8 +124,8 @@ class cl_deque {
    * this function is meant to only be invoked by the owner
    */
   void push(T o) {
-    ssize_t b = bottom;
-    ssize_t t = top;
+    int64_t b = bottom;
+    int64_t t = top;
     circular_array* a = buffer;
     long size = b - t;
     if (size >= a->size() - 1) {
@@ -144,12 +145,12 @@ class cl_deque {
    * this function is meant to only be invoked by the owner
    */
   T pop(bool* success = nullptr) {
-    ssize_t b = bottom;
+    int64_t b = bottom;
     circular_array* a = buffer;
     b = b - 1;
     bottom = b;
-    ssize_t t = top;
-    ssize_t size = b - t;
+    int64_t t = top;
+    int64_t size = b - t;
     if (size < 0) {
       bottom = t;
       if (success) *success = false;
@@ -177,10 +178,10 @@ class cl_deque {
    * process to steal the topmoset element
    */
   T steal(bool* success = nullptr) {
-    ssize_t t = top;
-    ssize_t b = bottom;
+    int64_t t = top;
+    int64_t b = bottom;
     circular_array* a = buffer;
-    ssize_t size = b - t;
+    int64_t size = b - t;
     if (size <= 0) {
       if (success) *success = false;
       return nullptr;
