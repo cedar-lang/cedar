@@ -39,6 +39,7 @@
 #include <atomic>
 #include <stdexcept>
 #include <stdint.h>
+#include <memory>
 
 
 /**
@@ -93,6 +94,7 @@ class cl_deque {
       return a;
     }
   };
+
 
 
   std::atomic<circular_array*> buffer;
@@ -171,6 +173,18 @@ class cl_deque {
     return o;
   }
 
+  void push_back(T o) {
+    // grab information atomically
+    int64_t t = top;
+    // int64_t b = bottom;
+    circular_array *a = buffer;
+    if (!cas_top(t, t-1)) {
+      printf("FAILED\n");
+    }
+    t--;
+    a->put(t, o);
+  }
+
   /**
    * If the deque is empty, returns T{} and sets success arg to false,
    * otherwise returns the element successfully stolen from the top of the
@@ -189,7 +203,8 @@ class cl_deque {
     T o = a->get(t);
     if (success) *success = true;
     if (!cas_top(t, t+1)) {
-      throw std::logic_error("Steal compare and swap failed");
+      return nullptr;
+      // throw std::logic_error("Steal compare and swap failed");
     }
 
     return o;

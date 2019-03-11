@@ -36,10 +36,10 @@
 #include <uv.h>
 #include <atomic>
 #include <chrono>
+#include <condition_variable>
 #include <cstdlib>
 #include <flat_hash_map.hpp>
 #include <mutex>
-#include <condition_variable>
 
 
 using namespace cedar;
@@ -75,7 +75,7 @@ static unsigned ncpus = 8;
  * when works is here, it means it is not assigned to a worker and it's ready to
  * be ran. The size of this container is always less or equal to pending_jobs
  */
-static std::list<job*> work;
+static std::list<job *> global_work;
 
 /**
  * A lock around the global work queue.
@@ -87,10 +87,13 @@ static std::mutex work_mutex;
 
 
 /**
- * the listing of all worker threads
+ * the listing of all worker threads and a fast lookup map to the same
+ * information
  * TODO: more docs
  */
-static std::vector<worker_thread*> worker_threads;
+static std::mutex worker_thread_mutex;
+static std::vector<worker_thread *> worker_threads;
+static ska::flat_hash_map<std::thread::id, worker_thread *> worker_thread_map;
 
 
 
@@ -106,17 +109,33 @@ static std::mutex jid_mutex;
 int next_jid = 0;
 
 
+static worker_thread *lookup_or_create_worker(std::thread::id tid) {
+  std::unique_lock<std::mutex> lock(worker_thread_mutex);
+  worker_thread *w = worker_thread_map[tid];
+  if (w == nullptr) {
+    // create w
+    w = new worker_thread();
+    w->tid = tid;
+    worker_thread_map[tid] = w;
+    worker_threads.push_back(w);
+  }
+  return w;
+}
+
+
 void cedar::add_job(fiber *f) {
+  std::unique_lock<std::mutex> lock(work_mutex);
+  auto *w = lookup_or_create_worker(std::this_thread::get_id());
+  job *j = new job(f);
+  w->local_queue.push(j);
+}
 
+job::job(fiber *f) {
   static std::atomic<int> next_jid = 0;
-  auto jid = next_jid++;
-
-  job *j = new job();
-  j->task = f;
-  j->create_time = time_ms();
-  j->last_ran = 0;
-  j->jid = jid;
-  // TODO: atomically add the job to the pending job pool
+  task = f;
+  create_time = time_ms();
+  last_ran = 0;
+  jid = next_jid++;
 }
 
 /**
@@ -128,21 +147,13 @@ void cedar::add_job(fiber *f) {
  *     B) a job to be accessable in the global queue
  *     C) POSSIBLY, steal work from other worker threads.
  */
-static void spawn_worker_thread(void) {
-  static unsigned next_wid = 0;
-
-  // TODO: get this working for real.
-
-  auto *thd = new worker_thread();
-  thd->wid = next_wid++;
-  printf("spawn thread %u: %p\n", thd->wid, thd);
-  worker_threads.push_back(thd);
-}
-
-
-job *worker_thread::get_work(void) {
-  // TODO: do the stealing
-  return nullptr;
+static std::thread spawn_worker_thread(void) {
+  return std::thread([](void) -> void {
+    register_thread();
+    worker_thread *my_thread =
+        lookup_or_create_worker(std::this_thread::get_id());
+    while (true) volunteer(my_thread);
+  });
 }
 
 
@@ -161,6 +172,8 @@ static bool schedule_job(job *proc) {
       throw cedar::make_exception("$CDR_SCHED_TIME must be larger than 2ms");
     read_env = true;
   }
+
+  if (proc->task == nullptr) return false;
 
   bool done = false;
   u64 time = time_ms();
@@ -200,7 +213,72 @@ static void init_scheduler(void) {
   if (CDRMAXPROC != nullptr) ncpus = atol(CDRMAXPROC);
 
   // spawn 'ncpus' worker threads
-  for (unsigned i = 0; i < ncpus; i++) spawn_worker_thread();
+  for (unsigned i = 0; i < ncpus; i++) spawn_worker_thread().detach();
+}
+
+
+
+
+void cedar::volunteer(worker_thread *worker) {
+  if (worker == nullptr) {
+    worker = lookup_or_create_worker(std::this_thread::get_id());
+  }
+  size_t pool_size = 0;
+
+  /**
+   * now that we have the worker_thread, we need to find work to do
+   */
+
+
+  // work is the thing that will eventually be done, while looking for work,
+  // it will be set and checked for equality to nullptr. If at any point it
+  // is not nullptr, it will immediately be scheduled.
+  job *work = nullptr;
+
+
+  // first check the local queue
+  work = worker->local_queue.pop();
+  if (work != nullptr) goto SCHEDULE;
+
+
+  // now look through other threads in the thread pool for work to steal
+  pool_size = worker_threads.size();
+  for (size_t i = 0; i < pool_size; i++) {
+    work = worker_threads[i]->local_queue.steal();
+    if (work != nullptr) {
+      goto SCHEDULE;
+    }
+  usleep(20);
+  }
+
+
+
+  work_mutex.lock();
+  work = global_work.back();
+  work_mutex.unlock();
+  if (work != nullptr) {
+    global_work.pop_back();
+    goto SCHEDULE;
+  };
+
+  return;
+
+SCHEDULE:
+
+
+  if (work->task == nullptr) {
+    return;
+    throw std::logic_error("work->task is nullptr");
+  }
+
+  // switch into the work for a time slice and return here when done.
+  schedule_job(work);
+
+  // since we did some work, we should put it back in the local queue
+  // but only if it isn't done.
+  if (work->task != nullptr && !work->task->done) {
+    worker->local_queue.push(work);
+  }
 }
 
 
@@ -237,12 +315,17 @@ void cedar::init(void) {
  * such a call
  */
 ref cedar::eval_lambda(lambda *fn) {
-
-  // TODO: tack this into the scheduler... somehow
-
-  /* create a stack-local fiber that will be run to completion */
   fiber f(fn);
-  return f.run();
+  worker_thread *my_worker =
+      lookup_or_create_worker(std::this_thread::get_id());
+
+  job *j = new job(&f);
+
+  my_worker->local_queue.push(j);
+  while (!f.done) {
+    volunteer(my_worker);
+  }
+  return f.return_value;
 }
 
 

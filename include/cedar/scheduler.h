@@ -24,13 +24,13 @@
 
 #pragma once
 
+#include <cedar/cl_deque.h>
 #include <cedar/ref.h>
 #include <cedar/types.h>
 #include <uv.h>
 #include <future>
 #include <list>
 #include <mutex>
-#include <cedar/cl_deque.h>
 #include <thread>
 
 /*
@@ -63,6 +63,7 @@ namespace cedar {
     u64 create_time; /* when the job was created in milliseconds */
     int ticks = 0;   /* how many times this job has been switched into */
     fiber *task; /* the actual task that needs to be run. Must never be null */
+    job(fiber*);
   };
 
 
@@ -82,14 +83,30 @@ namespace cedar {
     module *mod;
   };
 
+  /*
+   * a worker thread represents a thread that has volunteered some of it's time.
+   * When a thread does volunteer, it calls the 'volunteer' function, which will
+   * create a worker_thread object if there isn't already one, and use that
+   * state to do a bit of work.
+   */
   class worker_thread {
-    cl_deque<job*> local_queue;
    public:
-    std::thread native;
-    unsigned wid = 0;
-
-    job *get_work(void);
+    std::thread::id tid;
+    cl_deque<job *> local_queue;
   };
+
+
+  /**
+   * the volunteer function is the main function that will execute work. It
+   * allows a thread to start working on it's own queue, steal from another
+   * queue, or immediately return with no work.
+   *
+   * It has an optional argument representing the worker_thread that is
+   * volunteering it's time. If this optional argument is nullptr, it needs to
+   * do a hashtable lookup for the thread and create a worker_thread object if
+   * it needs to.
+   */
+  void volunteer(worker_thread* = nullptr);
 
 
   ref eval_lambda(lambda *);

@@ -26,7 +26,6 @@ struct gc_startup {
 static gc_startup init;
 
 
-
 #define USE_GC
 
 #ifdef USE_GC
@@ -52,21 +51,17 @@ void* operator new[](size_t size) {
 
 void operator delete(void* ptr)_NOEXCEPT {
   deallocate(ptr);
-  // GC_free(ptr);
 }
 
 void operator delete[](void* ptr) _NOEXCEPT {
   deallocate(ptr);
-  // GC_free(ptr);
 }
 
 
 void operator delete(void* ptr, std::size_t s)_NOEXCEPT {
   deallocate(ptr);
-  // GC_free(ptr);
 }
 
 void operator delete[](void* ptr, std::size_t s) _NOEXCEPT {
   deallocate(ptr);
-  // GC_free(ptr);
 }

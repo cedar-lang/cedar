@@ -56,4 +56,8 @@
     (fib-iter max 1 0 1)))
 
 
-(println "hello")
+(map
+  (fn (x) (go (while true (sleep 0))))
+  (range 0 30))
+
+(while true)

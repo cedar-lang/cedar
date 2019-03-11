@@ -6,6 +6,7 @@ if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
 endif()
 set (CMAKE_CXX_STANDARD 17)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 set(CMAKE_CXX_FLAGS_DEBUG "-g -O0 -DBUILD_MODE=Debug -fsanitize=address -fno-omit-frame-pointer")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3 -g -DBUILD_MODE=Release")
@@ -13,10 +14,14 @@ set(CMAKE_CXX_FLAGS_RELEASE "-O3 -g -DBUILD_MODE=Release")
 set(CMAKE_C_FLAGS_DEBUG "-g -O0 -DBUILD_MODE=Debug -fsanitize=address -fno-omit-frame-pointer")
 set(CMAKE_C_FLAGS_RELEASE "-O3 -g -DBUILD_MODE=Release")
 
+
+include_directories(dep/bdwgc/include)
+add_definitions(-DPOINTER_MASK=0x0000FFFFFFFFFFFF)
+
 # build dependencies before setting up project deets
-add_subdirectory(${CMAKE_SOURCE_DIR}/dep/libuv)
-add_subdirectory(${CMAKE_SOURCE_DIR}/dep/replxx)
-# add_subdirectory(${CMAKE_SOURCE_DIR}/dep/bdwgc)
+add_subdirectory(dep/libuv)
+add_subdirectory(dep/replxx)
+# add_subdirectory(dep/bdwgc EXCLUDE_FROM_ALL)
 
 
 link_directories(/usr/local/lib)

@@ -24,7 +24,6 @@
 
 #include <apathy.h>
 #include <cedar.h>
-#include <cedar/lib/linenoise.h>
 #include <ctype.h>
 #include <dlfcn.h>
 #include <getopt.h>
@@ -55,9 +54,6 @@
 using Replxx = replxx::Replxx;
 
 
-
-using ref = cedar::ref;
-
 static void help(void);
 static void usage(void);
 
@@ -82,19 +78,6 @@ cedar::type::method lambda_wrap(ref func) {
 
 
 int main(int argc, char **argv) {
-
-
-  cl_deque<const char*> q;
-  q.push("1");
-  q.push("2");
-  q.push("3");
-
-  printf("stole %s\n", q.steal());
-  printf("popped %s\n", q.pop());
-  printf("popped %s\n", q.pop());
-  printf("popped %s\n", q.pop());
-
-  return 0;
 
   srand((unsigned int)time(nullptr));
 
@@ -139,7 +122,7 @@ int main(int argc, char **argv) {
     for (int i = optind; i < argc; i++) {
       args = cedar::idx_append(args, new cedar::string(argv[i]));
     }
-    // require("os")->def("args", args);
+    require("os")->def("args", args);
 
     if (optind == argc) {
       interactive = true;
