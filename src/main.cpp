@@ -153,7 +153,7 @@ int main(int argc, char **argv) {
 
 
 
-    if (false && interactive) {
+    if (interactive) {
       Replxx rx;
       printf("cedar lisp v" CEDAR_VERSION "\n");
       rx.history_load("~/.cedar_history");

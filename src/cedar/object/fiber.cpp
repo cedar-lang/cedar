@@ -283,7 +283,7 @@ loop:
      * TODO: possibly swich from using a time-based scheduler
      *       to using an instruction count based scheduler
      */
-    u64 instructions_per_check = 10000;
+    u64 instructions_per_check = 10;
     if (ran > instructions_per_check) {
       ran = 0;
       u64 current = time_microseconds();

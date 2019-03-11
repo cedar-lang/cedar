@@ -165,13 +165,13 @@ static std::thread spawn_worker_thread(void) {
 static bool schedule_job(job *proc) {
   static int sched_time = 2;
   static bool read_env = false;
-  static const char *SCHED_TIME_ENV = getenv("CDR_SCHED_TIME");
+  static const char *SCHED_TIME_ENV = getenv("CDRTIMESLICE");
   if (SCHED_TIME_ENV != nullptr && !read_env) {
     sched_time = atol(SCHED_TIME_ENV);
     if (sched_time < 2)
-      throw cedar::make_exception("$CDR_SCHED_TIME must be larger than 2ms");
-    read_env = true;
+      throw cedar::make_exception("$CDRTIMESLICE must be larger than 2ms");
   }
+  read_env = true;
 
   if (proc->task == nullptr) return false;
 
@@ -208,6 +208,8 @@ bool cedar::all_work_done(void) {
 
 
 static void init_scheduler(void) {
+  // the number of worker threads is the number of cpus the host machine
+  // has, minus one as the main thread does work
   ncpus = std::thread::hardware_concurrency();
   static const char *CDRMAXPROC = getenv("CDRMAXPROC");
   if (CDRMAXPROC != nullptr) ncpus = atol(CDRMAXPROC);
@@ -248,7 +250,7 @@ void cedar::volunteer(worker_thread *worker) {
     if (work != nullptr) {
       goto SCHEDULE;
     }
-  usleep(20);
+    // usleep(20);
   }
 
 
@@ -273,6 +275,8 @@ SCHEDULE:
 
   // switch into the work for a time slice and return here when done.
   schedule_job(work);
+  worker->ticks++;
+  // printf("Worker %p: %lu\n", worker, worker->ticks);
 
   // since we did some work, we should put it back in the local queue
   // but only if it isn't done.

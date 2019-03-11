@@ -91,6 +91,7 @@ namespace cedar {
    */
   class worker_thread {
    public:
+    u64 ticks = 0;
     std::thread::id tid;
     cl_deque<job *> local_queue;
   };
