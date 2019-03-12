@@ -55,13 +55,11 @@
     max
     (fib-iter max 1 0 1)))
 
-
-(def x 0)
-
-(def c (chan))
 (map
-  (fn (i) (go (while true (print (str i "\n")))))
-  (range 0 100))
+  (fn (i) (go (while true
+                (print (str i ": " (fib i) "\n"))
+                (sleep 1000))))
+  (range 0 (* 16 4)))
 
 
 (while true)

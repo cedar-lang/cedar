@@ -125,9 +125,9 @@ static worker_thread *lookup_or_create_worker(std::thread::id tid) {
 
 void cedar::add_job(fiber *f) {
   std::unique_lock<std::mutex> lock(work_mutex);
-  auto *w = lookup_or_create_worker(std::this_thread::get_id());
+  // int ind = rand() % worker_threads.size();
   job *j = new job(f);
-  w->local_queue.push(j);
+  worker_threads[0]->local_queue.push(j);
 }
 
 job::job(fiber *f) {
@@ -222,10 +222,13 @@ static void init_scheduler(void) {
 
 
 void cedar::volunteer(worker_thread *worker) {
+
   if (worker == nullptr) {
     worker = lookup_or_create_worker(std::this_thread::get_id());
   }
   size_t pool_size = 0;
+  int i1, i2;
+  worker_thread *w1, *w2;
 
   /**
    * now that we have the worker_thread, we need to find work to do
@@ -238,24 +241,38 @@ void cedar::volunteer(worker_thread *worker) {
   job *work = nullptr;
 
 
+
   // first check the local queue
-  work = worker->local_queue.pop();
+  work = worker->local_queue.steal();
   if (work != nullptr) goto SCHEDULE;
 
 
   // now look through other threads in the thread pool for work to steal
   pool_size = worker_threads.size();
-  for (size_t i = 0; i < pool_size; i++) {
-    work = worker_threads[i]->local_queue.steal();
-    if (work != nullptr) {
-      goto SCHEDULE;
-    }
-    // usleep(20);
+
+  i1 = rand() % pool_size;
+  i2 = rand() % pool_size;
+  w1 = worker_threads[i1];
+  w2 = worker_threads[i2];
+
+  if (w1->local_queue.size() > w2->local_queue.size()) {
+    work = w1->local_queue.steal();
+  } else {
+    work = w2->local_queue.steal();
   }
 
+  if (work != nullptr) {
+    goto SCHEDULE;
+  }
+  usleep(20);
+  return;
 
 
   work_mutex.lock();
+  if (global_work.size() <= 0) {
+    work_mutex.unlock();
+    return;
+  }
   work = global_work.back();
   work_mutex.unlock();
   if (work != nullptr) {
@@ -273,10 +290,11 @@ SCHEDULE:
     throw std::logic_error("work->task is nullptr");
   }
 
+  // printf("%d\n", work->jid);
+
   // switch into the work for a time slice and return here when done.
   schedule_job(work);
   worker->ticks++;
-  // printf("Worker %p: %lu\n", worker, worker->ticks);
 
   // since we did some work, we should put it back in the local queue
   // but only if it isn't done.

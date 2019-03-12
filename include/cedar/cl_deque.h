@@ -36,10 +36,10 @@
 #ifndef CL_DEQUE_H
 #define CL_DEQUE_H
 
-#include <atomic>
-#include <stdexcept>
 #include <stdint.h>
+#include <atomic>
 #include <memory>
+#include <stdexcept>
 
 
 /**
@@ -120,14 +120,22 @@ class cl_deque {
   }
 
 
+  int64_t size(void) {
+    int64_t b = bottom.load(std::memory_order_relaxed);
+    std::atomic_thread_fence(std::memory_order_seq_cst);
+    int64_t t = top.load(std::memory_order_relaxed);
+    return b-t;
+  }
+
   /**
    * Pushes o onto the bottom of the deque
    *
    * this function is meant to only be invoked by the owner
    */
   void push(T o) {
-    int64_t b = bottom;
-    int64_t t = top;
+    int64_t b = bottom.load(std::memory_order_relaxed);
+    std::atomic_thread_fence(std::memory_order_seq_cst);
+    int64_t t = top.load(std::memory_order_relaxed);
     circular_array* a = buffer;
     long size = b - t;
     if (size >= a->size() - 1) {
@@ -147,11 +155,12 @@ class cl_deque {
    * this function is meant to only be invoked by the owner
    */
   T pop(bool* success = nullptr) {
-    int64_t b = bottom;
-    circular_array* a = buffer;
+    int64_t b = bottom.load(std::memory_order_relaxed);
+    circular_array* a = buffer.load(std::memory_order_relaxed);
+    std::atomic_thread_fence(std::memory_order_seq_cst);
     b = b - 1;
     bottom = b;
-    int64_t t = top;
+    int64_t t = top.load(std::memory_order_relaxed);
     int64_t size = b - t;
     if (size < 0) {
       bottom = t;
@@ -164,25 +173,13 @@ class cl_deque {
     if (size > 0) {
       return o;
     }
-    if (!cas_top(t, t+1)) {
+    if (!cas_top(t, t + 1)) {
       if (success) *success = false;
       o = nullptr;
     }
 
     bottom = t + 1;
     return o;
-  }
-
-  void push_back(T o) {
-    // grab information atomically
-    int64_t t = top;
-    // int64_t b = bottom;
-    circular_array *a = buffer;
-    if (!cas_top(t, t-1)) {
-      printf("FAILED\n");
-    }
-    t--;
-    a->put(t, o);
   }
 
   /**
@@ -192,8 +189,9 @@ class cl_deque {
    * process to steal the topmoset element
    */
   T steal(bool* success = nullptr) {
-    int64_t t = top;
-    int64_t b = bottom;
+    int64_t t = top.load(std::memory_order_acquire);
+    std::atomic_thread_fence(std::memory_order_seq_cst);
+    int64_t b = bottom.load(std::memory_order_acquire);
     circular_array* a = buffer;
     int64_t size = b - t;
     if (size <= 0) {
@@ -202,7 +200,7 @@ class cl_deque {
     }
     T o = a->get(t);
     if (success) *success = true;
-    if (!cas_top(t, t+1)) {
+    if (!cas_top(t, t + 1)) {
       return nullptr;
       // throw std::logic_error("Steal compare and swap failed");
     }
