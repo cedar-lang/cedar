@@ -26,7 +26,6 @@
 #pragma once
 
 #include <cedar/runes.h>
-#include <utf8.h>
 #include <codecvt>
 #include <cstdlib>
 #include <fstream>
