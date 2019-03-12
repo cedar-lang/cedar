@@ -48,10 +48,12 @@ namespace cedar {
   class lambda;
   class scheduler;
   class module;
+  struct job;
 
   // the intro initialization function
   void init(void);
   void add_job(fiber *);
+  void add_job(job *);
 
   // a job is a representation of a fiber's state as
   // viewed by the scheduler

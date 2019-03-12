@@ -11,6 +11,7 @@ add_library(cedar-lib SHARED
 	src/cedar/passes.cpp
 	src/cedar/scheduler.cpp
 	src/cedar/objtype.cpp
+	src/cedar/event_loop.cpp
 	src/cedar/gc.cpp
 	src/cedar/runes.cpp
 	src/cedar/parser.cpp

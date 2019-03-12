@@ -55,12 +55,20 @@
     max
     (fib-iter max 1 0 1)))
 
-(map
-  (fn (i) (go (while true
-                (print (str i ": " (fib i) "\n"))
-                (sleep 1000))))
-  (range 0 (* 16 4)))
 
 
-(while true)
+
+(go (while true (ofib 20)))
+(go (while true (ofib 20)))
+(go (while true (ofib 20)))
+(go (while true (ofib 20)))
+(go (while true (ofib 20)))
+(go (while true (ofib 20)))
+(go (while true (ofib 20)))
+(go (while true (ofib 20)))
+(go (while true (ofib 20)))
+(go (while true (ofib 20)))
+(go (while true (ofib 20)))
+(go (while true (ofib 20)))
+(while true (sleep 100))
 

@@ -32,15 +32,18 @@
 #define CEDAR_HH
 
 #include "cedar/importutil.h"
+#include "cedar/channel.h"
 #include "cedar/version.h"
 #include "cedar/builtin_types.h"
 #include "cedar/types.h"
 #include "cedar/objtype.h"
 #include "cedar/parser.h"
+#include "cedar/cl_deque.h"
 #include "cedar/scheduler.h"
 #include "cedar/globals.h"
 #include "cedar/modules.h"
 #include "cedar/thread.h"
+#include "cedar/event_loop.h"
 #include "cedar/passes.h"
 #include "cedar/memory.h"
 #include "cedar/object.h"
