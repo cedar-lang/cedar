@@ -54,7 +54,7 @@ namespace cedar {
 				// it also determines *where* to write when writing new data
 				u64 size = 0;
 				// cap is the number of bytes allocated for the code pointer
-				u64 cap = 255;
+				u64 cap = 32;
 
 			public:
 
@@ -70,7 +70,7 @@ namespace cedar {
 				uint8_t *code;
 
 				inline bytecode() {
-					code = new uint8_t[255];
+					code = new uint8_t[32];
 				}
 
 				void print(u8 *ip = nullptr);

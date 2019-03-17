@@ -24,7 +24,6 @@
 
 #include <apathy.h>
 #include <cedar.h>
-#include <cedar/lib/linenoise.h>
 #include <ctype.h>
 #include <dlfcn.h>
 #include <getopt.h>
@@ -47,6 +46,7 @@
 #include <typeinfo>
 #define GC_THREADS
 #include <cedar/thread.h>
+#include <ffi/ffi.h>
 #include <gc/gc.h>
 #include <cedar/util.hpp>
 
@@ -55,29 +55,13 @@
 using Replxx = replxx::Replxx;
 
 
-
-using ref = cedar::ref;
-
 static void help(void);
 static void usage(void);
 
 using namespace cedar;
 
 
-std::thread start_daemon_thread(short);
 void hook_color(std::string const &str, Replxx::colors_t &colors, module *mod);
-
-cedar::type::method lambda_wrap(ref func) {
-  if (lambda *fn = ref_cast<lambda>(func); fn != nullptr) {
-    return [func](int argc, ref *argv, vm::machine *m) -> ref {
-      lambda *fn = ref_cast<lambda>(func)->copy();
-      fn->prime_args(argc, argv);
-      return eval_lambda(fn);
-    };
-  }
-
-  throw cedar::make_exception("lambda_wrap requires a lambda object");
-}
 
 
 
@@ -89,12 +73,14 @@ int main(int argc, char **argv) {
 
   def_global("*cedar-version*", new cedar::string(CEDAR_VERSION));
 
+  module *repl_mod = new module("user");
+
 
   try {
     bool interactive = false;
 
-
     char c;
+
     while ((c = getopt(argc, argv, "ihe:")) != -1) {
       switch (c) {
         case 'h':
@@ -108,6 +94,7 @@ int main(int argc, char **argv) {
           // TODO: implement evaluate argument
         case 'e': {
           cedar::runes expr = optarg;
+          eval_string_in_module(expr, repl_mod);
           return 0;
           break;
         };
@@ -119,14 +106,13 @@ int main(int argc, char **argv) {
     }
 
 
-    module *repl_mod = new module("user");
 
     // there are also args, so make that vector...
     ref args = new cedar::vector();
     for (int i = optind; i < argc; i++) {
       args = cedar::idx_append(args, new cedar::string(argv[i]));
     }
-    // require("os")->def("args", args);
+    require("os")->def("args", args);
 
     if (optind == argc) {
       interactive = true;
@@ -137,7 +123,6 @@ int main(int argc, char **argv) {
 
       // there are also args, so make that vector...
       ref args = new cedar::vector();
-
       optind++;
       for (int i = optind; i < argc; i++) {
         args = self_call(args, "put", new string(argv[i]));
@@ -146,42 +131,19 @@ int main(int argc, char **argv) {
       repl_mod = require(path);
     }
 
-    // run the async event loop now
-    // run_loop();
-
-    ///////////////////////////////////////////////////////////////
-    // repl logic begins here
-    // TODO: make the repl either live on another thread *or*
-    //       implement it inside libuv using the language itself
-    ///////////////////////////////////////////////////////////////
-
-    std::thread repl_thread;
-
 
     if (interactive) {
-      // repl_thread = std::thread([&](void) -> void {
-      // register_thread();
-
       Replxx rx;
-
       printf("cedar lisp v" CEDAR_VERSION "\n");
-
       rx.history_load("~/.cedar_history");
-
-
-
       using namespace std::placeholders;
       rx.set_highlighter_callback(std::bind(&hook_color, _1, _2, repl_mod));
-
-
       repl_mod->def("*file*", cedar::new_obj<cedar::string>(
                                   apathy::Path::cwd().string()));
       cedar::reader repl_reader;
       while (interactive) {
         std::string ps1;
-
         ps1 += "> ";
-
         char const *buf = nullptr;
         do {
           buf = rx.input(ps1);
@@ -191,15 +153,6 @@ int main(int argc, char **argv) {
           break;
         }
         std::string input = buf;
-
-        /*
-        std::string input;
-        std::cout << ps1;
-
-        char b[100];
-        std::cin >> b;
-        input = b;
-        */
 
         if (input.empty()) {
           continue;
@@ -216,17 +169,11 @@ int main(int argc, char **argv) {
           std::cerr << "Uncaught Exception: " << e.what() << std::endl;
         }
       }
-
-      // rx.history_save("~/.cedar_history");
-      //});
     }
 
 
-    // run_loop();
-
-    if (repl_thread.joinable()) {
-      printf("JOIN REPL THREAD\n");
-      repl_thread.join();
+    while (!all_work_done()) {
+      usleep(200);
     }
 
   } catch (std::exception &e) {
@@ -276,7 +223,6 @@ int utf8_strlen(char const *s, int utf8len) {
 
 void hook_color(std::string const &context, Replxx::colors_t &colors,
                 module *mod) {
-
   using cl = Replxx::Color;
 
   static auto cols = std::vector<cl>{cl::BLUE, cl::RED, cl::GREEN};

@@ -41,19 +41,13 @@ using namespace cedar;
 
 long cedar::object_count = 0;
 
-object *cedar::obj_root = nullptr;
-
 // the object constructor and destructor keeps
 // track of how many objects are allocated
 object::object(void) {
   m_type = object_type;
-
-  next = obj_root;
-
-  object_count++;
 }
 
-object::~object(void) { object_count--; }
+object::~object(void) {}
 
 
 
@@ -107,6 +101,7 @@ ref object::getattr_fast(u64 i) {
   throw cedar::make_exception("attribute '", symbol::unintern(i), "' on object not found");
 
 FOUND:
+
   if (val.get_type() == lambda_type) {
     lambda *fn = ref_cast<lambda>(val)->copy();
     fn->self = this;

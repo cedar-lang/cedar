@@ -41,7 +41,7 @@ list::list(ref first, ref rest) {
   m_rest = rest;
 }
 
-list::list(std::vector<ref> items) {
+list::list(std::vector<ref> const& items) {
   m_type = list_type;
 
   if (items.size() == 0) return;

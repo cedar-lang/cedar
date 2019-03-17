@@ -1,4 +1,5 @@
 (import os)
+(import bits)
 
 (def (fact n)
   (cond (<= n 1) 1
@@ -27,7 +28,7 @@
   (let (s "" i 0)
     (while (< i 16)
       (def s (str (hexchar (bits.and x 0x0F)) s))
-      (def x (bit-shift-right x 4))
+      (def x (bits.shift-right x 4))
       (def i (inc i)))
     (trim-zeros s)))
 
@@ -40,6 +41,8 @@
         (if (= r not-found-sym)
           (set mem args (apply f args))
           r)))))
+
+
 (def (fib-iter max n i j)
   (if (= n max)
     j
@@ -47,18 +50,7 @@
            (inc n)
            j
            (+ i j))))
-
-
 (def (fib max)
   (if (< max 2)
     max
-    (fib-iter max 1 0.0 1.0)))
-
-
-
-
-(deftype tokenizer
-  (def i 0)
-  (defn new [self s]
-    (def self.string s)))
-
+    (fib-iter max 1 0 1)))

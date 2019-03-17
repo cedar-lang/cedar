@@ -26,6 +26,7 @@
 
 #include <cedar/object.h>
 #include <cedar/scheduler.h>
+#include <cedar/object/lambda.h>
 #include <future>
 
 namespace cedar {
@@ -42,12 +43,15 @@ namespace cedar {
   struct frame {
     frame *caller = nullptr;
     lambda *code;
+    lambda fn;
     int sp;
     int fp;
     u8 *ip;
   };
 
+  enum fiber_state { RUNNING, STOPPED, PAUSED };
   class fiber : public object {
+
    private:
     int stack_size = 0;
     ref *stack = nullptr;
@@ -62,8 +66,21 @@ namespace cedar {
 
     frame *add_call_frame(lambda *);
     frame *pop_call_frame(void);
+    /**
+     * a process starts paused, which allows it to continue running.
+     */
+    std::mutex state_lock;
+    fiber_state state = PAUSED;
 
    public:
+    int jid = 0;
+    i64 sleep = 0;
+    i64 ticks = 0;
+    int reductions = 0;
+
+    u64 last_ran = 0;
+    u64 create_time = 0;
+
     bool done = false;
     ref return_value = nullptr;
     int fid = 0;
@@ -71,10 +88,13 @@ namespace cedar {
     fiber(lambda *);
     ~fiber(void);
 
+    fiber_state get_state(void);
+    void set_state(fiber_state);
+
     void print_callstack();
 
     // run the fiber for at most max_ms miliseconds
-    void run(scheduler *sched, run_context *state, int max_ms);
+    void run(run_context *state, int max_ms);
 
     // run the fiber until it returns, then return the value it yields
     ref run(void);

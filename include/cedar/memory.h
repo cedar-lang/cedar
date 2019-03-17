@@ -30,17 +30,5 @@
 
 
 namespace cedar {
-	// supply an alias to a shorter form of std::shared_ptr<T>
-	// that can be used by either cedar::ptr<T> or ptr<T> internally
-	template<typename T>
-		using ptr = std::shared_ptr<T>;
-	template<typename T>
-		using weak_ptr = std::weak_ptr<T>;
 
-	// supply an alias around std::make_shared because it's ugly
-	// and it needs to be run quite often in the VM side of cedar
-	template<typename T, typename ...Args>
-		inline ptr<T> make(Args... args) {
-			return std::make_shared<T>(args...);
-		}
 } // namespace cedar

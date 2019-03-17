@@ -23,10 +23,12 @@
  */
 
 #pragma once
+#ifndef _CHANNEL_H
+#define _CHANNEL_H
 
-#include <list>
-#include <mutex>
 #include <condition_variable>
+#include <list>
+#include <thread>
 
 
 namespace cedar {
@@ -40,27 +42,22 @@ namespace cedar {
 
    public:
     channel() : closed(false) {}
-    inline void close() {
+    void close() {
       std::unique_lock<std::mutex> lock(m);
       closed = true;
       cv.notify_all();
     }
-    inline bool is_closed() {
+    bool is_closed() {
       std::unique_lock<std::mutex> lock(m);
       return closed;
     }
-    inline bool has_data() {
-      std::unique_lock<std::mutex> lock(m);
-      return queue.size() != 0;
-    }
-
-    inline void put(const item &i) {
+    void put(const item &i) {
       std::unique_lock<std::mutex> lock(m);
       if (closed) throw std::logic_error("put to closed channel");
       queue.push_back(i);
       cv.notify_one();
     }
-    inline bool get(item &out, bool wait = true) {
+    bool get(item &out, bool wait = true) {
       std::unique_lock<std::mutex> lock(m);
       if (wait) cv.wait(lock, [&]() { return closed || !queue.empty(); });
       if (queue.empty()) return false;
@@ -69,4 +66,7 @@ namespace cedar {
       return true;
     }
   };
+
 }  // namespace cedar
+
+#endif

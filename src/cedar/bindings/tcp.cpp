@@ -53,11 +53,9 @@ class server_obj : public object {
 };
 
 
-UV_EXTERN int uv_ip4_addr(const char* ip, int port, struct sockaddr_in* addr);
+UV_EXTERN int uv_ip4_addr(const char *ip, int port, struct sockaddr_in *addr);
 
 void bind_tcp(void) {
-
-
   tcp_type = new type("Server");
 
 
@@ -68,16 +66,18 @@ void bind_tcp(void) {
 
 
   tcp_type->set_field("new", bind_lambda(argc, argv, ctx) {
-    if (argc != 2) {
-      throw cedar::make_exception("tcp.Server.new requires 1 argument");
-    }
-    if (argv[1].get_type() != lambda_type) {
-      throw cedar::make_exception("tcp.Server.new requires a lambda callback");
-    }
-    lambda *cb = ref_cast<lambda>(argv[1]);
-    server_obj *server = ref_cast<server_obj>(argv[0]);
-    server->m_cb = cb;
-    uv_tcp_init(ctx->schd->loop, &server->m_tcp);
+    /*
+  if (argc != 2) {
+    throw cedar::make_exception("tcp.Server.new requires 1 argument");
+  }
+  if (argv[1].get_type() != lambda_type) {
+    throw cedar::make_exception("tcp.Server.new requires a lambda callback");
+  }
+  lambda *cb = ref_cast<lambda>(argv[1]);
+  server_obj *server = ref_cast<server_obj>(argv[0]);
+  server->m_cb = cb;
+  uv_tcp_init(ctx->schd->loop, &server->m_tcp);
+  */
     return nullptr;
   });
 
@@ -91,10 +91,12 @@ void bind_tcp(void) {
 
 
     if (argv[1].get_type() != string_type) {
-      throw cedar::make_exception("tcp.Server.listen requires the form (String, Number)");
+      throw cedar::make_exception(
+          "tcp.Server.listen requires the form (String, Number)");
     }
     if (argv[2].get_type() != number_type) {
-      throw cedar::make_exception("tcp.Server.listen requires the form (String, Number)");
+      throw cedar::make_exception(
+          "tcp.Server.listen requires the form (String, Number)");
     }
 
     sockaddr_in *addr = new sockaddr_in();

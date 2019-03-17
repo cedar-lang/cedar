@@ -59,8 +59,8 @@ namespace cedar {
 			 */
 			std::map<uint64_t, int> m_bindings;
 			public:
-				std::shared_ptr<scope> m_parent = nullptr;
-				scope(std::shared_ptr<scope>);
+				scope* m_parent = nullptr;
+				scope(scope*);
 
 				int find(uint64_t);
 				int find(ref &);
@@ -70,7 +70,6 @@ namespace cedar {
 
 		};
 
-		using scope_ptr = std::shared_ptr<scope>;
 
 		class compiler {
 			public:
@@ -89,14 +88,14 @@ namespace cedar {
 				 */
 				ref compile(ref, module*);
 
-				void compile_lambda_expression(ref, bytecode &, scope_ptr sc, compiler_ctx*);
-				void compile_number(ref, bytecode &, scope_ptr, compiler_ctx*);
-				void compile_object(ref, bytecode &, scope_ptr, compiler_ctx*);
-				void compile_constant(ref, bytecode &, scope_ptr, compiler_ctx*);
-				void compile_symbol(ref, bytecode &, scope_ptr, compiler_ctx*);
-				void compile_list(ref, bytecode &, scope_ptr, compiler_ctx*);
-        void compile_vector(ref, bytecode &, scope_ptr, compiler_ctx*);
-				void compile_quasiquote(ref, bytecode &, scope_ptr sc, compiler_ctx*);
+				void compile_lambda_expression(ref, bytecode &, scope* sc, compiler_ctx*);
+				void compile_number(ref, bytecode &, scope*, compiler_ctx*);
+				void compile_object(ref, bytecode &, scope*, compiler_ctx*);
+				void compile_constant(ref, bytecode &, scope*, compiler_ctx*);
+				void compile_symbol(ref, bytecode &, scope*, compiler_ctx*);
+				void compile_list(ref, bytecode &, scope*, compiler_ctx*);
+        void compile_vector(ref, bytecode &, scope*, compiler_ctx*);
+				void compile_quasiquote(ref, bytecode &, scope* sc, compiler_ctx*);
 		};
 
 		// a bytecode compilation pass that takes in the compiler

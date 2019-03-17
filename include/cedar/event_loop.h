@@ -21,15 +21,25 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-
-
 #pragma once
+
+#ifndef __EVENT_LOOP_H
+#define __EVENT_LOOP_H
+
+#include <uv.h>
+#include <functional>
+
 
 namespace cedar {
 
-  class dict;
-  class with_meta {
-    public:
-      dict *m_meta;
-  };
-};
+  // forward decl
+  struct job;
+
+
+  void init_ev(void);
+  void in_ev(std::function<void(uv_loop_t *)>);
+  void set_timeout(int time_ms, job *j);
+}  // namespace cedar
+
+#endif
+

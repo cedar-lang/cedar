@@ -23,6 +23,8 @@
  */
 
 
+#include <cedar/channel.h>
+#include <cedar/event_loop.h>
 #include <cedar/globals.h>
 #include <cedar/modules.h>
 #include <cedar/object/fiber.h>
@@ -33,233 +35,249 @@
 #include <cedar/types.h>
 #include <unistd.h>
 #include <uv.h>
+#include <atomic>
 #include <chrono>
+#include <condition_variable>
 #include <cstdlib>
+#include <flat_hash_map.hpp>
 #include <mutex>
+
 
 using namespace cedar;
 
 
-#define LOCK(m)                                           \
-  if (0) printf("WAITING " #m " at line %d\n", __LINE__); \
-  (m).lock();                                             \
-  if (0) printf("AQUIRED " #m " at line %d\n", __LINE__);
+/**
+ * The number of jobs that have yet to be completed. This number is used
+ * to track if the main thread should exit or not, and if a certain thread
+ * should wait or not. When a job is pushed to the scheduler, this value is
+ * incremented, and is decremented when a job is deemed completed.
+ *
+ * This number is an unsigned 64 bit integer, because cedar will eventually
+ * be able to run a huge number of these jobs concurrently. :)
+ */
+static std::atomic<u64> pending_job_count;
+
+/**
+ * ncpus is how many worker threads to maintain at any given time.
+ */
+static unsigned ncpus = 8;
 
 
-static u64 time_ms(void) {
-  auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-      std::chrono::system_clock::now().time_since_epoch());
-  return ms.count();
-}
+
+/**
+ * the listing of all worker threads and a fast lookup map to the same
+ * information
+ * TODO: more docs
+ */
+static std::mutex worker_thread_mutex;
+static std::vector<worker_thread *> worker_threads;
+static ska::flat_hash_map<std::thread::id, worker_thread *> worker_thread_map;
 
 
 
-static std::mutex sid_lock;
-static int next_sid;
+/**
+ * time_ms returns the number of milliseconds from the unix epoch. This is
+ * useful for timing fibers
+ * TODO: remove the need for this entirely by using libuv
+ */
+static u64 time_ms(void);
 
-scheduler::scheduler(void) {
-  // TODO: initialize thread-local state
-  sid = next_sid++;
-  thread = std::this_thread::get_id();
-}
-
-scheduler::~scheduler(void) {
-  for (job *j = jobs; j != nullptr;) {
-    job *c = j;
-    j = j->next;
-    remove_job(c);
-  }
-}
 
 static std::mutex jid_mutex;
 int next_jid = 0;
-static int job_pool_size = 0;
-static job *job_pool = nullptr;
 
 
-// add a fiber to the front of the jobs linked list
-void scheduler::add_job(fiber *f) {
-  // grab a lock on this scheduler's jobs
-  job *j = new job();
-  j->task = f;
-  // grab a lock to the jid_mutex lock and take the next jid
-  // for this job
-  LOCK(jid_mutex);
-  j->jid = next_jid++;
-  jid_mutex.unlock();
-
-  j->create_time = time_ms();
-  // the job hasn't ran yet, so we just want to run it as
-  // soon as possible (give long last_ran time)
-  j->last_ran = 0;
-  // increment the number of jobs in the scheduler
-  jobc++;
-  LOCK(job_mutex);
-  work.push(j);
-  job_mutex.unlock();
+static worker_thread *lookup_or_create_worker(std::thread::id tid) {
+  std::unique_lock<std::mutex> lock(worker_thread_mutex);
+  worker_thread *w = worker_thread_map[tid];
+  if (w == nullptr) {
+    // create w
+    w = new worker_thread();
+    w->tid = tid;
+    worker_thread_map[tid] = w;
+    worker_threads.push_back(w);
+  }
+  return w;
 }
 
 
-
-
-void scheduler::remove_job(job *j) {
-  // decrement the number of jobs in the system
-  jobc--;
-
-  /*
-  if (jobs == j) {
-    jobs = jobs->next;
-  }
-  */
-  delete j;
+void cedar::add_job(fiber *f) {
+  worker_thread_mutex.lock();
+  int ind = rand() % worker_threads.size();
+  worker_threads[ind]->local_queue.push(f);
+  worker_thread_mutex.unlock();
 }
 
 
-
-
-bool scheduler::schedule(void) {
-  if (state != running) {
-    return false;
-  }
-  u64 time = time_ms();
-  LOCK(job_mutex);
-  if (work.empty()) {
-    job_mutex.unlock();
-    return false;
-  }
-  job *job = work.front();
-  work.pop();
-  job_mutex.unlock();
-
-  bool done = false;
-
-  if (true || time >= (job->last_ran + job->sleeping_for)) {
-    // printf("Scheduling Job %d %d\n", job->jid, jobc);
-    job->run_count++;
-    run_context ctx;
-
-    // run the job for 2 ms
-    job->task->run(this, &ctx, 2);
-    job->last_ran = time_ms();
-
-
-    job->sleeping_for = ctx.sleep_for;
-    done = ctx.done;
-    job->task->done = done;
-  }
-
-
-
-  LOCK(job_mutex);
-  if (done) {
-    remove_job(job);
-  } else {
-    work.push(job);
-  }
-  job_mutex.unlock();
-
-
-  return true;
-}
 
 /**
- * tick the scheduler once, meaning schedule a fiber then run the UV loop
- * once
+ * construct and start a worker thread by creating it and pushing it to
+ * the worker pool atomically
+ *
+ * A worker thread will sit and wait for jobs in the following order:
+ *     A) A job is waiting in the local job queue
+ *     B) a job to be accessable in the global queue
+ *     C) POSSIBLY, steal work from other worker threads.
  */
-bool scheduler::tick(void) {
-  // std::cout << "TICK FROM: " << std::this_thread::get_id() << std::endl;
-  schedule();
-  uv_run(loop, UV_RUN_ONCE);
+static std::thread spawn_worker_thread(void) {
+  return std::thread([](void) -> void {
+    register_thread();
+    worker_thread *my_thread =
+        lookup_or_create_worker(std::this_thread::get_id());
+    while (true) volunteer(my_thread);
+  });
+}
+
+
+
+/**
+ * schedule a single job on the caller thread, it's up to the caller to manage
+ * where the job goes after the job yields
+ */
+static bool schedule_job(fiber *proc) {
+  static int sched_time = 2;
+  static bool read_env = false;
+  static const char *SCHED_TIME_ENV = getenv("CDRTIMESLICE");
+  if (SCHED_TIME_ENV != nullptr && !read_env) {
+    sched_time = atol(SCHED_TIME_ENV);
+    if (sched_time < 2)
+      throw cedar::make_exception("$CDRTIMESLICE must be larger than 2ms");
+  }
+  read_env = true;
+
+  if (proc == nullptr) return false;
+
+  bool done = false;
+  u64 time = time_ms();
+  /* check if this process needs to be run or not */
+  if (time >= (proc->last_ran + proc->sleep)) {
+    run_context ctx;
+    /* "context switch" into the job for sched_time milliseconds
+     * and return back here, with a modified ctx */
+    proc->run(&ctx, sched_time);
+    /* store the last time of execution in the job. This is an
+     * approximation as getting the ms from epoch takes too long */
+    proc->last_ran = time + sched_time;
+    /* store how long the process should sleep for.
+     * TODO: move this into libuv once that is implenented */
+    proc->sleep = ctx.sleep_for;
+
+
+    /* and increment the ticks for this job */
+    proc->ticks++;
+    done = proc->done;
+
+
+    return !done;
+  }
   return true;
 }
 
 
-
-
-void scheduler::set_state(run_state s) {
-  LOCK(job_mutex);
-  state = s;
-  job_mutex.unlock();
+/**
+ * return if all work has been completed or not
+ */
+bool cedar::all_work_done(void) {
+  // if there are no pending jobs, we must be done with all work.
+  return pending_job_count == 0;
 }
 
-
-struct sched_thread {
-  scheduler sched;
-};
-
-
-static std::vector<sched_thread> schdulers;
-static uv_idle_t *idler = nullptr;
-static scheduler primary_scheduler;
-std::thread scheduler_thread;
-std::thread::id sched_thread;
-
-
-// the callback for when libuv feels like it's okay to
-// schedule a fiber run. How nice of it.
-void event_idle_schedule(uv_idle_t *handle) {
-  auto *sched = (scheduler *)handle->data;
-  sched->schedule();
-}
-
-namespace cedar {
-  void bind_stdlib(void);
-};
 
 
 static void init_scheduler(void) {
-  scheduler_thread = std::thread([](void) {
-    register_thread();
-    // create the scheduler's libuv loop
-    primary_scheduler.loop = new uv_loop_t();
-    primary_scheduler.thread = std::this_thread::get_id();
-    uv_loop_init(primary_scheduler.loop);
-    // store the primary scheduler in the loop itself
-    primary_scheduler.loop->data = &primary_scheduler;
-    // set it to running
-    primary_scheduler.set_state(scheduler::running);
-    // in libuv, other events need to occur interleaved with
-    // fiber evaluation, so we need to use a uv_idle_t event
-    // in order to schedule fibers in the libuv idle time.
-    idler = new uv_idle_t();
-    idler->data = &primary_scheduler;
+  // the number of worker threads is the number of cpus the host machine
+  // has, minus one as the main thread does work
+  ncpus = std::thread::hardware_concurrency();
+  static const char *CDRMAXPROC = getenv("CDRMAXPROC");
+  if (CDRMAXPROC != nullptr) ncpus = atol(CDRMAXPROC);
 
-    while (true) {
-    /*
-      bool has_jobs = primary_scheduler.tick();
-      if (!has_jobs) break;
-      */
-    }
-
-
-    uv_loop_close(primary_scheduler.loop);
-    // uv_run(primary_scheduler.loop, UV_RUN_DEFAULT);
-
-    delete primary_scheduler.loop;
-    deregister_thread();
-  });
-
-  scheduler_thread.detach();
-  return;
-  // create the scheduler's libuv loop
-  primary_scheduler.loop = new uv_loop_t();
-  primary_scheduler.thread = std::this_thread::get_id();
-  uv_loop_init(primary_scheduler.loop);
-  // store the primary scheduler in the loop itself
-  primary_scheduler.loop->data = &primary_scheduler;
-  // set it to running
-  primary_scheduler.set_state(scheduler::running);
-  // in libuv, other events need to occur interleaved with
-  // fiber evaluation, so we need to use a uv_idle_t event
-  // in order to schedule fibers in the libuv idle time.
-  idler = new uv_idle_t();
-  idler->data = &primary_scheduler;
-  sched_thread = std::this_thread::get_id();
-  // scheduler_thread = std::this_thread;
+  // spawn 'ncpus' worker threads
+  for (unsigned i = 0; i < ncpus; i++) spawn_worker_thread().detach();
 }
 
 
+
+
+void cedar::volunteer(worker_thread *worker) {
+  if (worker == nullptr) {
+    worker = lookup_or_create_worker(std::this_thread::get_id());
+  }
+  size_t pool_size = 0;
+  int i1, i2;
+  worker_thread *w1, *w2;
+
+  /**
+   * now that we have the worker_thread, we need to find work to do
+   */
+
+
+  // work is the thing that will eventually be done, while looking for work,
+  // it will be set and checked for equality to nullptr. If at any point it
+  // is not nullptr, it will immediately be scheduled.
+  fiber *work = nullptr;
+
+
+
+  // first check the local queue
+  work = worker->local_queue.steal();
+  if (work != nullptr) goto SCHEDULE;
+
+
+
+  worker_thread_mutex.lock();
+  // now look through other threads in the thread pool for work to steal
+  pool_size = worker_threads.size();
+
+  i1 = rand() % pool_size;
+  i2 = rand() % pool_size;
+  w1 = worker_threads[i1];
+  w2 = worker_threads[i2];
+  worker_thread_mutex.unlock();
+
+  if (w1->local_queue.size() > w2->local_queue.size()) {
+    work = w1->local_queue.steal();
+  } else {
+    work = w2->local_queue.steal();
+  }
+
+  if (work != nullptr) {
+    goto SCHEDULE;
+  }
+  // sleep for 1 ms
+  usleep(10);
+  return;
+
+SCHEDULE:
+
+
+  if (work == nullptr) {
+    return;
+    throw std::logic_error("work is nullptr");
+  }
+
+  // switch into the work for a time slice and return here when done.
+  bool replace = schedule_job(work);
+  worker->ticks++;
+
+
+
+  // since we did some work, we should put it back in the local queue
+  // but only if it isn't done.
+  if (work != nullptr && replace) {
+    worker->local_queue.push(work);
+  }
+}
+
+
+
+
+// forward declare this function
+namespace cedar {
+  void bind_stdlib(void);
+};
 void init_binding(cedar::vm::machine *m);
+
+
 
 /**
  * this is the primary entry point for cedar, this function
@@ -267,24 +285,12 @@ void init_binding(cedar::vm::machine *m);
  */
 void cedar::init(void) {
   init_scheduler();
+  // init_ev();
   type_init();
   init_binding(nullptr);
   bind_stdlib();
   core_mod = require("core");
 }
-
-
-
-
-void cedar::run_loop(void) {
-  while (true) {
-    primary_scheduler.tick();
-  }
-}
-
-
-
-void cedar::add_job(fiber *f) { primary_scheduler.add_job(f); }
 
 
 /**
@@ -297,30 +303,14 @@ void cedar::add_job(fiber *f) { primary_scheduler.add_job(f); }
  * such a call
  */
 ref cedar::eval_lambda(lambda *fn) {
-  fiber r(fn);
-  return r.run();
-
-
-  fiber *f = new fiber(fn);
-  /* we're only allowed to run if we're on the thread of
-   * the event loop. Otherwise we have to just sit and wait */
-  bool run = sched_thread == std::this_thread::get_id();
-  // printf("%d\n", run);
-  f->done = false;
-  add_job(f);
-  while (!f->done) {
-    if (run) {
-      primary_scheduler.tick();
-    } else {
-      usleep(10);
-    }
+  fiber f(fn);
+  worker_thread *my_worker =
+      lookup_or_create_worker(std::this_thread::get_id());
+  my_worker->local_queue.push(&f);
+  while (!f.done) {
+    volunteer(my_worker);
   }
-
-  ref val = f->return_value;
-
-  delete f;
-
-  return val;
+  return f.return_value;
 }
 
 
@@ -332,4 +322,15 @@ ref cedar::call_function(lambda *fn, int argc, ref *argv, call_context *ctx) {
   fn = fn->copy();
   fn->prime_args(argc, argv);
   return eval_lambda(fn);
+}
+
+
+
+/**
+ * get the time since epoch in ms
+ */
+static u64 time_ms(void) {
+  auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+      std::chrono::system_clock::now().time_since_epoch());
+  return ms.count();
 }

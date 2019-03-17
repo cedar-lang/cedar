@@ -137,9 +137,10 @@ ref cedar::eval_string_in_module(cedar::runes &src, module *mod) {
   reader reader;
   reader.lex_source(src);
   bool valid = true;
-  ref val;
+  ref val, obj;
+
   while (true) {
-    ref obj = reader.read_one(&valid);
+    obj = reader.read_one(&valid);
     if (!valid) break;
     val = eval(obj, mod);
   }

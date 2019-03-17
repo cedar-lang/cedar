@@ -302,7 +302,7 @@ skip_comment:
 reader::reader() {}
 
 void reader::lex_source(cedar::runes src) {
-  m_lexer = std::make_shared<cedar::lexer>(src);
+  m_lexer = new cedar::lexer(src);
   tokens.clear();
 
   // read all the tokens from the source code
@@ -330,7 +330,7 @@ ref reader::read_one(bool *valid) {
 std::vector<ref> reader::run(cedar::runes source) {
   std::vector<ref> statements;
 
-  m_lexer = std::make_shared<cedar::lexer>(source);
+  m_lexer = new lexer(source);
 
   tokens.clear();
 

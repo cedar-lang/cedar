@@ -24,7 +24,6 @@
 
 
 #include <cedar/runes.h>
-#include <utf8.h>
 #include <codecvt>
 #include <iostream>
 #include <locale>
@@ -34,14 +33,15 @@
 
 using namespace cedar;
 
+
+static std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> unicode_conv;
+
 static std::string to_utf8(std::u32string const& s) {
-  std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> conv;
-  return conv.to_bytes(s);
+  return unicode_conv.to_bytes(s);
 }
 
 static std::u32string to_utf32(std::string const & s) {
-	std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> conv;
-	return conv.from_bytes(s);
+	return unicode_conv.from_bytes(s);
 }
 
 
@@ -66,7 +66,7 @@ runes::runes(const char32_t* s) {
 runes::runes(std::string s) { ingest_utf8(s); }
 // copy constructor
 runes::runes(const cedar::runes& other) {
-  operator=(other);
+  buf = other.buf;
   return;
 }
 

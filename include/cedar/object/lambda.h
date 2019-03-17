@@ -34,13 +34,18 @@
 #include <functional>
 #include <memory>
 
+#include <gc/gc_cpp.h>
+
 // define the number of references to store in the
 // closure itself, instead of in the vector
 #define CLOSURE_INTERNAL_SIZE 0
 
+
+
 namespace cedar {
 
   class module;
+  class lambda;
 
   // closure represents a wraper around closed values
   // in functions, also known as "freevars" in LC
@@ -51,15 +56,21 @@ namespace cedar {
    public:
     i32 m_size = 0;
     i32 m_index = 0;
-    std::shared_ptr<closure> m_parent;
+    closure *m_parent;
 
     std::vector<ref> m_vars;
     // constructor to allocate n vars of closure space
     //
-    closure(i32, std::shared_ptr<closure> = nullptr, i32 = 0);
+    closure(i32, closure * = nullptr, i32 = 0);
     ~closure(void);
-    std::shared_ptr<closure> clone(void);
+    closure *clone(void);
     ref &at(int);
+  };
+
+
+  struct primed_fn {
+    lambda *fn;
+    closure *cl;
   };
 
 
@@ -70,34 +81,34 @@ namespace cedar {
       function_binding_type,
     };
 
-    lambda_type code_type = bytecode_type;
+    char code_type = bytecode_type;
     vm::bytecode *code;
-    std::shared_ptr<closure> m_closure = nullptr;
-
-
+    closure *m_closure = nullptr;
     module *mod = nullptr;
     ref name;
-    ref self;
+    ref self = nullptr;
     ref defining;
-
-    i32 arg_index = 0;
-    i32 argc = 0;
+    i16 arg_index = 0;
+    i8 argc = 0;
     bool vararg = false;
-
     bound_function function_binding;
 
+
+
+
     lambda(void);
-    lambda(cedar::vm::bytecode*);
+    lambda(cedar::vm::bytecode *);
     lambda(cedar::bound_function);
     ~lambda(void);
-
-
-
     u64 hash(void);
     lambda *copy(void);
     // prime_args configures the lambda with a closure and loads it
     // with the arguments according to that lambda's calling conv
     void prime_args(int argc = 0, ref *argv = nullptr);
-    void set_args_closure(int argc = 0, ref *argv = nullptr);
+    primed_fn prime(int argc = 0l, ref *argv = nullptr);
+    void set_args_closure(closure *, int argc = 0, ref *argv = nullptr);
   };
+
+
+
 }  // namespace cedar

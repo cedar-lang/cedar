@@ -24,15 +24,24 @@
 
 #pragma once
 
+#include <cedar/cl_deque.h>
 #include <cedar/ref.h>
 #include <cedar/types.h>
 #include <uv.h>
 #include <future>
+#include <list>
 #include <mutex>
-#include <queue>
+#include <thread>
+
+/*
+ * The cedar scheduler's job is to distribute work across several worker threads
+ *
+ * It does this by...
+ * TODO: Write how it works :)
+ */
+
 
 namespace cedar {
-
 
   // forward declaration
   class fiber;
@@ -40,29 +49,9 @@ namespace cedar {
   class scheduler;
   class module;
 
-
-
   // the intro initialization function
   void init(void);
-
   void add_job(fiber *);
-
-  void run_loop(void);
-
-
-  // a job is a representation of a fiber's state as
-  // viewed by the scheduler
-  struct job {
-    int jid = 0;
-    job *next;
-    job *prev;
-    i64 sleeping_for = 0;
-    u64 last_ran;
-    u64 create_time;
-    int run_count = 0;
-    int wait_time = 0;
-    fiber *task;
-  };
 
 
   struct run_context {
@@ -72,68 +61,43 @@ namespace cedar {
   };
 
 
+  bool all_work_done(void);
 
   // the context that gets passed into a bound_function
   // call in the fiber loop
   struct call_context {
     fiber *coro;
-    scheduler *schd;
     module *mod;
   };
 
-
-  ref call_function(lambda *, int argc, ref *argv, call_context *ctx);
-
-  // a scheduler is the primary controller of a thread's event loop
-  // and it maintains control over the fibers running on the thread.
-  // it works on a mix between cooperative and preemptive multitasking
-  // using a job system and the fiber evaluators in cedar.
-  class scheduler {
+  /*
+   * a worker thread represents a thread that has volunteered some of it's time.
+   * When a thread does volunteer, it calls the 'volunteer' function, which will
+   * create a worker_thread object if there isn't already one, and use that
+   * state to do a bit of work.
+   */
+  class worker_thread {
    public:
-    enum run_state {
-      paused,
-      running,
-      stopped,
-    };
-
-   private:
-    // schedule a job and return true if there are more jobs
-    // and return false if there are no more jobs to run
-    job *jobs = nullptr;
-
-
-    std::queue<job *> work;
-    std::mutex job_mutex;
-
-   public:
-    int jobc = 0;
-    bool ready = false;
-    std::thread::id thread;
-    uv_loop_t *loop;
-    bool schedule(void);
-
-    run_state state;
-    int sid = 0;
-
-
-    scheduler(void);
-    ~scheduler(void);
-
-    void add_job(fiber *);
-
-    void remove_job(job *);
-
-    void set_state(run_state);
-
-
-
-    // tick the scheduler and return if the scheduler still has jobs
-    bool tick(void);
+    u64 ticks = 0;
+    std::thread::id tid;
+    cl_deque<fiber *> local_queue;
   };
 
 
-  // evaluate a lambda to completion. Mainly used in situations
-  // where code runs outside the scheduler like macroexpand
+  /**
+   * the volunteer function is the main function that will execute work. It
+   * allows a thread to start working on it's own queue, steal from another
+   * queue, or immediately return with no work.
+   *
+   * It has an optional argument representing the worker_thread that is
+   * volunteering it's time. If this optional argument is nullptr, it needs to
+   * do a hashtable lookup for the thread and create a worker_thread object if
+   * it needs to.
+   */
+  void volunteer(worker_thread* = nullptr);
+
+
   ref eval_lambda(lambda *);
+  ref call_function(lambda *, int argc, ref *argv, call_context *ctx);
 
 }  // namespace cedar
