@@ -86,6 +86,8 @@ new_op('GET_MODULE', effect=1)
 
 new_op('ADD', effect=-1)
 
+new_op('LOAD_SELF', effect=1)
+
 def main(outfile):
     with open(outfile, 'w') as f:
         f.write(header)

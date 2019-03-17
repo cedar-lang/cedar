@@ -102,13 +102,11 @@ ref object::getattr_fast(u64 i) {
 
 FOUND:
 
-  /*
   if (val.get_type() == lambda_type) {
     lambda *fn = ref_cast<lambda>(val)->copy();
     fn->self = this;
     return fn;
   }
-  */
   return val;
 }
 

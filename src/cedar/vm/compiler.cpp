@@ -549,6 +549,14 @@ void vm::compiler::compile_symbol(ref sym, bytecode &code, scope *sc,
 
 
   static ref mod_sym = new symbol("*module*");
+  static ref self_sym = new symbol("SELF");
+
+
+
+  if (sym == self_sym) {
+    code.write_op(OP_LOAD_SELF);
+    return;
+  }
 
   if (sym == mod_sym) {
     code.write_op(OP_GET_MODULE);

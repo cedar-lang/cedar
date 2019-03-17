@@ -23,13 +23,13 @@
  */
 
 #include <cedar/globals.h>
+#include <cedar/modules.h>
 #include <cedar/object/dict.h>
+#include <cedar/object/fiber.h>
 #include <cedar/object/keyword.h>
+#include <cedar/object/module.h>
 #include <cedar/object/string.h>
 #include <cedar/object/vector.h>
-#include <cedar/object/module.h>
-#include <cedar/object/fiber.h>
-#include <cedar/modules.h>
 #include <cedar/objtype.h>
 #include <cedar/vm/binding.h>
 #include <dirent.h>
@@ -76,7 +76,8 @@ static cedar_binding(os_shell) {
 static cedar_binding(os_stat) {
   if (argc != 1) throw cedar::make_exception("os.stat requires 1 argument");
   if (argv[0].get_type() != string_type) {
-    throw cedar::make_exception("os.stat requires a string path as an argument");
+    throw cedar::make_exception(
+        "os.stat requires a string path as an argument");
   }
   std::string path = argv[0].to_string(true);
   struct stat s;
@@ -113,12 +114,12 @@ static cedar_binding(os_stat) {
 
 
 static cedar_binding(os_listdir) {
-
   std::string path = ".";
 
   if (argc == 1) {
     if (argv[0].get_type() != string_type) {
-      throw cedar::make_exception("os.listdir requires a string path as an argument");
+      throw cedar::make_exception(
+          "os.listdir requires a string path as an argument");
     }
     path = argv[0].to_string(true);
   }
@@ -150,10 +151,12 @@ static cedar_binding(os_rm) {
 
 typedef void(init_func)(void);
 static cedar_binding(os_import_so) {
-  if (argc != 1) throw cedar::make_exception("os.import-so requires 1 argument");
+  if (argc != 1)
+    throw cedar::make_exception("os.import-so requires 1 argument");
 
   if (argv[0].get_type() != string_type) {
-    throw cedar::make_exception("os.import-so requires a string as an argument");
+    throw cedar::make_exception(
+        "os.import-so requires a string as an argument");
   }
 
   std::string path = argv[0].to_string(true);
@@ -167,20 +170,17 @@ static cedar_binding(os_import_so) {
   init_func *init = (init_func *)dlsym(handle, "$CDR-INIT$");
 
   if (init == nullptr) {
-    throw cedar::make_exception("unable to find init function in shared object file");
+    throw cedar::make_exception(
+        "unable to find init function in shared object file");
   }
 
   init();
   return nullptr;
 }
 
-static cedar_binding(os_getpid) {
-  return (i64)getpid();
-}
+static cedar_binding(os_getpid) { return (i64)getpid(); }
 
-static cedar_binding(os_getppid) {
-  return (i64)getppid();
-}
+static cedar_binding(os_getppid) { return (i64)getppid(); }
 
 static cedar_binding(os_getenv) {
   if (argc != 1) throw cedar::make_exception("os.getenv requires 1 argument");
@@ -210,6 +210,7 @@ static ref os_panic(int argc, ref *argv, call_context *ctx) {
 
   return nullptr;
 }
+
 
 void bind_os(void) {
   module *mod = new module("os");

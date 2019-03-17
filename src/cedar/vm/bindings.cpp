@@ -484,40 +484,7 @@ struct url_data {
   char *data;
 };
 
-size_t write_data(void *ptr, size_t size, size_t nmemb, struct url_data *data) {
-  size_t index = data->size;
-  size_t n = (size * nmemb);
-  char *tmp;
-
-  data->size += (size * nmemb);
-
-#ifdef DEBUG
-  fprintf(stderr, "data at %p size=%ld nmemb=%ld\n", ptr, size, nmemb);
-#endif
-  tmp = (char *)realloc(data->data, data->size + 1); /* +1 for '\0' */
-
-  if (tmp) {
-    data->data = tmp;
-  } else {
-    if (data->data) {
-      free(data->data);
-    }
-    fprintf(stderr, "Failed to allocate memory.\n");
-    return 0;
-  }
-
-  memcpy((data->data + index), ptr, n);
-  data->data[data->size] = '\0';
-
-  return size * nmemb;
-}
-
-
-
 type *reader_type;
-
-
-
 
 std::vector<cedar::runes> regex_matches(
     std::string r, std::string s,

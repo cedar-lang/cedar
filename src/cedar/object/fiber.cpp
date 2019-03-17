@@ -43,14 +43,13 @@ using namespace cedar;
 
 // the frame pool is a mechanism that attempts to
 // limit allocations on call stack changes
-
 static std::mutex frame_pool_lock;
-
 static int frame_pool_size = 0;
 static frame *frame_pool = nullptr;
 
 
 static frame *alloc_frame(void) {
+  /*
   frame_pool_lock.lock();
   if (frame_pool != nullptr) {
     auto *f = frame_pool;
@@ -61,10 +60,12 @@ static frame *alloc_frame(void) {
     return f;
   }
   frame_pool_lock.unlock();
+  */
   return new frame();
 }
 
 static void dispose_frame(frame *f) {
+  /*
   // clear the frame
   memset(f, 0, sizeof(frame));
 
@@ -77,6 +78,8 @@ static void dispose_frame(frame *f) {
 
   frame_pool_size++;
   frame_pool_lock.unlock();
+*/
+  // delete f;
 }
 
 
@@ -106,7 +109,7 @@ void fiber::adjust_stack(int required) {
 
 
 
-frame *fiber::add_call_frame(lambda *func) {
+inline frame *fiber::add_call_frame(lambda *func) {
   if (func->code_type != lambda::lambda_type::bytecode_type) {
     throw cedar::make_exception(
         "Unable to add call frame of non-bytecode lambda");
@@ -133,27 +136,34 @@ frame *fiber::pop_call_frame(void) {
 
 
 
-static std::mutex fid_mutex;
-static int next_fid = 0;
 
 fiber::fiber(lambda *entry) {
+  static std::mutex jid_mutex;
+  static int next_jid = 0;
+
   m_type = fiber_type;
   add_call_frame(entry);
 
-
-  fid_mutex.lock();
-  fid = next_fid++;
-  fid_mutex.unlock();
+  jid_mutex.lock();
+  jid = next_jid++;
+  jid_mutex.unlock();
 }
 
 
-fiber::~fiber(void) {}
+fiber::~fiber(void) {
+  // clear out the stack when we're done
+  delete[] stack;
+}
 
+
+
+fiber_state fiber::get_state(void) { return state; }
+void fiber::set_state(fiber_state s) { state = s; }
 
 
 void fiber::print_callstack(void) {
   static auto name_id = symbol::intern("*name*");
-  printf("Fiber #%d\n", fid);
+  printf("Fiber #%d\n", jid);
   int i = 0;
   for (frame *f = call_stack; f != nullptr; f = f->caller) {
     if (i == 0) {
@@ -182,16 +192,19 @@ ref fiber::run(void) {
 
 
 
-static bool created_thread_labels = false;
 
 
 
 // the primary run loop for fibers in cedar
-void fiber::run(run_context *state, int max_ms) {
+void fiber::run(run_context *schstate, int max_ms) {
+  // std::unique_lock<std::mutex> rlock(running_lock);
+  state = RUNNING;
   u64 max_time = max_ms * 1000;
   // this function should have very minimal initialization code at the start
   // in order to make the yield operations easier. It should just act on
   u64 start_time = time_microseconds();
+
+  reductions = 2000;
 
 
 #define PROG() call_stack->code
@@ -199,22 +212,21 @@ void fiber::run(run_context *state, int max_ms) {
 #define IP() call_stack->ip
 #define PUSH(val) (stack[SP()++] = (val))
 #define POP() (stack[--SP()])
-
 #define CODE_READ(type) (*(type *)(void *)IP())
 #define CODE_SKIP(type) (IP() += sizeof(type))
-
 #define LABEL(op) DO_##op
+#define CONSTANT(i) (PROG()->code->constants[(i)])
+#define SET_LABEL(op) threaded_labels[op] = &&DO_##op;
 #define TARGET(op) \
   case op:         \
     DO_##op:
 
-#define CONSTANT(i) (PROG()->code->constants[(i)])
 
-#define SET_LABEL(op) threaded_labels[op] = &&DO_##op;
 
+  static bool created_thread_labels = false;
   static void *threaded_labels[255];
   // if the global thread label vector isn't initialized, we need to do that
-  // first
+  // first before executing any bytecode
   if (!created_thread_labels) {
     for (int i = 0; i < 255; i++) threaded_labels[i] = &&LABEL(OP_NOP);
     SET_LABEL(OP_NIL);
@@ -245,6 +257,7 @@ void fiber::run(run_context *state, int max_ms) {
     SET_LABEL(OP_SLEEP);
     SET_LABEL(OP_GET_MODULE);
     SET_LABEL(OP_ADD);
+    SET_LABEL(OP_LOAD_SELF);
     created_thread_labels = true;
   }
 
@@ -254,7 +267,6 @@ void fiber::run(run_context *state, int max_ms) {
 #define PRELUDE \
   if (SP() > stack_size - 10) adjust_stack(stack_size * 2)
 #define DISPATCH \
-  ran++;         \
   goto loop;
 
 
@@ -268,7 +280,6 @@ void fiber::run(run_context *state, int max_ms) {
     }                     \
   } while (0);
 
-  // #define PREDICT(NEXTOP)
   u8 op = 0;
   u64 ran = 0;
 
@@ -283,36 +294,21 @@ loop:
      * TODO: possibly swich from using a time-based scheduler
      *       to using an instruction count based scheduler
      */
-    u64 instructions_per_check = 1000;
+    u64 instructions_per_check = 10000;
     if (ran > instructions_per_check) {
       ran = 0;
       if (time_microseconds() - start_time > max_time) {
-        state->done = false;
-        state->value = nullptr;
+        schstate->done = false;
+        schstate->value = nullptr;
         return;
       }
     }
   }
 
+
+  // grab the next opcode and increment the instruction pointer
   op = *IP();
   IP()++;
-
-
-
-
-
-  /*
-  switch (op) {
-#define V(NAME, VAL, a, b)           \
-  case VAL:                          \
-    printf("%02x: %s\n", op, #NAME); \
-    break;
-    CEDAR_FOREACH_OPCODE(V)
-#undef V
-  }
-  */
-
-  ran++;
 
   goto *threaded_labels[op];
   switch (op) {
@@ -468,11 +464,8 @@ loop:
       i64 new_fp = SP() - argc - 1;
       int abp = SP() - argc; /* argumement base pointer, represents the base of
                               the argument list */
-
-
       if (stack[new_fp].isa(lambda_type)) {
         auto *new_program = stack[new_fp].reinterpret<cedar::lambda *>();
-
         if (new_program == nullptr) {
           throw cedar::make_exception(
               "Function to be run in call returned nullptr");
@@ -480,12 +473,8 @@ loop:
 
         if (new_program->code_type == lambda::bytecode_type) {
           new_program = new_program->copy();
-
           new_program->prime_args(argc, stack + abp);
 
-          // otherwise, call it using the builtin frame pointer and stack
-          // pointer logic.
-          // callheight++;
           SP() = new_fp;
           add_call_frame(new_program);
           PREDICT(OP_RETURN);
@@ -498,28 +487,28 @@ loop:
           ref val = new_program->function_binding(argc, argv, &ctx);
           SP() = new_fp;
           PUSH(val);
-
           PREDICT(OP_RETURN);
           PREDICT(OP_SET_GLOBAL);
           DISPATCH;
         }
       } else if (stack[new_fp].is<type>()) {
+        /**
+         *
+         * create an instance of a type
+         *
+         */
         static auto __alloc__id = symbol::intern("__alloc__");
         static auto new_id = symbol::intern("new");
         // if the function to be called was a type, we need to make an instance
         type *cls = stack[new_fp].as<type>();
         ref alloc_func_ref = cls->getattr_fast(__alloc__id);
-
         call_context ctx;
         ctx.coro = this;
         ctx.mod = PROG()->mod;
-
         // allocate the instance
         ref inst =
             call_function(alloc_func_ref.as<lambda>(), 0, stack + new_fp, &ctx);
-
         stack[new_fp] = inst;
-
         ref new_func_ref = inst->getattr_fast(new_id);
         if (!new_func_ref.is<lambda>()) {
           throw cedar::make_exception("`new` method for ", ref{cls},
@@ -533,7 +522,6 @@ loop:
         PREDICT(OP_SET_GLOBAL);
         DISPATCH;
       }
-
       ref v = self_callv(stack[new_fp], "apply", argc + 1, stack + abp - 1);
       stack[new_fp] = v;
       SP() = new_fp + 1;
@@ -553,6 +541,7 @@ loop:
       function->m_closure = PROG()->m_closure;
       // when creating functions, inherit the module object
       function->mod = PROG()->mod;
+      function->self = PROG()->self;
       PUSH(function);
       DISPATCH;
     }
@@ -569,8 +558,8 @@ loop:
       dispose_frame(old_frame);
 
       if (call_stack == nullptr) {
-        state->value = val;
-        state->done = true;
+        schstate->value = val;
+        schstate->done = true;
         done = true;
         return_value = val;
         return;
@@ -624,7 +613,6 @@ loop:
 
     TARGET(OP_RECUR) {
       PRELUDE;
-
       i64 argc = CODE_READ(i64);
       CODE_SKIP(i64);
       if (argc != PROG()->argc)
@@ -637,7 +625,7 @@ loop:
 
 
 
-      PROG()->set_args_closure(argc, stack + abp);
+      PROG()->set_args_closure(PROG()->m_closure, argc, stack + abp);
       IP() = PROG()->code->code;
 
       SP() = call_stack->caller->sp + 1;
@@ -733,13 +721,13 @@ loop:
       PRELUDE;
       ref dur_ref = POP();
       done = false;
-      state->value = nullptr;
-      state->done = false;
+      schstate->value = nullptr;
+      schstate->done = false;
       i64 interval = 0;
       if (dur_ref.get_type() == number_type) {
         interval = dur_ref.to_int();
       }
-      state->sleep_for = interval;
+      schstate->sleep_for = interval;
       // push a value for when we come back
       PUSH(nullptr);
       return;
@@ -761,14 +749,24 @@ loop:
       PUSH(a + b);
       DISPATCH;
     }
+
+
+    TARGET(OP_LOAD_SELF) {
+      PRELUDE;
+      PUSH(PROG()->self);
+      DISPATCH;
+    }
+
   }
 
   goto loop;
 
 
 exit:
+  state = STOPPED;
   done = true;
-  state->value = POP();
-  state->done = true;
+  return_value = POP();
+  schstate->value = return_value;
+  schstate->done = true;
   return;
 }

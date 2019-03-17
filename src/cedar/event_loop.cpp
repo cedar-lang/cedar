@@ -80,7 +80,7 @@ void cedar::in_ev(std::function<void(uv_loop_t *)> fn) {
 
 void set_timeout_cb(uv_timer_t *handle) {
   printf("TIMEOUT %p\n", handle);
-  auto *j = (job *)handle->data;
+  auto *j = (fiber *)handle->data;
   add_job(j);
 }
 

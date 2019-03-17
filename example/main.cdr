@@ -54,21 +54,3 @@
   (if (< max 2)
     max
     (fib-iter max 1 0 1)))
-
-
-
-
-(go (while true (ofib 20)))
-(go (while true (ofib 20)))
-(go (while true (ofib 20)))
-(go (while true (ofib 20)))
-(go (while true (ofib 20)))
-(go (while true (ofib 20)))
-(go (while true (ofib 20)))
-(go (while true (ofib 20)))
-(go (while true (ofib 20)))
-(go (while true (ofib 20)))
-(go (while true (ofib 20)))
-(go (while true (ofib 20)))
-(while true (sleep 100))
-

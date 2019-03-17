@@ -48,25 +48,10 @@ namespace cedar {
   class lambda;
   class scheduler;
   class module;
-  struct job;
 
   // the intro initialization function
   void init(void);
   void add_job(fiber *);
-  void add_job(job *);
-
-  // a job is a representation of a fiber's state as
-  // viewed by the scheduler
-  struct job {
-    int jid = 0; /* the job id for this job. Simply an enumerated identifier */
-    i64 sleep = 0;   /* how long this process should sleep for. This is relative
-                        to the last run time */
-    u64 last_ran;    /* when the job was last ran, in milliseconds */
-    u64 create_time; /* when the job was created in milliseconds */
-    int ticks = 0;   /* how many times this job has been switched into */
-    fiber *task; /* the actual task that needs to be run. Must never be null */
-    job(fiber*);
-  };
 
 
   struct run_context {
@@ -95,7 +80,7 @@ namespace cedar {
    public:
     u64 ticks = 0;
     std::thread::id tid;
-    cl_deque<job *> local_queue;
+    cl_deque<fiber *> local_queue;
   };
 
 

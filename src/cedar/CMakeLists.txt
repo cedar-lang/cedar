@@ -48,11 +48,11 @@ add_executable(cedar
 )
 
 
-target_link_libraries(cedar-lib uv_a ${CMAKE_DL_LIBS} -lgc -lgccpp -pthread
+target_link_libraries(cedar-lib uv_a ${CMAKE_DL_LIBS} -lffi -lgc -lgccpp -pthread
 -lboost_system)
 set_target_properties(cedar-lib PROPERTIES OUTPUT_NAME cedar)
 
-target_link_libraries(cedar cedar-lib replxx uv_a ${CMAKE_DL_LIBS} -lgc -lgccpp
+target_link_libraries(cedar cedar-lib replxx uv_a ${CMAKE_DL_LIBS} -lffi -lgc -lgccpp
 -pthread -lboost_system)
 set_target_properties(cedar PROPERTIES OUTPUT_NAME cedar)
 

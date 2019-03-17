@@ -58,24 +58,10 @@ using namespace cedar;
 static std::atomic<u64> pending_job_count;
 
 /**
- * a condition variable for which a thread can wait on when it wants work
- * TODO: Determine if it's a bad idea to globalize this, or to have it at all
- *       as work assigning and work stealing can easily replace this
- */
-static std::condition_variable job_pending_cv;
-
-/**
  * ncpus is how many worker threads to maintain at any given time.
  */
 static unsigned ncpus = 8;
 
-/**
- * the global work queue
- *
- * this is where work goes in order to be distributed among worker threads.
- * when works is here, it means it is not assigned to a worker and it's ready to
- * be ran. The size of this container is always less or equal to pending_jobs
- */
 
 
 /**
@@ -118,25 +104,11 @@ static worker_thread *lookup_or_create_worker(std::thread::id tid) {
 void cedar::add_job(fiber *f) {
   worker_thread_mutex.lock();
   int ind = rand() % worker_threads.size();
-  job *j = new job(f);
-  worker_threads[ind]->local_queue.push(j);
+  worker_threads[ind]->local_queue.push(f);
   worker_thread_mutex.unlock();
 }
 
-void cedar::add_job(job *j) {
-  worker_thread_mutex.lock();
-  int ind = rand() % worker_threads.size();
-  worker_threads[ind]->local_queue.push(j);
-  worker_thread_mutex.unlock();
-}
 
-job::job(fiber *f) {
-  static std::atomic<int> next_jid = 0;
-  task = f;
-  create_time = time_ms();
-  last_ran = 0;
-  jid = next_jid++;
-}
 
 /**
  * construct and start a worker thread by creating it and pushing it to
@@ -162,7 +134,7 @@ static std::thread spawn_worker_thread(void) {
  * schedule a single job on the caller thread, it's up to the caller to manage
  * where the job goes after the job yields
  */
-static bool schedule_job(job *proc) {
+static bool schedule_job(fiber *proc) {
   static int sched_time = 2;
   static bool read_env = false;
   static const char *SCHED_TIME_ENV = getenv("CDRTIMESLICE");
@@ -173,7 +145,7 @@ static bool schedule_job(job *proc) {
   }
   read_env = true;
 
-  if (proc->task == nullptr) return false;
+  if (proc == nullptr) return false;
 
   bool done = false;
   u64 time = time_ms();
@@ -182,7 +154,7 @@ static bool schedule_job(job *proc) {
     run_context ctx;
     /* "context switch" into the job for sched_time milliseconds
      * and return back here, with a modified ctx */
-    proc->task->run(&ctx, sched_time);
+    proc->run(&ctx, sched_time);
     /* store the last time of execution in the job. This is an
      * approximation as getting the ms from epoch takes too long */
     proc->last_ran = time + sched_time;
@@ -193,16 +165,10 @@ static bool schedule_job(job *proc) {
 
     /* and increment the ticks for this job */
     proc->ticks++;
-    done = proc->task->done;
+    done = proc->done;
 
 
-    if (false && proc->sleep != 0) {
-      set_timeout(proc->sleep, proc);
-      // return true, so don't put it back in the scheduler;
-      return true;
-    }
-
-    return !proc->task->done;
+    return !done;
   }
   return true;
 }
@@ -248,7 +214,7 @@ void cedar::volunteer(worker_thread *worker) {
   // work is the thing that will eventually be done, while looking for work,
   // it will be set and checked for equality to nullptr. If at any point it
   // is not nullptr, it will immediately be scheduled.
-  job *work = nullptr;
+  fiber *work = nullptr;
 
 
 
@@ -278,25 +244,26 @@ void cedar::volunteer(worker_thread *worker) {
     goto SCHEDULE;
   }
   // sleep for 1 ms
-  usleep(1000);
+  usleep(10);
   return;
 
 SCHEDULE:
 
 
-  if (work->task == nullptr) {
+  if (work == nullptr) {
     return;
-    throw std::logic_error("work->task is nullptr");
+    throw std::logic_error("work is nullptr");
   }
-
 
   // switch into the work for a time slice and return here when done.
   bool replace = schedule_job(work);
   worker->ticks++;
 
+
+
   // since we did some work, we should put it back in the local queue
   // but only if it isn't done.
-  if (work->task != nullptr && replace) {
+  if (work != nullptr && replace) {
     worker->local_queue.push(work);
   }
 }
@@ -318,7 +285,7 @@ void init_binding(cedar::vm::machine *m);
  */
 void cedar::init(void) {
   init_scheduler();
-  init_ev();
+  // init_ev();
   type_init();
   init_binding(nullptr);
   bind_stdlib();
@@ -339,10 +306,7 @@ ref cedar::eval_lambda(lambda *fn) {
   fiber f(fn);
   worker_thread *my_worker =
       lookup_or_create_worker(std::this_thread::get_id());
-
-  job *j = new job(&f);
-
-  my_worker->local_queue.push(j);
+  my_worker->local_queue.push(&f);
   while (!f.done) {
     volunteer(my_worker);
   }
