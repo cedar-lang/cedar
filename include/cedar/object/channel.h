@@ -62,24 +62,13 @@ namespace cedar {
 
 
   class channel : public object {
-    // channel_buffer *buf;
-    // front and back are indexes to items in the buffers
-    // int64_t front, back;
     std::mutex lock;
     std::deque<sender> sendq;
     std::deque<receiver> recvq;
 
    public:
-    channel(int64_t size) {
+    channel(void) {
       m_type = channel_type;
-      // buf = new channel_buffer(size);
-    }
-    inline void set_size(int64_t size) {
-      // delete buf;
-      // buf = new channel_buffer(size);
-    }
-    virtual inline ~channel(void) {
-      // delete buf;
     }
 
 

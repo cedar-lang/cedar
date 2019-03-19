@@ -773,16 +773,10 @@ static void init_channel_type() {
   type_init_default_bindings(module_type);
 
   channel_type->setattr(
-      "__alloc__", bind_lambda(argc, argv, machine) { return new channel(0); });
+      "__alloc__", bind_lambda(argc, argv, machine) { return new channel(); });
 
-  channel_type->set_field("new", bind_lambda(argc, argv, machine) {
-    channel *self = ref_cast<channel>(argv[0]);
-    if (argc == 2) {
-      auto size = argv[1].to_int();
-      self->set_size(size);
-    }
-    return nullptr;
-  });
+  channel_type->set_field("new",
+                          bind_lambda(argc, argv, machine) { return nullptr; });
   def_global(new symbol("chan"), channel_type);
 
 }  // init_channel_type
