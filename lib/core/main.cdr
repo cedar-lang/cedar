@@ -529,6 +529,11 @@
   `(go* (fn nil (do ~@body))))
 
 
+(defn send [o c] (chan-send* o c))
+(defmacro send (o c) `(chan-send* ~o ~c))
+(defn recv [c] (chan-recv* c))
+(defmacro recv (c) `(chan-recv* ~c))
+
 
 (def importutil (require "importutil"))
 
@@ -908,54 +913,3 @@
 
 (defmacro interval (i & body)
   `(interval* ~i (fn () (do ~@body))))
-
-
-
-(def (locked? x)
-  (. x (locked?)))
-
-(def (lock! m) (. m (lock!)))
-
-(def (unlock! m) (. m (unlock!)))
-
-
-
-(import _mutex)
-;; define an event-loop safe wrapper around a kernel mutex
-(deftype Mutex
-  (def (new self)
-    (. self _mut := (_mutex.KernelMutex)))
-  (def (locked? self)
-    (locked? self._mut))
-  (def (lock! self)
-    (wait-until (not (locked? self._mut))
-      (lock! self._mut)))
-  (def (unlock! self)
-      (unlock! self._mut)))
-
-
-
-
-(deftype chan
-  (def (new self)
-    (. self value := nil)
-    (. self _mut := (Mutex)))
-
-  ;; put an item in the channel
-  (def (put self val)
-    ;; grab a lock to this channel's lock
-    (lock! self._mut)
-    ;; set it's value
-    (. self value := val))
-
-
-  ;; take an item out of the channel
-  (def (pop self)
-    ;; wait until there is an item in the channel
-    (wait-until (locked? self._mut))
-    (let [value self.value]
-      (unlock! self._mut)
-      (return value))))
-
-
-

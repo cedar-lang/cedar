@@ -33,7 +33,7 @@
 
 namespace cedar {
   template <class item>
-  class channel {
+  class not_chan {
    private:
     std::list<item> queue;
     std::mutex m;
@@ -41,7 +41,7 @@ namespace cedar {
     bool closed;
 
    public:
-    channel() : closed(false) {}
+    not_chan() : closed(false) {}
     void close() {
       std::unique_lock<std::mutex> lock(m);
       closed = true;

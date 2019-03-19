@@ -54,3 +54,10 @@
   (if (< max 2)
     max
     (fib-iter max 1 0 1)))
+
+(def nums (chan))
+
+(go (let [x 0]
+      (while true
+        (send x nums)
+        (inc= x))))

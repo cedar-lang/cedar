@@ -56,6 +56,7 @@
 #include "cedar/vm/instruction.h"
 #include "cedar/vm/binding.h"
 #include "cedar/vm/opcode.h"
+#include "cedar/object/channel.h"
 #include "cedar/object/keyword.h"
 #include "cedar/object/symbol.h"
 #include "cedar/object/invocable.h"

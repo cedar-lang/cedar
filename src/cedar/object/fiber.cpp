@@ -27,6 +27,7 @@
 #include <cedar/object/fiber.h>
 #include <cedar/object/list.h>
 #include <cedar/object/module.h>
+#include <cedar/object/channel.h>
 #include <cedar/objtype.h>
 #include <cedar/vm/compiler.h>
 #include <cedar/vm/machine.h>
@@ -258,6 +259,8 @@ void fiber::run(run_context *schstate, int max_ms) {
     SET_LABEL(OP_GET_MODULE);
     SET_LABEL(OP_ADD);
     SET_LABEL(OP_LOAD_SELF);
+    SET_LABEL(OP_SEND);
+    SET_LABEL(OP_RECV);
     created_thread_labels = true;
   }
 
@@ -754,6 +757,60 @@ loop:
     TARGET(OP_LOAD_SELF) {
       PRELUDE;
       PUSH(PROG()->self);
+      DISPATCH;
+    }
+
+
+    TARGET(OP_SEND) {
+      PRELUDE;
+
+      ref item = POP();
+      ref chanr = POP();
+
+      auto *chan = ref_cast<channel>(chanr);
+      if (chan == nullptr) {
+        throw cedar::make_exception("unable to send on invalid channel: ", chan);
+      }
+
+      sender s{this, item};
+
+      bool sent = chan->send(s);
+
+
+      // should return nil
+      PUSH(nullptr);
+
+      // if it wasn't sent, yield. It's up to the channel to re-add this fiber
+      if (!sent) {
+        schstate->value = nullptr;
+        schstate->done = true;
+        return;
+      }
+
+      DISPATCH;
+    }
+
+    TARGET(OP_RECV) {
+      PRELUDE;
+
+      ref chanr = POP();
+      auto *chan = ref_cast<channel>(chanr);
+      if (chan == nullptr) {
+        throw cedar::make_exception("unable to recv on invalid channel: ", chan);
+      }
+
+      ref *slot = stack + SP()++;
+
+      receiver r{this, slot};
+
+      bool received = chan->recv(r);
+
+      if (!received) {
+        schstate->value = nullptr;
+        schstate->done = true;
+        return;
+      }
+
       DISPATCH;
     }
 

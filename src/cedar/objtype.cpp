@@ -27,6 +27,7 @@
 #include <cedar/objtype.h>
 
 #include <cedar/globals.h>
+#include <cedar/object/channel.h>
 #include <cedar/object/keyword.h>
 #include <cedar/object/list.h>
 #include <cedar/object/string.h>
@@ -750,12 +751,43 @@ static void init_module_type() {
   // bind defaults
   type_init_default_bindings(module_type);
 
-  fiber_type->setattr(
+  module_type->setattr(
       "__alloc__", bind_lambda(argc, argv, machine) { return new module(); });
-  fiber_type->set_field("new",
-                        bind_lambda(argc, argv, machine) { return nullptr; });
+  module_type->set_field("new",
+                         bind_lambda(argc, argv, machine) { return nullptr; });
   def_global(new symbol("Module"), module_type);
-}  // init_fiber_type
+}  // init_module_type
+
+
+//
+//
+//
+/////////////////////////////////////////////////////////////
+//
+//
+//
+
+type *cedar::channel_type;
+static void init_channel_type() {
+  // bind defaults
+  type_init_default_bindings(module_type);
+
+  channel_type->setattr(
+      "__alloc__", bind_lambda(argc, argv, machine) { return new channel(0); });
+
+  channel_type->set_field("new", bind_lambda(argc, argv, machine) {
+    channel *self = ref_cast<channel>(argv[0]);
+    if (argc == 2) {
+      auto size = argv[1].to_int();
+      self->set_size(size);
+    }
+    return nullptr;
+  });
+  def_global(new symbol("chan"), channel_type);
+
+}  // init_channel_type
+
+
 
 
 void cedar::type_init(void) {

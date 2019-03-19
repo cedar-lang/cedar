@@ -88,6 +88,10 @@ new_op('ADD', effect=-1)
 
 new_op('LOAD_SELF', effect=1)
 
+
+new_op('RECV', effect=0)
+new_op('SEND', effect=0)
+
 def main(outfile):
     with open(outfile, 'w') as f:
         f.write(header)

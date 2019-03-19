@@ -23,6 +23,6 @@ BUILTIN_TYPE(symbol, "Symbol")
 BUILTIN_TYPE(keyword, "Keyword")
 BUILTIN_TYPE(fiber, "Fiber")
 BUILTIN_TYPE(module, "Module")
-
+BUILTIN_TYPE(channel, "chan")
 
 #endif

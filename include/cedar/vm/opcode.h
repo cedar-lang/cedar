@@ -36,6 +36,8 @@
 #define OP_GET_MODULE               0x1d
 #define OP_ADD                      0x1e
 #define OP_LOAD_SELF                0x1f
+#define OP_RECV                     0x20
+#define OP_SEND                     0x21
 
 /* Instruction opcode foreach macro for code generation */
 /* Arg order: (name, bytecode, type, stack effect */
@@ -71,6 +73,8 @@
   V(SLEEP, OP_SLEEP, no_arg, -1) \
   V(GET_MODULE, OP_GET_MODULE, no_arg, 1) \
   V(ADD, OP_ADD, no_arg, -1) \
-  V(LOAD_SELF, OP_LOAD_SELF, no_arg, 1)
+  V(LOAD_SELF, OP_LOAD_SELF, no_arg, 1) \
+  V(RECV, OP_RECV, no_arg, 0) \
+  V(SEND, OP_SEND, no_arg, 0)
 
 #endif

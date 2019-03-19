@@ -276,6 +276,27 @@ void vm::compiler::compile_list(ref obj, vm::bytecode &code, scope *sc,
     return;
   }
 
+
+
+  // chan-send* is expected to be called correctly. Unexpected behaviour if
+  // not. It's wrapped in (send item chan)
+  if (list_is_call_to("chan-send*", obj)) {
+    ref args = obj.rest();
+    ref item = args.first();
+    ref chan = args.rest().first();
+    compile_object(chan, code, sc, ctx);
+    compile_object(item, code, sc, ctx);
+    code.write_op(OP_SEND);
+    return;
+  }
+  if (list_is_call_to("chan-recv*", obj)) {
+    ref args = obj.rest();
+    ref chan = args.first();
+    compile_object(chan, code, sc, ctx);
+    code.write_op(OP_RECV);
+    return;
+  }
+
   if (list_is_call_to("quote", obj)) {
     return compile_constant(obj.rest().first(), code, sc, ctx);
   }

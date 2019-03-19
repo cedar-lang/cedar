@@ -23,7 +23,6 @@
  */
 
 
-#include <cedar/channel.h>
 #include <cedar/event_loop.h>
 #include <cedar/globals.h>
 #include <cedar/modules.h>
@@ -102,10 +101,9 @@ static worker_thread *lookup_or_create_worker(std::thread::id tid) {
 
 
 void cedar::add_job(fiber *f) {
-  worker_thread_mutex.lock();
+  std::unique_lock<std::mutex> lock(worker_thread_mutex);
   int ind = rand() % worker_threads.size();
   worker_threads[ind]->local_queue.push(f);
-  worker_thread_mutex.unlock();
 }
 
 
@@ -161,13 +159,9 @@ static bool schedule_job(fiber *proc) {
     /* store how long the process should sleep for.
      * TODO: move this into libuv once that is implenented */
     proc->sleep = ctx.sleep_for;
-
-
     /* and increment the ticks for this job */
     proc->ticks++;
-    done = proc->done;
-
-
+    done = ctx.done;
     return !done;
   }
   return true;
@@ -243,7 +237,6 @@ void cedar::volunteer(worker_thread *worker) {
   if (work != nullptr) {
     goto SCHEDULE;
   }
-  // sleep for 1 ms
   usleep(10);
   return;
 
@@ -251,15 +244,12 @@ SCHEDULE:
 
 
   if (work == nullptr) {
-    return;
     throw std::logic_error("work is nullptr");
   }
 
   // switch into the work for a time slice and return here when done.
   bool replace = schedule_job(work);
   worker->ticks++;
-
-
 
   // since we did some work, we should put it back in the local queue
   // but only if it isn't done.
