@@ -22,56 +22,17 @@
  * SOFTWARE.
  */
 
+
 #pragma once
 
-#include <cedar/ref.h>
-#include <cedar/runes.h>
-#include <cedar/vm/binding.h>
-#include <cedar/vm/bytecode.h>
-#include <cedar/vm/compiler.h>
-#include <cedar/object.h>
-#include <cstdio>
-#include <map>
-#include <tuple>
-#include <vector>
-#include <mutex>
 
 namespace cedar {
-  namespace vm {
 
-    // check if an id is a macro or not
-    bool is_macro(int);
-    lambda *get_macro(int);
-    void set_macro(int, ref);
+  class lambda;
+  class closure;
 
-
-
-    ref macroexpand_1(ref);
-
-    // a "var" is a storage cell in the machine. It allows
-    // storage of values, docs, etc...
-    struct var {
-      ref docs;
-      ref meta;
-      ref value;
-    };
-
-
-    class machine {
-     protected:
-      cedar::vm::compiler m_compiler;
-
-      friend cedar::vm::compiler;
-
-     public:
-
-      machine(void);
-      ~machine(void);
-    };
-
-
-
-  }  // namespace vm
-
-  extern vm::machine *primary_machine;
-}  // namespace cedar
+  struct call_state {
+    lambda *func;
+    closure *locals;
+  };
+}

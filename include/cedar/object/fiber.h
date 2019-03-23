@@ -27,13 +27,12 @@
 #include <cedar/object.h>
 #include <cedar/scheduler.h>
 #include <cedar/object/lambda.h>
-#include <future>
+#include <mutex>
 
 namespace cedar {
 
 
   // forward declarations
-  class lambda;
   class scheduler;
   namespace vm {
     class machine;
@@ -42,8 +41,7 @@ namespace cedar {
 
   struct frame {
     frame *caller = nullptr;
-    lambda *code;
-    lambda fn;
+    call_state call;
     int sp;
     int fp;
     u8 *ip;
@@ -51,6 +49,8 @@ namespace cedar {
 
   enum fiber_state { RUNNING, STOPPED, PAUSED };
   class fiber : public object {
+
+    std::mutex run_lock;
 
    private:
     int stack_size = 0;
@@ -64,7 +64,7 @@ namespace cedar {
     void adjust_stack(int);
 
 
-    frame *add_call_frame(lambda *);
+    frame *add_call_frame(call_state);
     frame *pop_call_frame(void);
     /**
      * a process starts paused, which allows it to continue running.
@@ -85,7 +85,7 @@ namespace cedar {
     ref return_value = nullptr;
     int fid = 0;
 
-    fiber(lambda *);
+    fiber(call_state);
     ~fiber(void);
 
     fiber_state get_state(void);

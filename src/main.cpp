@@ -139,10 +139,10 @@ int main(int argc, char **argv) {
       repl_mod->def("*file*", cedar::new_obj<cedar::string>(
                                   apathy::Path::cwd().string()));
       cedar::reader repl_reader;
+      char const *buf = nullptr;
+      std::string ps1;
+      ps1 += "> ";
       while (interactive) {
-        std::string ps1;
-        ps1 += "> ";
-        char const *buf = nullptr;
         do {
           buf = rx.input(ps1);
         } while ((buf == nullptr) && (errno == EAGAIN));

@@ -153,6 +153,6 @@ ref cedar::eval(ref obj, module *mod) {
   ref compiled_lambda = c.compile(obj, mod);
   lambda *raw_program = ref_cast<cedar::lambda>(compiled_lambda);
   raw_program->mod = mod;
-  ref v = eval_lambda(raw_program);
+  ref v = eval_lambda(raw_program->prime(0, nullptr));
   return v;
 }

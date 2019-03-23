@@ -528,7 +528,9 @@
 (defmacro go (& body)
   `(go* (fn nil (do ~@body))))
 
-
+;; channel related macros and functions. These must exist because chan-send* and
+;; chan-recv* are "special form" function calls because they require opcode
+;; level actions
 (defn send [o c] (chan-send* o c))
 (defmacro send (o c) `(chan-send* ~o ~c))
 (defn recv [c] (chan-recv* c))
@@ -705,27 +707,6 @@
 
 
 
-
-(def (eval-file-in-module path m)
-  (let [src (read-file path)
-        exprs (map identity (read-string src))]
-    (println exprs)
-    (map eval exprs)))
-
-
-
-
-(defmacro do-global (& globs)
-  (let [old-mod-name (gensym)
-        return-sym (gensym)]
-    `(let* ((~old-mod-name (internal/get-module))
-            (~return-sym nil))
-       (internal/set-module nil)
-       (def ~return-sym (do ~@globs))
-       (internal/set-module ~old-mod-name)
-       ~return-sym)))
-
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;; Base Exceptions
@@ -825,8 +806,6 @@
 (. Number (set-field 'rest (fn (self) (inc self))))
 
 
-(def (up-to n))
-
 (def (write stream & things)
   (. stream (write (apply str things))))
 
@@ -841,14 +820,7 @@
     (. *out* (write (join things " ")))))
 
 (def (println & things)
-  (+ (apply print things)
-     (print "\n")))
-
-
-(def (print-error & things)
-  (do (. *err* (write (join things " ")))
-      (. *err* (write "\n"))))
-
+  (print (str (join things " ") "\n")))
 
 
 
@@ -913,3 +885,21 @@
 
 (defmacro interval (i & body)
   `(interval* ~i (fn () (do ~@body))))
+
+
+(def *print-chan* (chan))
+(go (while true
+      (print (recv *print-chan*))))
+
+
+(defn sleep [n]
+  (sleep n))
+
+
+(defn parmap [func xs]
+  (map recv
+    (map (fn (x)
+           (let [ch (chan)]
+             (go (send (func x) ch))
+             ch))
+         xs)))

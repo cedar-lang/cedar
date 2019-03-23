@@ -110,19 +110,15 @@ void fiber::adjust_stack(int required) {
 
 
 
-inline frame *fiber::add_call_frame(lambda *func) {
-  if (func->code_type != lambda::lambda_type::bytecode_type) {
-    throw cedar::make_exception(
-        "Unable to add call frame of non-bytecode lambda");
-  }
+inline frame *fiber::add_call_frame(call_state call) {
   frame *frm = alloc_frame();
-  frm->code = func;
+  frm->call = call;
   frm->caller = call_stack;
   frm->sp = call_stack == nullptr ? 0 : call_stack->sp;
-  frm->ip = func->code->code;
+  frm->ip = call.func->code->code;
   call_stack = frm;
 
-  adjust_stack(frm->sp + func->code->stack_size);
+  adjust_stack(frm->sp + call.func->code->stack_size);
   return frm;
 }
 
@@ -138,7 +134,7 @@ frame *fiber::pop_call_frame(void) {
 
 
 
-fiber::fiber(lambda *entry) {
+fiber::fiber(call_state entry) {
   static std::mutex jid_mutex;
   static int next_jid = 0;
 
@@ -173,10 +169,10 @@ void fiber::print_callstack(void) {
       printf("  ");
     }
     printf("frame #%d: ", i++);
-    std::cout << ref(f->code);
+    std::cout << ref(f->call.func);
 
     std::cout << " in ";
-    ref mod_name = f->code->mod->getattr_fast(name_id);
+    ref mod_name = f->call.func->mod->getattr_fast(name_id);
     std::cout << mod_name;
     printf("\n");
   }
@@ -198,6 +194,9 @@ ref fiber::run(void) {
 
 // the primary run loop for fibers in cedar
 void fiber::run(run_context *schstate, int max_ms) {
+
+
+  std::unique_lock rlock(run_lock);
   // std::unique_lock<std::mutex> rlock(running_lock);
   state = RUNNING;
   u64 max_time = max_ms * 1000;
@@ -208,7 +207,8 @@ void fiber::run(run_context *schstate, int max_ms) {
   reductions = 2000;
 
 
-#define PROG() call_stack->code
+#define PROG() call_stack->call.func
+#define LOCALS() call_stack->call.locals
 #define SP() call_stack->sp
 #define IP() call_stack->ip
 #define PUSH(val) (stack[SP()++] = (val))
@@ -358,7 +358,7 @@ loop:
     TARGET(OP_LOAD_LOCAL) {
       PRELUDE;
       auto ind = CODE_READ(u64);
-      auto val = PROG()->m_closure->at(ind);
+      auto val = LOCALS()->at(ind);
       PUSH(val);
 
       CODE_SKIP(u64);
@@ -370,7 +370,7 @@ loop:
       PRELUDE;
       auto ind = CODE_READ(u64);
       CODE_SKIP(u64);
-      PROG()->m_closure->at(ind) = stack[SP() - 1];
+      LOCALS()->at(ind) = stack[SP() - 1];
       DISPATCH;
     }
 
@@ -475,11 +475,10 @@ loop:
         }
 
         if (new_program->code_type == lambda::bytecode_type) {
-          new_program = new_program->copy();
-          new_program->prime_args(argc, stack + abp);
+          auto call = new_program->prime(argc, stack + abp);
 
           SP() = new_fp;
-          add_call_frame(new_program);
+          add_call_frame(call);
           PREDICT(OP_RETURN);
           PREDICT(OP_SET_GLOBAL);
           DISPATCH;
@@ -541,9 +540,10 @@ loop:
       lambda *function = template_ptr->copy();
       // inherit closures from parent, a new
       // child closure is created on call
-      function->m_closure = PROG()->m_closure;
+      function->m_closure = LOCALS();
       // when creating functions, inherit the module object
       function->mod = PROG()->mod;
+      // inherit the self object as well
       function->self = PROG()->self;
       PUSH(function);
       DISPATCH;
@@ -628,7 +628,7 @@ loop:
 
 
 
-      PROG()->set_args_closure(PROG()->m_closure, argc, stack + abp);
+      PROG()->set_args_closure(LOCALS(), argc, stack + abp);
       IP() = PROG()->code->code;
 
       SP() = call_stack->caller->sp + 1;
@@ -713,7 +713,8 @@ loop:
       vm::compiler c;
       ref compiled_lambda = c.compile(expr, nullptr);
       lambda *func = compiled_lambda.as<lambda>();
-      fiber eval_fiber(func);
+      call_state call = func->prime(0, nullptr);
+      fiber eval_fiber(call);
       ref res = eval_fiber.run();
       PUSH(res);
       DISPATCH;

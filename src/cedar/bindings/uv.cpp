@@ -25,14 +25,14 @@
 #include <cedar/globals.h>
 #include <cedar/modules.h>
 #include <cedar/object/dict.h>
+#include <cedar/object/fiber.h>
 #include <cedar/object/keyword.h>
 #include <cedar/object/module.h>
 #include <cedar/object/string.h>
 #include <cedar/object/vector.h>
-#include <cedar/object/fiber.h>
 #include <cedar/objtype.h>
-#include <cedar/vm/binding.h>
 #include <cedar/scheduler.h>
+#include <cedar/vm/binding.h>
 #include <uv.h>
 
 
@@ -55,11 +55,10 @@ class uv_timer_obj : public object {
 };
 
 
-static void _timer_cb(uv_timer_t* handle) {
-  auto *cb = (lambda*)handle->data;
+static void _timer_cb(uv_timer_t *handle) {
+  auto *cb = (lambda *)handle->data;
   cb = cb->copy();
-  cb->prime_args(0, nullptr);
-  fiber *f = new fiber(cb);
+  fiber *f = new fiber(cb->prime(0, nullptr));
   add_job(f);
 }
 
@@ -74,7 +73,8 @@ static cedar_binding(uv_create_timer) {
   ref cb_ = argv[2];
 
   if (cb_.get_type() != lambda_type) {
-    throw cedar::make_exception("uv.create-timer: third argument must be callback");
+    throw cedar::make_exception("uv.create-timer: third argument must be
+  callback");
   }
 
   lambda *cb = ref_cast<lambda>(cb_);

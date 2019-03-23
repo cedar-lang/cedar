@@ -27,6 +27,7 @@
 #include <cedar/cl_deque.h>
 #include <cedar/ref.h>
 #include <cedar/types.h>
+#include <cedar/call_state.h>
 #include <uv.h>
 #include <future>
 #include <list>
@@ -44,8 +45,8 @@
 namespace cedar {
 
   // forward declaration
-  class fiber;
   class lambda;
+  class fiber;
   class scheduler;
   class module;
 
@@ -71,10 +72,8 @@ namespace cedar {
   };
 
   /*
-   * a worker thread represents a thread that has volunteered some of it's time.
-   * When a thread does volunteer, it calls the 'volunteer' function, which will
-   * create a worker_thread object if there isn't already one, and use that
-   * state to do a bit of work.
+   * a worker thread represents a thread that has volunteered some of it's time
+   * to the scheduler
    */
   class worker_thread {
    public:
@@ -85,7 +84,7 @@ namespace cedar {
 
 
   /**
-   * the volunteer function is the main function that will execute work. It
+   * the schedule function is the main function that will execute work. It
    * allows a thread to start working on it's own queue, steal from another
    * queue, or immediately return with no work.
    *
@@ -94,10 +93,10 @@ namespace cedar {
    * do a hashtable lookup for the thread and create a worker_thread object if
    * it needs to.
    */
-  void volunteer(worker_thread* = nullptr);
+  void schedule(worker_thread* = nullptr, bool = false);
 
 
-  ref eval_lambda(lambda *);
+  ref eval_lambda(call_state);
   ref call_function(lambda *, int argc, ref *argv, call_context *ctx);
 
 }  // namespace cedar

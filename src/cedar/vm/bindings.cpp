@@ -428,9 +428,7 @@ cedar_binding(cedar_apply) {
       return fnc->function_binding(i, args.data(), ctx);
     }
 
-    fnc = fnc->copy();
-    fnc->prime_args(i, args.data());
-    return eval_lambda(fnc);
+    return eval_lambda(fnc->prime(i, args.data()));
   } else {
     throw cedar::make_exception("(apply ...) to '", f,
                                 "' failed because it's not a function");
@@ -449,12 +447,10 @@ cedar_binding(cedar_catch) {
 
   auto handle = [&](ref e) {
     if (lambda *fn = ref_cast<lambda>(handler); fn != nullptr) {
-      fn = fn->copy();
       int ac = 1;
       ref *av = &e;
 
-      fn->prime_args(ac, av);
-      return eval_lambda(fn);
+      return eval_lambda(fn->prime(ac, av));
     } else {
       throw make_exception("catch requires a lambda as a handler");
     }
@@ -462,9 +458,7 @@ cedar_binding(cedar_catch) {
 
   try {
     if (lambda *fn = ref_cast<lambda>(exceptional); fn != nullptr) {
-      fn = fn->copy();
-      fn->prime_args(0, nullptr);
-      return eval_lambda(fn);
+      return eval_lambda(fn->prime(0, nullptr));
     } else {
       throw make_exception("catch requires a lambda as a first argument");
     }
@@ -679,7 +673,7 @@ void init_binding(cedar::vm::machine *m) {
   def_global("go*", bind_lambda(argc, argv, machine) {
     ref fn = argv[0];
     if (fn.get_type() == lambda_type) {
-      fiber *fi = new fiber(fn.as<lambda>());
+      fiber *fi = new fiber(fn.as<lambda>()->prime(0, nullptr));
       add_job(fi);
       return fi;
     }

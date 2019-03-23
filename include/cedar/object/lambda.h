@@ -30,9 +30,8 @@
 #include <cedar/vm/binding.h>
 #include <cedar/vm/bytecode.h>
 #include <cedar/vm/machine.h>
-#include <atomic>
+#include <cedar/call_state.h>
 #include <functional>
-#include <memory>
 
 #include <gc/gc_cpp.h>
 
@@ -45,7 +44,6 @@
 namespace cedar {
 
   class module;
-  class lambda;
 
   // closure represents a wraper around closed values
   // in functions, also known as "freevars" in LC
@@ -67,11 +65,6 @@ namespace cedar {
     ref &at(int);
   };
 
-
-  struct primed_fn {
-    lambda *fn;
-    closure *cl;
-  };
 
 
   class lambda : public object {
@@ -102,10 +95,8 @@ namespace cedar {
     ~lambda(void);
     u64 hash(void);
     lambda *copy(void);
-    // prime_args configures the lambda with a closure and loads it
-    // with the arguments according to that lambda's calling conv
-    void prime_args(int argc = 0, ref *argv = nullptr);
-    primed_fn prime(int argc = 0l, ref *argv = nullptr);
+
+    call_state prime(int argc = 0l, ref *argv = nullptr);
     void set_args_closure(closure *, int argc = 0, ref *argv = nullptr);
   };
 

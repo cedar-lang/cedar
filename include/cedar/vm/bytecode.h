@@ -10,8 +10,8 @@
  * copies of the Software, and to permit persons to whom the Software is
  * furnished to do so, subject to the following conditions:
  *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
  *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -26,112 +26,107 @@
 
 #include <cedar/exception.hpp>
 
-#include <stdio.h>
-#include <cstdlib>
-#include <cstdint>
-#include <cstring>
-#include <map>
-#include <list>
-#include <vector>
-#include <memory.h>
 #include <cedar/ref.h>
 #include <cedar/types.h>
+#include <memory.h>
+#include <stdio.h>
+#include <cstdint>
+#include <cstdlib>
+#include <cstring>
+#include <list>
+#include <map>
+#include <vector>
 
 namespace cedar {
 
-	class object;
+  class object;
 
 
-	namespace vm {
+  namespace vm {
 
 
-		// bytecode object
-		class bytecode {
+    // bytecode object
+    class bytecode {
+     private:
+      // size is how many bytes are written into the code pointer
+      // it also determines *where* to write when writing new data
+      u64 size = 0;
+      // cap is the number of bytes allocated for the code pointer
+      u64 cap = 32;
 
-			private:
+     public:
+      i32 stack_size = 0;
 
-				// size is how many bytes are written into the code pointer
-				// it also determines *where* to write when writing new data
-				u64 size = 0;
-				// cap is the number of bytes allocated for the code pointer
-				u64 cap = 32;
+      // constants stores values that the bytecode can reference with
+      // a simple index into it.
+      std::vector<ref> constants;
 
-			public:
+      // the code pointer is where this instance's bytecode is actually
+      // stored. All calls for read interpret a type from this byte vector
+      // and calls for write append to it.
+      uint8_t *code;
 
-				i32 stack_size = 0;
+      inline bytecode() {
+        cap = 32;
+        code = new uint8_t[cap];
+      }
 
-				// constants stores values that the bytecode can reference with
-				// a simple index into it.
-				std::vector<ref> constants;
-
-				// the code pointer is where this instance's bytecode is actually
-				// stored. All calls for read interpret a type from this byte vector
-				// and calls for write append to it.
-				uint8_t *code;
-
-				inline bytecode() {
-					code = new uint8_t[32];
-				}
-
-				void print(u8 *ip = nullptr);
-				ref& get_const(int);
-				int push_const(ref);
-				void finalize();
-
-				template<typename T>
-					inline T operator[](int) {
-						return {};
-					}
-
-				template<typename T>
-					inline T read(uint64_t i) const {
-						return *(T*)(void*)(code+i);
-					}
-
-				template<typename T>
-					inline uint64_t write_to(uint64_t i, T val) const {
-						if (sizeof(T) + i >= cap)
-							throw cedar::make_exception("bytecode unable to write ", sizeof(T), " bytes to index ", i, ". Out of bounds.");
-						*(T*)(void*)(code+i) = val;
-						return size;
-					}
-
-				template<typename T>
-					inline uint64_t write(T val) {
-						if (size + sizeof(val) >= cap-1) {
-							uint8_t *new_code = new uint8_t[cap * 2];
-							std::memcpy(new_code, code, cap);
-							cap *= 2;
-							delete code;
-							code = new_code;
-						}
-						uint64_t addr = write_to(size, val);
-						size += sizeof(T);
-						return addr;
-					}
-
-          inline u64 write_op(u8 op) {
-            return write((u8)op);
-          }
-          inline u64 write_op(u8 op, u64 arg) {
-            auto r = write((u8)op);
-            write((u64)arg);
-            return r;
-          }
-
-				inline uint64_t get_size() {
-					return size;
-				}
-				inline uint64_t get_cap() {
-					return cap;
-				}
+      void print(u8 *ip = nullptr);
+      ref &get_const(int);
+      int push_const(ref);
+      void finalize();
 
 
-				template<typename T>
-					inline T & at(int i) {
-						return *(T*)(void*)(code+i);
-					}
-		};
+      template <typename T>
+      inline T read(uint64_t i) const {
+        return *(T *)(void *)(code + i);
+      }
 
-	} // namespace vm
-} // namespace cedar
+      template <typename T>
+      inline uint64_t write_to(uint64_t i, T val) const {
+        if (sizeof(T) + i >= cap)
+          throw cedar::make_exception("bytecode unable to write ", sizeof(T),
+                                      " bytes to index ", i,
+                                      ". Out of bounds.");
+        *(T *)(void *)(code + i) = val;
+        return size;
+      }
+
+
+      template <typename T>
+      inline uint64_t write(T val) {
+        if (size + sizeof(val) >= cap - 1) {
+          uint8_t *new_code = new uint8_t[cap * 2];
+          std::memcpy(new_code, code, cap);
+          cap *= 2;
+          delete code;
+          code = new_code;
+        }
+        uint64_t addr = write_to(size, val);
+        size += sizeof(T);
+        return addr;
+      }
+
+
+
+      inline u64 write_op(u8 op) { return write((u8)op); }
+
+
+      inline u64 write_op(u8 op, u64 arg) {
+        auto r = write((u8)op);
+        write((u64)arg);
+        return r;
+      }
+
+      inline uint64_t get_size() { return size; }
+      inline uint64_t get_cap() { return cap; }
+
+
+      template <typename T>
+      inline T &at(int i) {
+        return *(T *)(void *)(code + i);
+      }
+    };
+
+  }  // namespace vm
+}  // namespace cedar

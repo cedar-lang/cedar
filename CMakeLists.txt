@@ -8,10 +8,10 @@ endif()
 set (CMAKE_CXX_STANDARD 17)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-set(CMAKE_CXX_FLAGS_DEBUG "-g -O0 -DBUILD_MODE=Debug -fsanitize=thread -fno-omit-frame-pointer")
+set(CMAKE_CXX_FLAGS_DEBUG "-g -O0 -DBUILD_MODE=Debug -fno-omit-frame-pointer")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3 -g -DBUILD_MODE=Release")
 
-set(CMAKE_C_FLAGS_DEBUG "-g -O0 -DBUILD_MODE=Debug -fsanitize=thread -fno-omit-frame-pointer")
+set(CMAKE_C_FLAGS_DEBUG "-g -O0 -DBUILD_MODE=Debug -fno-omit-frame-pointer")
 set(CMAKE_C_FLAGS_RELEASE "-O3 -g -DBUILD_MODE=Release")
 
 

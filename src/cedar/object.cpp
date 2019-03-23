@@ -43,9 +43,7 @@ long cedar::object_count = 0;
 
 // the object constructor and destructor keeps
 // track of how many objects are allocated
-object::object(void) {
-  m_type = object_type;
-}
+object::object(void) { m_type = object_type; }
 
 object::~object(void) {}
 
@@ -98,11 +96,12 @@ ref object::getattr_fast(u64 i) {
     goto FOUND;
   }
 
-  throw cedar::make_exception("attribute '", symbol::unintern(i), "' on object not found");
+  throw cedar::make_exception("attribute '", symbol::unintern(i),
+                              "' on object not found");
 
 FOUND:
 
-  if (val.get_type() == lambda_type) {
+  if (false || val.get_type() == lambda_type) {
     lambda *fn = ref_cast<lambda>(val)->copy();
     fn->self = this;
     return fn;
@@ -110,9 +109,7 @@ FOUND:
   return val;
 }
 
-attr_map::bucket *object::getattrbucket(u64 i) {
-  return m_attrs.buck(i);
-}
+attr_map::bucket *object::getattrbucket(u64 i) { return m_attrs.buck(i); }
 
 void object::setattr_fast(u64 k, ref v) { m_attrs.set(k, v); }
 
@@ -120,14 +117,16 @@ ref object::getattr(ref k) {
   if (symbol *s = ref_cast<symbol>(k); s != nullptr) {
     return getattr_fast(s->id);
   }
-  throw cedar::make_exception("unable to getattr, '", k, "' from object. requires symbol as key");
+  throw cedar::make_exception("unable to getattr, '", k,
+                              "' from object. requires symbol as key");
 }
 
 void object::setattr(ref k, ref v) {
   if (symbol *s = ref_cast<symbol>(k); s != nullptr) {
     return setattr_fast(s->id, v);
   }
-  throw cedar::make_exception("unable to setattr, '", k, "' from object. requires symbol as key ");
+  throw cedar::make_exception("unable to setattr, '", k,
+                              "' from object. requires symbol as key ");
 }
 
 void object::setattr(runes name, bound_function fn) {
@@ -152,7 +151,7 @@ ref object::self_call(u64 id, bool *valid) {
 }
 
 cedar::runes object::to_string(bool human) {
-  static auto str_id =  symbol::intern("str");
+  static auto str_id = symbol::intern("str");
   static auto repr_id = symbol::intern("repr");
 
   bool valid;
@@ -212,7 +211,8 @@ u64 object::hash(void) {
   }
   return x;
 
-  throw cedar::make_exception("Unable to hash unknown object of type ", m_type->to_string());
+  throw cedar::make_exception("Unable to hash unknown object of type ",
+                              m_type->to_string());
 }
 
 const char *object::object_type_name(void) { return "object"; };
@@ -259,7 +259,8 @@ ref attr_map::at(u64 i) {
     }
     b = b->next;
   }
-  throw cedar::make_exception("attribute '", symbol::unintern(i), "' not found");
+  throw cedar::make_exception("attribute '", symbol::unintern(i),
+                              "' not found");
 };
 
 bool attr_map::has(u64 i) {
