@@ -65,6 +65,7 @@ using namespace cedar;
 void hook_color(std::string const &str, Replxx::colors_t &colors, module *mod);
 
 int main(int argc, char **argv) {
+
   srand((unsigned int)time(nullptr));
 
   init();

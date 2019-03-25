@@ -77,7 +77,7 @@ class block_timer {
  * This number is an unsigned 64 bit integer, because cedar will eventually
  * be able to run a huge number of these jobs concurrently. :)
  */
-static std::atomic<u64> pending_job_count;
+static std::atomic<u64> jobc;
 
 /**
  * ncpus is how many worker threads to maintain at any given time.
@@ -94,7 +94,6 @@ static unsigned ncpus = 8;
 static std::mutex worker_thread_mutex;
 static std::vector<worker_thread *> worker_threads;
 static ska::flat_hash_map<std::thread::id, worker_thread *> worker_thread_map;
-static std::condition_variable work_cv;
 
 static std::vector<std::thread> thread_handles;
 
@@ -121,11 +120,12 @@ static worker_thread *lookup_or_create_worker(std::thread::id tid) {
 
 
 void cedar::add_job(fiber *f) {
-  worker_thread_mutex.lock();
+  std::lock_guard guard(worker_thread_mutex);
   int ind = rand() % worker_threads.size();
   worker_threads[ind]->local_queue.push(f);
-  worker_thread_mutex.unlock();
-  work_cv.notify_all();
+  int j = jobc.load();
+  jobc.store(j + 1);
+  worker_threads[ind]->work_cv.notify_all();
 }
 
 
@@ -149,12 +149,41 @@ static std::thread spawn_worker_thread(void) {
 
 
 
+
+struct inout {
+  int m_id;
+  int ind;
+  void *ptr;
+  inout(int id) {
+    static std::mutex l;
+    static int nind = 0;
+
+    l.lock();
+    ind = nind++;
+    l.unlock();
+    m_id = id;
+    u64 time = std::chrono::duration_cast<std::chrono::microseconds>(
+                   std::chrono::system_clock::now().time_since_epoch())
+                   .count();
+    ptr = lookup_or_create_worker(std::this_thread::get_id());
+    printf("+ %p %d %d %lu\n", ptr, ind, m_id, time);
+  }
+
+  ~inout(void) {
+    u64 time = std::chrono::duration_cast<std::chrono::microseconds>(
+                   std::chrono::system_clock::now().time_since_epoch())
+                   .count();
+    printf("- %p %d %d %lu\n", ptr, ind, m_id, time);
+  }
+};
+
 /**
  * schedule a single job on the caller thread, it's up to the caller to manage
  * where the job goes after the job yields
  */
-static bool schedule_job(fiber *proc) {
-  // block_timer t("schedule_job");
+void schedule_job(fiber *proc) {
+  // inout p(proc->jid);
+  // std::unique_lock lock(proc->lock);
   static int sched_time = 4;
   static bool read_env = false;
   static const char *SCHED_TIME_ENV = getenv("CDRTIMESLICE");
@@ -165,31 +194,27 @@ static bool schedule_job(fiber *proc) {
   }
   read_env = true;
 
-  if (proc == nullptr) return false;
+  if (proc == nullptr) return;
 
-  bool done = false;
   u64 time = std::chrono::duration_cast<std::chrono::milliseconds>(
                  std::chrono::system_clock::now().time_since_epoch())
                  .count();
+  int state = proc->state.load();
 
-  /* check if this process needs to be run or not */
-  if (true || time >= (proc->last_ran + proc->sleep)) {
-    run_context ctx;
-    /* "context switch" into the job for sched_time milliseconds
-     * and return back here, with a modified ctx */
-    proc->run(&ctx, sched_time);
-    /* store the last time of execution in the job. This is an
-     * approximation as getting the ms from epoch takes too long */
-    proc->last_ran = time + sched_time;
-    /* store how long the process should sleep for.
-     * TODO: move this into libuv once that is implenented */
-    proc->sleep = ctx.sleep_for;
-    /* and increment the ticks for this job */
-    proc->ticks++;
-    done = ctx.done;
-    return !done;
+  if (state == SLEEPING) {
+    if (time < (proc->last_ran + proc->sleep)) {
+      return;
+    }
   }
-  return true;
+  /* "context switch" into the job for sched_time milliseconds
+   * and return back here, with a modified ctx */
+  proc->run(sched_time);
+  /* store the last time of execution in the job. This is an
+   * approximation as getting the ms from epoch takes too long */
+  proc->last_ran = time + sched_time;
+  /* and increment the ticks for this job */
+  proc->ticks++;
+  return;
 }
 
 
@@ -198,7 +223,7 @@ static bool schedule_job(fiber *proc) {
  */
 bool cedar::all_work_done(void) {
   // if there are no pending jobs, we must be done with all work.
-  return pending_job_count == 0;
+  return jobc.load() == 0;
 }
 
 
@@ -224,61 +249,88 @@ void cedar::schedule(worker_thread *worker, bool internal_worker) {
     worker = lookup_or_create_worker(std::this_thread::get_id());
   }
 
-TOP:
+  bool steal = true;
+
   size_t pool_size = 0;
   int i1, i2;
   worker_thread *w1, *w2;
+
+TOP:
+
+
+#ifdef SHOW_WORK_COUNT
+  worker_thread_mutex.lock();
+  int c = 0;
+  for (auto w : worker_threads) {
+    c += w->local_queue.size();
+  }
+  worker_thread_mutex.unlock();
+
+#endif
 
   // work is the thing that will eventually be done, while looking for work,
   // it will be set and checked for equality to nullptr. If at any point it
   // is not nullptr, it will immediately be scheduled.
   fiber *work = nullptr;
 
+
   // first check the local queue
   work = worker->local_queue.steal();
   if (work != nullptr) goto SCHEDULE;
 
-  worker_thread_mutex.lock();
-  // now look through other threads in the thread pool for work to steal
-  pool_size = worker_threads.size();
+  if (steal) {
+    worker_thread_mutex.lock();
+    // now look through other threads in the thread pool for work to steal
+    pool_size = worker_threads.size();
 
-  i1 = rand() % pool_size;
-  i2 = rand() % pool_size;
-  w1 = worker_threads[i1];
-  w2 = worker_threads[i2];
-  worker_thread_mutex.unlock();
+    i1 = rand() % pool_size;
+    i2 = rand() % pool_size;
+    w1 = worker_threads[i1];
+    w2 = worker_threads[i2];
+    worker_thread_mutex.unlock();
 
-  if (w1->local_queue.size() > w2->local_queue.size()) {
-    work = w1->local_queue.steal();
-  } else {
-    work = w2->local_queue.steal();
+    if (w1->local_queue.size() > w2->local_queue.size()) {
+      work = w1->local_queue.steal();
+    } else {
+      work = w2->local_queue.steal();
+    }
+
+    if (work != nullptr) {
+      goto SCHEDULE;
+    }
   }
 
-  if (work != nullptr) {
-    goto SCHEDULE;
-  }
-  usleep(10);
+
   if (internal_worker) {
-    // std::unique_lock lk(l);
-    // work_cv.wait(lk);
-    // lk.unlock();
+    /*
+    std::unique_lock lk(worker->lock);
+    worker->work_cv.wait_for(lk, std::chrono::milliseconds(20));
+    lk.unlock();
+    */
+    usleep(100);
     goto TOP;
   }
+
   return;
 
 SCHEDULE:
 
-  if (work == nullptr) {
-    throw std::logic_error("work is nullptr");
+  schedule_job(work);
+
+
+  bool replace = true;
+
+  auto state = work->state.load();
+
+  if (state == STOPPED || state == BLOCKING) {
+    replace = false;
   }
 
-  // switch into the work for a time slice and return here when done.
-  bool replace = schedule_job(work);
   worker->ticks++;
 
   // since we did some work, we should put it back in the local queue
   // but only if it isn't done.
-  if (work != nullptr && replace) {
+  if (replace) {
     worker->local_queue.push(work);
   }
 
@@ -304,6 +356,7 @@ void init_binding(cedar::vm::machine *m);
  */
 void cedar::init(void) {
   init_scheduler();
+  // init_ev();
   type_init();
   init_binding(nullptr);
   bind_stdlib();

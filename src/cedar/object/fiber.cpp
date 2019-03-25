@@ -24,10 +24,10 @@
 
 
 #include <cedar/globals.h>
+#include <cedar/object/channel.h>
 #include <cedar/object/fiber.h>
 #include <cedar/object/list.h>
 #include <cedar/object/module.h>
-#include <cedar/object/channel.h>
 #include <cedar/objtype.h>
 #include <cedar/vm/compiler.h>
 #include <cedar/vm/machine.h>
@@ -58,16 +58,18 @@ static frame *alloc_frame(void) {
     frame_pool = frame_pool->caller;
     frame_pool_size--;
     frame_pool_lock.unlock();
+    printf("REUSE\n");
     return f;
   }
+  printf("CREATE\n");
   frame_pool_lock.unlock();
   */
   return new frame();
 }
 
 static void dispose_frame(frame *f) {
-  /*
   // clear the frame
+  /*
   memset(f, 0, sizeof(frame));
 
   frame_pool_lock.lock();
@@ -79,8 +81,8 @@ static void dispose_frame(frame *f) {
 
   frame_pool_size++;
   frame_pool_lock.unlock();
-*/
-  // delete f;
+  */
+  delete f;
 }
 
 
@@ -154,7 +156,7 @@ fiber::~fiber(void) {
 
 
 
-fiber_state fiber::get_state(void) { return state; }
+int fiber::get_state(void) { return state.load(); }
 void fiber::set_state(fiber_state s) { state = s; }
 
 
@@ -182,20 +184,16 @@ void fiber::print_callstack(void) {
 // run a fiber for its first return value
 // be it a yield or a real return
 ref fiber::run(void) {
-  run_context ctx;
-  run(&ctx, -1);
-  return ctx.value;
+  printf("here\n");
+  run(-1);
+  return nullptr;
 }
 
 
 
 
-
-
 // the primary run loop for fibers in cedar
-void fiber::run(run_context *schstate, int max_ms) {
-
-
+void fiber::run(int max_ms) {
   std::unique_lock rlock(run_lock);
   // std::unique_lock<std::mutex> rlock(running_lock);
   state = RUNNING;
@@ -269,8 +267,7 @@ void fiber::run(run_context *schstate, int max_ms) {
 
 #define PRELUDE \
   if (SP() > stack_size - 10) adjust_stack(stack_size * 2)
-#define DISPATCH \
-  goto loop;
+#define DISPATCH goto loop;
 
 
 
@@ -286,545 +283,558 @@ void fiber::run(run_context *schstate, int max_ms) {
   u8 op = 0;
   u64 ran = 0;
 
+  state.store(RUNNING);
 
-loop:
+  try {
+  loop:
 
-  if (max_ms != -1) {
-    /* only do a time check every instructions_per_check
-     * instructions this is because this loop is *very*
-     * performance sensitive and time_microseconds() takes a
-     * bit of that speed away
-     * TODO: possibly swich from using a time-based scheduler
-     *       to using an instruction count based scheduler
-     */
-    u64 instructions_per_check = 10000;
-    if (ran > instructions_per_check) {
-      ran = 0;
-      if (time_microseconds() - start_time > max_time) {
-        schstate->done = false;
-        schstate->value = nullptr;
-        return;
-      }
-    }
-  }
-
-
-  // grab the next opcode and increment the instruction pointer
-  op = *IP();
-  IP()++;
-
-  goto *threaded_labels[op];
-  switch (op) {
-    TARGET(OP_NOP) {
-      PRELUDE;
-      fprintf(stderr, "Unhandled instruction %02x in lambda ", op);
-      std::cout << PROG()->defining << std::endl;
-      exit(-1);
-      DISPATCH;
-    }
-
-    TARGET(OP_NIL) {
-      PRELUDE;
-      PUSH(nullptr);
-      DISPATCH;
-    }
-
-    TARGET(OP_CONST) {
-      PRELUDE;
-      const auto ind = CODE_READ(u64);
-      CODE_SKIP(u64);
-      ref val = CONSTANT(ind);
-      PUSH(val);
-      DISPATCH;
-    }
-
-    TARGET(OP_FLOAT) {
-      PRELUDE;
-      const auto flt = CODE_READ(double);
-      PUSH(flt);
-      CODE_SKIP(double);
-      DISPATCH;
-    }
-
-    TARGET(OP_INT) {
-      PRELUDE;
-      const auto integer = CODE_READ(i64);
-      PUSH(ref{(i64)integer});
-      CODE_SKIP(i64);
-      DISPATCH;
-    }
-
-
-    TARGET(OP_LOAD_LOCAL) {
-      PRELUDE;
-      auto ind = CODE_READ(u64);
-      auto val = LOCALS()->at(ind);
-      PUSH(val);
-
-      CODE_SKIP(u64);
-      DISPATCH;
-    }
-
-
-    TARGET(OP_SET_LOCAL) {
-      PRELUDE;
-      auto ind = CODE_READ(u64);
-      CODE_SKIP(u64);
-      LOCALS()->at(ind) = stack[SP() - 1];
-      DISPATCH;
-    }
-
-
-    TARGET(OP_LOAD_GLOBAL) {
-      PRELUDE;
-      u64 ind = CODE_READ(u64);
-      CODE_SKIP(u64);
-      ref val = nullptr;
-
-      module *m = PROG()->mod;
-
-      if (m != nullptr) {
-        bool has = false;
-        ref v = m->find(ind, &has, m);
-        if (has) {
-          PUSH(v);
-          DISPATCH;
+    if (max_ms != -1) {
+      /* only do a time check every instructions_per_check
+       * instructions this is because this loop is *very*
+       * performance sensitive and time_microseconds() takes a
+       * bit of that speed away
+       * TODO: possibly swich from using a time-based scheduler
+       *       to using an instruction count based scheduler
+       */
+      u64 instructions_per_check = 10000;
+      if (ran > instructions_per_check) {
+        ran = 0;
+        if (time_microseconds() - start_time > max_time) {
+          state.store(PARKED);
+          return;
         }
       }
-
-
-      if (core_mod != nullptr) {
-        bool has = false;
-        ref v = core_mod->find(ind, &has, m);
-        if (has) {
-          PUSH(v);
-          DISPATCH;
-        }
-      }
-      symbol s;
-      s.id = ind;
-      ref c = &s;
-      val = get_global(c);
-      PUSH(val);
-      DISPATCH;
     }
 
 
-    TARGET(OP_SET_GLOBAL) {
-      PRELUDE;
-      auto ind = CODE_READ(i64);
-      CODE_SKIP(i64);
-      ref val = POP();
+    // grab the next opcode and increment the instruction pointer
+    op = *IP();
+    IP()++;
 
-      if (PROG()->mod != nullptr) {
-        PROG()->mod->setattr_fast(ind, val);
+    goto *threaded_labels[op];
+    switch (op) {
+      TARGET(OP_NOP) {
+        PRELUDE;
+        fprintf(stderr, "Unhandled instruction %02x in lambda ", op);
+        std::cout << PROG()->defining << std::endl;
+        exit(-1);
+        DISPATCH;
+      }
+
+      TARGET(OP_NIL) {
+        PRELUDE;
+        PUSH(nullptr);
+        DISPATCH;
+      }
+
+      TARGET(OP_CONST) {
+        PRELUDE;
+        const auto ind = CODE_READ(u64);
+        CODE_SKIP(u64);
+        ref val = CONSTANT(ind);
         PUSH(val);
         DISPATCH;
       }
-      def_global(ind, val);
-      PUSH(val);
-      DISPATCH;
-    }
 
-    TARGET(OP_SET_PRIVATE) {
-      PRELUDE;
-      auto ind = CODE_READ(i64);
-      CODE_SKIP(i64);
-      ref v = POP();
-      PROG()->mod->set_private(ind, v);
-      PUSH(v);
-      DISPATCH;
-    }
+      TARGET(OP_FLOAT) {
+        PRELUDE;
+        const auto flt = CODE_READ(double);
+        PUSH(flt);
+        CODE_SKIP(double);
+        DISPATCH;
+      }
 
-
-    TARGET(OP_CONS) {
-      PRELUDE;
-      auto lst = POP();
-      auto val = POP();
-      PUSH(new list(val, lst));
-      DISPATCH;
-    }
+      TARGET(OP_INT) {
+        PRELUDE;
+        const auto integer = CODE_READ(i64);
+        PUSH(ref{(i64)integer});
+        CODE_SKIP(i64);
+        DISPATCH;
+      }
 
 
+      TARGET(OP_LOAD_LOCAL) {
+        PRELUDE;
+        auto ind = CODE_READ(u64);
+        CODE_SKIP(u64);
+        auto val = LOCALS()->at(ind);
+        PUSH(val);
 
-    TARGET(OP_APPEND) {
-      PRELUDE;
-      auto a = POP();
-      auto b = POP();
-      ref r = append(a, b);
-      PUSH(r);
-      DISPATCH;
-    }
+        DISPATCH;
+      }
 
 
+      TARGET(OP_SET_LOCAL) {
+        PRELUDE;
+        auto ind = CODE_READ(u64);
+        CODE_SKIP(u64);
+        LOCALS()->at(ind) = stack[SP() - 1];
+        DISPATCH;
+      }
 
-    TARGET(OP_CALL) {
-      PRELUDE;
 
-      i64 argc = CODE_READ(i64);
-      ref *argv = stack + SP() - argc;
-      CODE_SKIP(i64);
-      i64 new_fp = SP() - argc - 1;
-      int abp = SP() - argc; /* argumement base pointer, represents the base of
-                              the argument list */
-      if (stack[new_fp].isa(lambda_type)) {
-        auto *new_program = stack[new_fp].reinterpret<cedar::lambda *>();
-        if (new_program == nullptr) {
-          throw cedar::make_exception(
-              "Function to be run in call returned nullptr");
+      TARGET(OP_LOAD_GLOBAL) {
+        PRELUDE;
+        u64 ind = CODE_READ(u64);
+        CODE_SKIP(u64);
+        ref val = nullptr;
+
+        module *m = PROG()->mod;
+
+        if (m != nullptr) {
+          bool has = false;
+          ref v = m->find(ind, &has, m);
+          if (has) {
+            PUSH(v);
+            DISPATCH;
+          }
         }
 
-        if (new_program->code_type == lambda::bytecode_type) {
-          auto call = new_program->prime(argc, stack + abp);
 
-          SP() = new_fp;
-          add_call_frame(call);
-          PREDICT(OP_RETURN);
-          PREDICT(OP_SET_GLOBAL);
+        if (core_mod != nullptr) {
+          bool has = false;
+          ref v = core_mod->find(ind, &has, m);
+          if (has) {
+            PUSH(v);
+            DISPATCH;
+          }
+        }
+        symbol s;
+        s.id = ind;
+        ref c = &s;
+        val = get_global(c);
+        PUSH(val);
+        DISPATCH;
+      }
+
+
+      TARGET(OP_SET_GLOBAL) {
+        PRELUDE;
+        auto ind = CODE_READ(i64);
+        CODE_SKIP(i64);
+        ref val = POP();
+
+        if (PROG()->mod != nullptr) {
+          PROG()->mod->setattr_fast(ind, val);
+          PUSH(val);
           DISPATCH;
-        } else if (new_program->code_type == lambda::function_binding_type) {
+        }
+        def_global(ind, val);
+        PUSH(val);
+        DISPATCH;
+      }
+
+      TARGET(OP_SET_PRIVATE) {
+        PRELUDE;
+        auto ind = CODE_READ(i64);
+        CODE_SKIP(i64);
+        ref v = POP();
+        PROG()->mod->set_private(ind, v);
+        PUSH(v);
+        DISPATCH;
+      }
+
+
+      TARGET(OP_CONS) {
+        PRELUDE;
+        auto lst = POP();
+        auto val = POP();
+        PUSH(new list(val, lst));
+        DISPATCH;
+      }
+
+
+
+      TARGET(OP_APPEND) {
+        PRELUDE;
+        auto a = POP();
+        auto b = POP();
+        ref r = append(a, b);
+        PUSH(r);
+        DISPATCH;
+      }
+
+
+
+      TARGET(OP_CALL) {
+        PRELUDE;
+
+        i64 argc = CODE_READ(i64);
+        ref *argv = stack + SP() - argc;
+        CODE_SKIP(i64);
+        i64 new_fp = SP() - argc - 1;
+        int abp = SP() - argc; /* argumement base pointer, represents the base
+                                of the argument list */
+        if (stack[new_fp].isa(lambda_type)) {
+          auto *new_program = stack[new_fp].reinterpret<cedar::lambda *>();
+          if (new_program == nullptr) {
+            throw cedar::make_exception(
+                "Function to be run in call returned nullptr");
+          }
+
+          if (new_program->code_type == lambda::bytecode_type) {
+            auto call = new_program->prime(argc, stack + abp);
+
+            SP() = new_fp;
+            add_call_frame(call);
+            PREDICT(OP_RETURN);
+            PREDICT(OP_SET_GLOBAL);
+            DISPATCH;
+          } else if (new_program->code_type == lambda::function_binding_type) {
+            call_context ctx;
+            ctx.coro = this;
+            ctx.mod = PROG()->mod;
+            ref val = new_program->function_binding(argc, argv, &ctx);
+            SP() = new_fp;
+            PUSH(val);
+            PREDICT(OP_RETURN);
+            PREDICT(OP_SET_GLOBAL);
+            DISPATCH;
+          }
+        } else if (stack[new_fp].is<type>()) {
+          /**
+           *
+           * create an instance of a type
+           *
+           */
+          static auto __alloc__id = symbol::intern("__alloc__");
+          static auto new_id = symbol::intern("new");
+          // if the function to be called was a type, we need to make an
+          // instance
+          type *cls = stack[new_fp].as<type>();
+          ref alloc_func_ref = cls->getattr_fast(__alloc__id);
           call_context ctx;
           ctx.coro = this;
           ctx.mod = PROG()->mod;
-          ref val = new_program->function_binding(argc, argv, &ctx);
-          SP() = new_fp;
-          PUSH(val);
+          // allocate the instance
+          ref inst = call_function(alloc_func_ref.as<lambda>(), 0,
+                                   stack + new_fp, &ctx);
+          stack[new_fp] = inst;
+          ref new_func_ref = inst->getattr_fast(new_id);
+          if (!new_func_ref.is<lambda>()) {
+            throw cedar::make_exception("`new` method for ", ref{cls},
+                                        " is not a function");
+          }
+          lambda *new_func = new_func_ref.as<lambda>();
+          // call the new function on the object
+          call_function(new_func, argc + 1, stack + new_fp, &ctx);
+          SP() = new_fp + 1;
           PREDICT(OP_RETURN);
           PREDICT(OP_SET_GLOBAL);
           DISPATCH;
         }
-      } else if (stack[new_fp].is<type>()) {
-        /**
-         *
-         * create an instance of a type
-         *
-         */
-        static auto __alloc__id = symbol::intern("__alloc__");
-        static auto new_id = symbol::intern("new");
-        // if the function to be called was a type, we need to make an instance
-        type *cls = stack[new_fp].as<type>();
-        ref alloc_func_ref = cls->getattr_fast(__alloc__id);
-        call_context ctx;
-        ctx.coro = this;
-        ctx.mod = PROG()->mod;
-        // allocate the instance
-        ref inst =
-            call_function(alloc_func_ref.as<lambda>(), 0, stack + new_fp, &ctx);
-        stack[new_fp] = inst;
-        ref new_func_ref = inst->getattr_fast(new_id);
-        if (!new_func_ref.is<lambda>()) {
-          throw cedar::make_exception("`new` method for ", ref{cls},
-                                      " is not a function");
-        }
-        lambda *new_func = new_func_ref.as<lambda>();
-        // call the new function on the object
-        call_function(new_func, argc + 1, stack + new_fp, &ctx);
+        ref v = self_callv(stack[new_fp], "apply", argc + 1, stack + abp - 1);
+        stack[new_fp] = v;
         SP() = new_fp + 1;
-        PREDICT(OP_RETURN);
-        PREDICT(OP_SET_GLOBAL);
         DISPATCH;
       }
-      ref v = self_callv(stack[new_fp], "apply", argc + 1, stack + abp - 1);
-      stack[new_fp] = v;
-      SP() = new_fp + 1;
-      DISPATCH;
-    }
 
-    TARGET(OP_MAKE_FUNC) {
-      PRELUDE;
-      auto ind = CODE_READ(u64);
-      CODE_SKIP(u64);
-      ref function_template = PROG()->code->constants[ind];
-      // (void)function_template.to_string(false);
-      auto *template_ptr = (lambda *)function_template.get();
-      lambda *function = template_ptr->copy();
-      // inherit closures from parent, a new
-      // child closure is created on call
-      function->m_closure = LOCALS();
-      // when creating functions, inherit the module object
-      function->mod = PROG()->mod;
-      // inherit the self object as well
-      function->self = PROG()->self;
-      PUSH(function);
-      DISPATCH;
-    }
-
-
-
-
-    TARGET(OP_RETURN) {
-      PRELUDE;
-      ref val = POP();
-
-
-      frame *old_frame = pop_call_frame();
-      dispose_frame(old_frame);
-
-      if (call_stack == nullptr) {
-        schstate->value = val;
-        schstate->done = true;
-        done = true;
-        return_value = val;
-        return;
+      TARGET(OP_MAKE_FUNC) {
+        PRELUDE;
+        auto ind = CODE_READ(u64);
+        CODE_SKIP(u64);
+        ref function_template = PROG()->code->constants[ind];
+        // (void)function_template.to_string(false);
+        auto *template_ptr = (lambda *)function_template.get();
+        lambda *function = template_ptr->copy();
+        // inherit closures from parent, a new
+        // child closure is created on call
+        function->m_closure = LOCALS();
+        // when creating functions, inherit the module object
+        function->mod = PROG()->mod;
+        // inherit the self object as well
+        function->self = PROG()->self;
+        PUSH(function);
+        DISPATCH;
       }
 
-      PUSH(val);
-      DISPATCH;
-    }
+
+
+
+      TARGET(OP_RETURN) {
+        PRELUDE;
+        ref val = POP();
+
+
+        frame *old_frame = pop_call_frame();
+        dispose_frame(old_frame);
+
+        if (call_stack == nullptr) {
+          state.store(STOPPED);
+          done = true;
+          return_value = val;
+          return;
+        }
+
+        PUSH(val);
+        DISPATCH;
+      }
 
 
 
 
-    TARGET(OP_EXIT) {
-      PRELUDE;
-      goto exit;
-      DISPATCH;
-    }
+      TARGET(OP_EXIT) {
+        PRELUDE;
+        goto exit;
+        DISPATCH;
+      }
 
 
 
-    TARGET(OP_SKIP) {
-      PRELUDE;
-      SP()--;
-      DISPATCH;
-    }
+      TARGET(OP_SKIP) {
+        PRELUDE;
+        SP()--;
+        DISPATCH;
+      }
 
 
-    TARGET(OP_JUMP_IF_FALSE) {
-      PRELUDE;
+      TARGET(OP_JUMP_IF_FALSE) {
+        PRELUDE;
 
-      static ref false_val = new symbol("false");
-      i64 offset = CODE_READ(i64);
-      CODE_SKIP(i64);
-      auto val = POP();
-      if (val.is_nil() || val == false_val) {
+        static ref false_val = new symbol("false");
+        i64 offset = CODE_READ(i64);
+        CODE_SKIP(i64);
+        auto val = POP();
+        if (val.is_nil() || val == false_val) {
+          IP() = PROG()->code->code + offset;
+        }
+        DISPATCH;
+      }
+
+
+
+      TARGET(OP_JUMP) {
+        PRELUDE;
+        i64 offset = CODE_READ(i64);
         IP() = PROG()->code->code + offset;
-      }
-      DISPATCH;
-    }
-
-
-
-    TARGET(OP_JUMP) {
-      PRELUDE;
-      i64 offset = CODE_READ(i64);
-      IP() = PROG()->code->code + offset;
-      DISPATCH;
-    }
-
-
-
-    TARGET(OP_RECUR) {
-      PRELUDE;
-      i64 argc = CODE_READ(i64);
-      CODE_SKIP(i64);
-      if (argc != PROG()->argc)
-        throw cedar::make_exception(
-            "recur call has invalid number of arguments. Given ", argc,
-            " expected ", PROG()->argc);
-
-      int abp = SP() - argc; /* argumement base pointer, represents the base of
-                              the argument list */
-
-
-
-      PROG()->set_args_closure(LOCALS(), argc, stack + abp);
-      IP() = PROG()->code->code;
-
-      SP() = call_stack->caller->sp + 1;
-      DISPATCH;
-    }
-
-    TARGET(OP_GET_ATTR) {
-      PRELUDE;
-      u64 id = CODE_READ(u64);
-      CODE_SKIP(u64);
-      auto val = POP();
-      // create a stack allocated symbol
-      symbol s;
-      // set it's id
-      s.id = id;
-      // actually getattr
-      auto attr = val.getattr(&s);
-      // push the value
-      PUSH(attr);
-      DISPATCH;
-    }
-
-
-    TARGET(OP_SET_ATTR) {
-      PRELUDE;
-      i64 id = CODE_READ(i64);
-      CODE_SKIP(i64);
-      auto val = POP();
-      auto obj = POP();
-      // create a stack allocated symbol
-      symbol s;
-      // set it's id
-      s.id = id;
-      // actually getattr
-      obj.setattr(&s, val);
-      // push the value
-      PUSH(val);
-      DISPATCH;
-    }
-
-
-
-    TARGET(OP_DUP) {
-      PRELUDE;
-      i64 off = CODE_READ(i64);
-      auto val = stack[SP() - off];
-      CODE_SKIP(i64);
-      PUSH(val);
-      PREDICT(OP_SWAP);
-      DISPATCH;
-    }
-
-
-
-    TARGET(OP_SWAP) {
-      PRELUDE;
-      auto a = POP();
-      auto b = POP();
-      PUSH(a);
-      PUSH(b);
-      DISPATCH;
-    }
-
-
-    TARGET(OP_DEF_MACRO) {
-      PRELUDE;
-      auto func = POP();
-      int id = CODE_READ(i64);
-      CODE_SKIP(i64);
-      vm::set_macro(id, func);
-      auto s = new symbol();
-      s->id = id;
-      PUSH(id);
-      DISPATCH;
-    }
-
-
-    TARGET(OP_EVAL) {
-      PRELUDE;
-
-      ref expr = POP();
-      vm::compiler c;
-      ref compiled_lambda = c.compile(expr, nullptr);
-      lambda *func = compiled_lambda.as<lambda>();
-      call_state call = func->prime(0, nullptr);
-      fiber eval_fiber(call);
-      ref res = eval_fiber.run();
-      PUSH(res);
-      DISPATCH;
-    }
-
-
-    TARGET(OP_SLEEP) {
-      PRELUDE;
-      ref dur_ref = POP();
-      done = false;
-      schstate->value = nullptr;
-      schstate->done = false;
-      i64 interval = 0;
-      if (dur_ref.get_type() == number_type) {
-        interval = dur_ref.to_int();
-      }
-      schstate->sleep_for = interval;
-      // push a value for when we come back
-      PUSH(nullptr);
-      return;
-      DISPATCH;
-    }
-
-    TARGET(OP_GET_MODULE) {
-      PRELUDE;
-      PUSH(PROG()->mod);
-      DISPATCH;
-    }
-
-
-
-    TARGET(OP_ADD) {
-      PRELUDE;
-      ref b = POP();
-      ref a = POP();
-      PUSH(a + b);
-      DISPATCH;
-    }
-
-
-    TARGET(OP_LOAD_SELF) {
-      PRELUDE;
-      PUSH(PROG()->self);
-      DISPATCH;
-    }
-
-
-    TARGET(OP_SEND) {
-      PRELUDE;
-
-      ref item = POP();
-      ref chanr = POP();
-
-      auto *chan = ref_cast<channel>(chanr);
-      if (chan == nullptr) {
-        throw cedar::make_exception("unable to send on invalid channel: ", chan);
+        DISPATCH;
       }
 
-      sender s{this, item};
-
-      bool sent = chan->send(s);
 
 
-      // should return nil
-      PUSH(nullptr);
+      TARGET(OP_RECUR) {
+        PRELUDE;
+        i64 argc = CODE_READ(i64);
+        CODE_SKIP(i64);
+        if (argc != PROG()->argc)
+          throw cedar::make_exception(
+              "recur call has invalid number of arguments. Given ", argc,
+              " expected ", PROG()->argc);
 
-      // if it wasn't sent, yield. It's up to the channel to re-add this fiber
-      if (!sent) {
-        schstate->value = nullptr;
-        schstate->done = true;
+        int abp = SP() - argc; /* argumement base pointer, represents the base
+                                of the argument list */
+
+
+
+        PROG()->set_args_closure(LOCALS(), argc, stack + abp);
+        IP() = PROG()->code->code;
+
+        SP() = call_stack->caller->sp + 1;
+        DISPATCH;
+      }
+
+      TARGET(OP_GET_ATTR) {
+        PRELUDE;
+        u64 id = CODE_READ(u64);
+        CODE_SKIP(u64);
+        auto val = POP();
+        // create a stack allocated symbol
+        symbol s;
+        // set it's id
+        s.id = id;
+        // actually getattr
+        auto attr = val.getattr(&s);
+        // push the value
+        PUSH(attr);
+        DISPATCH;
+      }
+
+
+      TARGET(OP_SET_ATTR) {
+        PRELUDE;
+        i64 id = CODE_READ(i64);
+        CODE_SKIP(i64);
+        auto val = POP();
+        auto obj = POP();
+        // create a stack allocated symbol
+        symbol s;
+        // set it's id
+        s.id = id;
+        // actually getattr
+        obj.setattr(&s, val);
+        // push the value
+        PUSH(val);
+        DISPATCH;
+      }
+
+
+
+      TARGET(OP_DUP) {
+        PRELUDE;
+        i64 off = CODE_READ(i64);
+        auto val = stack[SP() - off];
+        CODE_SKIP(i64);
+        PUSH(val);
+        PREDICT(OP_SWAP);
+        DISPATCH;
+      }
+
+
+
+      TARGET(OP_SWAP) {
+        PRELUDE;
+        auto a = POP();
+        auto b = POP();
+        PUSH(a);
+        PUSH(b);
+        DISPATCH;
+      }
+
+
+      TARGET(OP_DEF_MACRO) {
+        PRELUDE;
+        auto func = POP();
+        int id = CODE_READ(i64);
+        CODE_SKIP(i64);
+        vm::set_macro(id, func);
+        auto s = new symbol();
+        s->id = id;
+        PUSH(id);
+        DISPATCH;
+      }
+
+
+      TARGET(OP_EVAL) {
+        PRELUDE;
+
+        ref expr = POP();
+        vm::compiler c;
+        ref compiled_lambda = c.compile(expr, nullptr);
+        lambda *func = compiled_lambda.as<lambda>();
+        call_state call = func->prime(0, nullptr);
+        fiber eval_fiber(call);
+        ref res = eval_fiber.run();
+        PUSH(res);
+        DISPATCH;
+      }
+
+
+      TARGET(OP_SLEEP) {
+        PRELUDE;
+        ref dur_ref = POP();
+        done = false;
+        i64 interval = 0;
+        if (dur_ref.get_type() == number_type) {
+          interval = dur_ref.to_int();
+        }
+
+        sleep = interval;
+
+        state.store(SLEEPING);
+        // push a value for when we come back
+        PUSH(nullptr);
         return;
+        DISPATCH;
       }
 
-      DISPATCH;
+      TARGET(OP_GET_MODULE) {
+        PRELUDE;
+        PUSH(PROG()->mod);
+        DISPATCH;
+      }
+
+
+
+      TARGET(OP_ADD) {
+        PRELUDE;
+        ref b = POP();
+        ref a = POP();
+        PUSH(a + b);
+        DISPATCH;
+      }
+
+
+      TARGET(OP_LOAD_SELF) {
+        PRELUDE;
+        PUSH(PROG()->self);
+        DISPATCH;
+      }
+
+
+      TARGET(OP_SEND) {
+        PRELUDE;
+
+        ref item = POP();
+        ref chanr = POP();
+
+        auto *chan = ref_cast<channel>(chanr);
+        if (chan == nullptr) {
+          throw cedar::make_exception("unable to send on invalid channel: ",
+                                      chan);
+        }
+
+        sender s{this, item};
+
+        bool sent = chan->send(s);
+
+
+        // should return nil
+        PUSH(nullptr);
+
+        // if it wasn't sent, yield. It's up to the channel to re-add this fiber
+        if (!sent) {
+          state.store(BLOCKING);
+          return;
+        }
+
+        DISPATCH;
+      }
+
+      TARGET(OP_RECV) {
+        PRELUDE;
+
+        ref chanr = POP();
+        auto *chan = ref_cast<channel>(chanr);
+        if (chan == nullptr) {
+          throw cedar::make_exception("unable to recv on invalid channel: ",
+                                      chan);
+        }
+
+        ref *slot = stack + SP()++;
+
+        receiver r{this, slot};
+
+        bool received = chan->recv(r);
+
+        if (!received) {
+          state.store(BLOCKING);
+          return;
+        }
+
+        DISPATCH;
+      }
     }
 
-    TARGET(OP_RECV) {
-      PRELUDE;
+    goto loop;
 
-      ref chanr = POP();
-      auto *chan = ref_cast<channel>(chanr);
-      if (chan == nullptr) {
-        throw cedar::make_exception("unable to recv on invalid channel: ", chan);
-      }
 
-      ref *slot = stack + SP()++;
+  exit:
+    state = STOPPED;
+    done = true;
+    return_value = POP();
+    state.store(STOPPED);
+    return;
 
-      receiver r{this, slot};
 
-      bool received = chan->recv(r);
-
-      if (!received) {
-        schstate->value = nullptr;
-        schstate->done = true;
-        return;
-      }
-
-      DISPATCH;
-    }
-
+  } catch (ref & ex) {
+    std::cout << ex << std::endl;
+    print_callstack();
+    PROG()->code->print(IP());
+    exit(0);
+  } catch (std::exception & ex) {
+    std::cout << ex.what() << std::endl;
+    print_callstack();
+    PROG()->code->print(IP());
+    exit(0);
   }
-
-  goto loop;
-
-
-exit:
-  state = STOPPED;
-  done = true;
-  return_value = POP();
-  schstate->value = return_value;
-  schstate->done = true;
-  return;
 }

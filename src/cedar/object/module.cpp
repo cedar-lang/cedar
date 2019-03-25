@@ -93,6 +93,7 @@ ref module::find(u64 id, bool *valid, module *from) {
 
 
 ref module::getattr_fast(u64 k) {
+  std::unique_lock l(lock);
   bool found = false;
   ref v = find(k, &found, nullptr);
   if (found) return v;
@@ -100,9 +101,11 @@ ref module::getattr_fast(u64 k) {
 }
 
 void module::setattr_fast(u64 k, ref v) {
+  lock.lock();
   binding b;
   b.type = PUBLIC;
   b.val = v;
   m_fields[k] = b;
+  lock.unlock();
 }
 

@@ -681,6 +681,20 @@ void init_binding(cedar::vm::machine *m) {
   });
 
 
+  // this is really dumb, but it works
+  def_global("has-attr?", bind_lambda(argc, argv, machine) {
+    static symbol *tr = new symbol("true");
+    ref thing = argv[0];
+    ref attr = argv[1];
+    try {
+      thing.getattr(attr);
+      return tr;
+    } catch (...) {
+      return nullptr;
+    }
+  });
+
+
 
 #define BIND_CONSTANT(name, val) def_global(new_obj<symbol>(#name), val)
   BIND_CONSTANT(S_IRWXU, 700);  /* RWX mask for owner */

@@ -47,7 +47,9 @@ namespace cedar {
     u8 *ip;
   };
 
-  enum fiber_state { RUNNING, STOPPED, PAUSED };
+  enum fiber_state { RUNNING, STOPPED, PARKED, BLOCKING, SLEEPING };
+
+
   class fiber : public object {
 
     std::mutex run_lock;
@@ -66,13 +68,11 @@ namespace cedar {
 
     frame *add_call_frame(call_state);
     frame *pop_call_frame(void);
-    /**
-     * a process starts paused, which allows it to continue running.
-     */
-    std::mutex state_lock;
-    fiber_state state = PAUSED;
 
    public:
+    std::atomic<int> state = PARKED;
+
+    std::mutex lock;
     int jid = 0;
     i64 sleep = 0;
     i64 ticks = 0;
@@ -88,13 +88,13 @@ namespace cedar {
     fiber(call_state);
     ~fiber(void);
 
-    fiber_state get_state(void);
+    int get_state(void);
     void set_state(fiber_state);
 
     void print_callstack();
 
     // run the fiber for at most max_ms miliseconds
-    void run(run_context *state, int max_ms);
+    void run(int max_ms);
 
     // run the fiber until it returns, then return the value it yields
     ref run(void);

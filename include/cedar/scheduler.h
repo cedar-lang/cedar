@@ -24,10 +24,10 @@
 
 #pragma once
 
+#include <cedar/call_state.h>
 #include <cedar/cl_deque.h>
 #include <cedar/ref.h>
 #include <cedar/types.h>
-#include <cedar/call_state.h>
 #include <uv.h>
 #include <future>
 #include <list>
@@ -43,6 +43,38 @@
 
 
 namespace cedar {
+
+
+
+
+  template <typename T>
+  class locked_queue {
+    std::list<T> m_buffer;
+    std::mutex m_lock;
+    public:
+      inline T pop(void) {
+        std::lock_guard lock(m_lock);
+        if (m_buffer.size() == 0) return T{};
+        T f = m_buffer.front();
+        m_buffer.pop_front();
+        return f;
+      }
+      inline T steal(void) {
+        std::lock_guard lock(m_lock);
+        if (m_buffer.size() == 0) return T{};
+        T f = m_buffer.back();
+        m_buffer.pop_back();
+        return f;
+      }
+      inline void push(T item) {
+        std::lock_guard lock(m_lock);
+        m_buffer.push_back(item);
+      }
+      inline size_t size(void) {
+        std::lock_guard lock(m_lock);
+        return m_buffer.size();
+      }
+  };
 
   // forward declaration
   class lambda;
@@ -79,6 +111,8 @@ namespace cedar {
    public:
     u64 ticks = 0;
     std::thread::id tid;
+    std::mutex lock;
+    std::condition_variable work_cv;
     cl_deque<fiber *> local_queue;
   };
 
@@ -93,7 +127,7 @@ namespace cedar {
    * do a hashtable lookup for the thread and create a worker_thread object if
    * it needs to.
    */
-  void schedule(worker_thread* = nullptr, bool = false);
+  void schedule(worker_thread * = nullptr, bool = false);
 
 
   ref eval_lambda(call_state);

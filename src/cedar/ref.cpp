@@ -260,10 +260,10 @@ ref ref::binary_op(binop op, ref & a, ref & b) {
   }
 
 
+
   switch (op) {
     #define V(name, op) case name: return self_call(a, #op, b);
     FOREACH_OP(V);
-
     #undef V
   }
   return 0.0;

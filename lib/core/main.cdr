@@ -92,7 +92,7 @@
 ;; internal catch* function
 (def* seq?
   (fn (v)
-    (catch* (fn () (and (and (. v first) (. v rest)) true))
+    (catch* (fn () (and (and (has-attr? v 'first) (has-attr? v 'rest)) true))
         (fn (e) false))))
 
 

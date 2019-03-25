@@ -39,6 +39,8 @@ namespace cedar {
       ref val;
     };
 
+    std::mutex lock;
+
     ska::flat_hash_map<intern_t, binding> m_fields;
 
    public:
