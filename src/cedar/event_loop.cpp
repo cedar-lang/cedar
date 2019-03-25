@@ -27,6 +27,7 @@
 #include <mutex>
 #include <queue>
 #include <thread>
+#include <unistd.h>
 
 using namespace cedar;
 
@@ -47,6 +48,7 @@ void work_discovery_idle_callback(uv_idle_t *handle) {
     awaiting_work.pop();
     w(main_loop);
   }
+  usleep(200);
 }
 
 void cedar::init_ev(void) {
@@ -79,13 +81,12 @@ void cedar::in_ev(std::function<void(uv_loop_t *)> fn) {
 
 
 void set_timeout_cb(uv_timer_t *handle) {
-  printf("TIMEOUT %p\n", handle);
   auto *j = (fiber *)handle->data;
   add_job(j);
 }
 
 
-void cedar::set_timeout(int time_ms, job *j) {
+void cedar::set_timeout(int time_ms, fiber *j) {
   in_ev([=](uv_loop_t *loop) {
     uv_timer_t *t = new uv_timer_t();
     t->data = j;

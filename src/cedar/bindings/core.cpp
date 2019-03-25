@@ -21,25 +21,34 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#pragma once
 
-#ifndef __EVENT_LOOP_H
-#define __EVENT_LOOP_H
-
+#include <cedar/globals.h>
+#include <cedar/modules.h>
+#include <cedar/object/dict.h>
+#include <cedar/object/fiber.h>
+#include <cedar/object/keyword.h>
+#include <cedar/object/module.h>
+#include <cedar/object/string.h>
+#include <cedar/object/vector.h>
+#include <cedar/objtype.h>
+#include <cedar/scheduler.h>
+#include <cedar/vm/binding.h>
 #include <uv.h>
-#include <functional>
 
 
-namespace cedar {
-
-  // forward decl
-  class fiber;
+using namespace cedar;
 
 
-  void init_ev(void);
-  void in_ev(std::function<void(uv_loop_t *)>);
-  void set_timeout(int time_ms, fiber *j);
-}  // namespace cedar
 
-#endif
+void bind_core(void) {
+  module *mod = new module("_core");
+  mod->def("hash", [&] (const function_callback & args) {
+        if (args.len() != 1) {
+          throw make_exception("hash requires 1 argument");
+        }
+        args.get_return() = (i64)args[0].hash();
+      });
 
+
+  define_builtin_module("_core", mod);
+}

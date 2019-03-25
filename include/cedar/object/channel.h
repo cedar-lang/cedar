@@ -83,6 +83,8 @@ namespace cedar {
       std::unique_lock l(lock);
       // if there are fibers waiting on values, don't add to the buffer and just
       // send directly at them. Then add the fibers to the scheduler.
+
+      // printf("send %zu\n", recvq.size());
       if (!recvq.empty()) {
         // grab the first receiver from the waiter queue
         auto target = recvq.front();
@@ -103,18 +105,17 @@ namespace cedar {
     // true -> successfully recv'd, continue
     // false -> waiting on send, yield to scheduler
     inline bool recv(receiver rec) {
-      lock.lock();
+      std::unique_lock l(lock);
+      // printf("recv %zu\n", sendq.size());
       if (!sendq.empty()) {
         auto s = sendq.front();
         sendq.pop_front();
-        lock.unlock();
         *rec.slot = s.val;
         add_job(s.F);
         return true;
       }
       // add the receiver to the recvq
       recvq.push_back(rec);
-      lock.unlock();
       return false;
     }
   };

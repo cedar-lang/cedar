@@ -35,7 +35,7 @@
 
 namespace cedar {
 
-  class vector : public indexable, public sequence {
+  class vector : public object {
    public:
     immer::flex_vector<ref> items;
     vector(immer::flex_vector<ref>);

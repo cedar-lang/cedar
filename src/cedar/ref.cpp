@@ -131,26 +131,24 @@ ref cedar::ref::rest() const {
 */
 
 ref cedar::ref::cons(ref v) {
-  if (is_obj()) {
-    if (sequence *seq = ref_cast<sequence>(m_obj); seq != nullptr) {
-      return seq->cons(v);
-    }
-  }
-  return new list(v, *this);
+
+  return self_call(*this, "cons", v);
 }
 
 void cedar::ref::set_first(ref val) {
+  // printf("set_first\n");
   if (!is_obj())
     throw cedar::make_exception("unable to set first of non-object reference");
   if (m_obj == nullptr) return;
-  return dynamic_cast<sequence *>(m_obj)->set_first(val);
+  return dynamic_cast<list *>(m_obj)->set_first(val);
 }
 
 void cedar::ref::set_rest(ref val) {
+  // printf("set_rest\n");
   if (!is_obj())
     throw cedar::make_exception("unable to set rest of non-object reference");
   if (m_obj == nullptr) return;
-  return dynamic_cast<sequence *>(m_obj)->set_rest(val);
+  return dynamic_cast<list *>(m_obj)->set_rest(val);
 }
 
 
@@ -158,11 +156,6 @@ void cedar::ref::set_rest(ref val) {
 
 
 cedar::runes ref::to_string(bool human) {
-  if (is_ptr()) {
-    char buf[30];
-    sprintf(buf, "%p", m_ptr);
-    return buf;
-  }
   if (is_int()) {
     return std::to_string(m_int);
   }
@@ -239,7 +232,12 @@ bool cedar::ref::operator==(ref other) {
     }
     return false;
   }
-  return compare(other) == 0;
+
+
+  if (other.get_type() == get_type()) {
+    if (other.hash() == hash()) return true;
+  }
+  return false;
 }
 
 
@@ -258,8 +256,6 @@ ref ref::binary_op(binop op, ref & a, ref & b) {
         throw cedar::make_exception("unknown op");
     }
   }
-
-
 
   switch (op) {
     #define V(name, op) case name: return self_call(a, #op, b);

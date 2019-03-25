@@ -37,7 +37,7 @@ namespace cedar {
   // the `list` type is the most common sequence used in cedar
   // it is what gets read by the reader when the sequence (..)
   // is encountered.
-  class list : public sequence {
+  class list : public object {
    public:
 
     ref m_first = nullptr;

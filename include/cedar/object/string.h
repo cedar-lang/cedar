@@ -33,7 +33,7 @@
 
 namespace cedar {
 
-  class string : public sequence, public indexable {
+  class string : public object {
    private:
     cedar::runes m_content;
     // istr m_istr;

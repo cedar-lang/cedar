@@ -29,9 +29,9 @@
 
 namespace cedar {
 
-  class sequence : virtual public object {
+  class sequence_ : virtual public object {
    public:
-    virtual ~sequence(){};
+    virtual ~sequence_(){};
     // get the first of the sequence
     virtual ref first(void) = 0;
     // get the rest of the sequence

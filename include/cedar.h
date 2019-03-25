@@ -33,6 +33,7 @@
 
 #include "cedar/importutil.h"
 #include "cedar/channel.h"
+#include "cedar/call_state.h"
 #include "cedar/version.h"
 #include "cedar/builtin_types.h"
 #include "cedar/types.h"

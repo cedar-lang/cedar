@@ -70,6 +70,8 @@ namespace cedar {
     frame *pop_call_frame(void);
 
    public:
+
+    worker_thread *worker = nullptr;
     std::atomic<int> state = PARKED;
 
     std::mutex lock;

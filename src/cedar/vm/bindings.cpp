@@ -32,6 +32,7 @@
 #include <cedar/object/bytes.h>
 #include <cedar/thread.h>
 #include <cedar/vm/binding.h>
+#include <cedar/objtype.h>
 #include <fcntl.h>
 #include <math.h>
 #include <stdio.h>
@@ -204,13 +205,14 @@ cedar_binding(cedar_newdict) {
 
   ref d = cedar::new_obj<cedar::dict>();
   for (int i = 0; i < argc; i += 2) {
-    idx_set(d, argv[i], argv[i + 1]);
+
+    // idx_set(d, argv[i], argv[i + 1]);
   }
   return d;
 }
 
 cedar_binding(cedar_get) {
-  if (argc < 2)
+  if (argc < 2 || argc > 3)
     throw cedar::make_exception(
         "(get coll field [default]) requires two or three arguments, given ",
         argc);
@@ -230,7 +232,7 @@ cedar_binding(cedar_set) {
                                 argc);
   // set the 0th argument's dict entry at the 1st argument to the second
   // argument
-  return idx_set(argv[0], argv[1], argv[2]);
+  return self_call(argv[0], "set", argv[1], argv[2]);
 }
 
 cedar_binding(cedar_dict_keys) {
@@ -248,7 +250,7 @@ cedar_binding(cedar_size) {
   if (argc != 1)
     throw cedar::make_exception("(size ...) requires one arguments, given ",
                                 argc);
-  return idx_size(argv[0]);
+  return self_call(argv[0], "size");
 }
 
 
@@ -270,7 +272,7 @@ cedar_binding(cedar_os_open) {
   ERROR_IF_ARGS_PASSED_IS("os-open", !=, 2);
   ref path = argv[0];
   ref opts = argv[1];
-  if (!path.is<string>() || !opts.is<number>()) {
+  if (!path.isa(string_type) || !opts.isa(number_type)) {
     throw cedar::make_exception(
         "os-open requires types (os-open :string :number)");
   }
@@ -294,7 +296,6 @@ static ref obj_dir(int argc, ref *argv, call_context *ctx) {
   ref v = new vector();
 
   if (from->m_attrs.m_buckets == nullptr) {
-    printf("here\n");
     return v;
   }
 
@@ -425,7 +426,9 @@ cedar_binding(cedar_apply) {
     }
 
     if (fnc->code_type == lambda::function_binding_type) {
-      return fnc->function_binding(i, args.data(), ctx);
+      function_callback c(nullptr, i, args.data(), ctx->coro, ctx->mod);
+      fnc->call(c);
+      return c.get_return();
     }
 
     return eval_lambda(fnc->prime(i, args.data()));
@@ -522,8 +525,6 @@ void init_binding(cedar::vm::machine *m) {
   def_global("=", cedar_equal);
   def_global("eq", cedar_equal);
   def_global("is", cedar_is);
-  def_global("print", cedar_print);
-  def_global("println", cedar_println);
   def_global("cedar/hash", cedar_hash);
   def_global("cons", cedar_cons);
   def_global("<", cedar_lt);
@@ -547,6 +548,27 @@ void init_binding(cedar::vm::machine *m) {
   def_global("dir", obj_dir);
 
 
+
+
+
+  def_global("println", bind_lambda(argc, argv, machine) {
+    for (int i = 0; i < argc; i++) {
+      std::string s = argv[i].to_string(true);
+      printf("%s", s.c_str());
+      if (i < argc-1) printf(" ");
+    }
+    printf("\n");
+    return nullptr;
+  });
+
+  def_global("print", bind_lambda(argc, argv, machine) {
+    for (int i = 0; i < argc; i++) {
+      std::string s = argv[i].to_string(true);
+      printf("%s", s.c_str());
+      if (i < argc-1) printf(" ");
+    }
+    return nullptr;
+  });
 
 
   def_global("repr", bind_lambda(argc, argv, machine) {

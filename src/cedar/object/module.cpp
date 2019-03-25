@@ -25,6 +25,7 @@
 #include <cedar/modules.h>
 #include <cedar/object/module.h>
 #include <cedar/object/string.h>
+#include <cedar/object/lambda.h>
 #include <cedar/objtype.h>
 
 using namespace cedar;
@@ -48,6 +49,12 @@ void module::def(std::string name, ref val) {
 
 
 void module::def(std::string name, bound_function val) {
+  u64 id = symbol::intern(name);
+  ref func = new lambda(val);
+  setattr_fast(id, func);
+}
+
+void module::def(std::string name, native_callback val) {
   u64 id = symbol::intern(name);
   ref func = new lambda(val);
   setattr_fast(id, func);
@@ -93,19 +100,22 @@ ref module::find(u64 id, bool *valid, module *from) {
 
 
 ref module::getattr_fast(u64 k) {
-  std::unique_lock l(lock);
+  //std::unique_lock l(lock);
   bool found = false;
+
+  // lock.lock();
   ref v = find(k, &found, nullptr);
+  // lock.unlock();
   if (found) return v;
   return object::getattr_fast(k);
 }
 
 void module::setattr_fast(u64 k, ref v) {
-  lock.lock();
   binding b;
   b.type = PUBLIC;
   b.val = v;
+  // lock.lock();
   m_fields[k] = b;
-  lock.unlock();
+  // lock.unlock();
 }
 

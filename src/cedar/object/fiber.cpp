@@ -50,38 +50,10 @@ static frame *frame_pool = nullptr;
 
 
 static frame *alloc_frame(void) {
-  /*
-  frame_pool_lock.lock();
-  if (frame_pool != nullptr) {
-    auto *f = frame_pool;
-    // remove the frame from the pool
-    frame_pool = frame_pool->caller;
-    frame_pool_size--;
-    frame_pool_lock.unlock();
-    printf("REUSE\n");
-    return f;
-  }
-  printf("CREATE\n");
-  frame_pool_lock.unlock();
-  */
   return new frame();
 }
 
 static void dispose_frame(frame *f) {
-  // clear the frame
-  /*
-  memset(f, 0, sizeof(frame));
-
-  frame_pool_lock.lock();
-  // set it's next
-  f->caller = frame_pool;
-
-  // insert it into the frame pool
-  frame_pool = f;
-
-  frame_pool_size++;
-  frame_pool_lock.unlock();
-  */
   delete f;
 }
 
@@ -119,7 +91,6 @@ inline frame *fiber::add_call_frame(call_state call) {
   frm->sp = call_stack == nullptr ? 0 : call_stack->sp;
   frm->ip = call.func->code->code;
   call_stack = frm;
-
   adjust_stack(frm->sp + call.func->code->stack_size);
   return frm;
 }
@@ -184,7 +155,6 @@ void fiber::print_callstack(void) {
 // run a fiber for its first return value
 // be it a yield or a real return
 ref fiber::run(void) {
-  printf("here\n");
   run(-1);
   return nullptr;
 }
@@ -285,7 +255,6 @@ void fiber::run(int max_ms) {
 
   state.store(RUNNING);
 
-  try {
   loop:
 
     if (max_ms != -1) {
@@ -377,6 +346,7 @@ void fiber::run(int max_ms) {
         PRELUDE;
         u64 ind = CODE_READ(u64);
         CODE_SKIP(u64);
+
         ref val = nullptr;
 
         module *m = PROG()->mod;
@@ -484,7 +454,9 @@ void fiber::run(int max_ms) {
             call_context ctx;
             ctx.coro = this;
             ctx.mod = PROG()->mod;
-            ref val = new_program->function_binding(argc, argv, &ctx);
+            function_callback c(PROG()->self, argc, argv, this, PROG()->mod);
+            new_program->call(c);
+            ref val = c.get_return();
             SP() = new_fp;
             PUSH(val);
             PREDICT(OP_RETURN);
@@ -534,7 +506,6 @@ void fiber::run(int max_ms) {
         auto ind = CODE_READ(u64);
         CODE_SKIP(u64);
         ref function_template = PROG()->code->constants[ind];
-        // (void)function_template.to_string(false);
         auto *template_ptr = (lambda *)function_template.get();
         lambda *function = template_ptr->copy();
         // inherit closures from parent, a new
@@ -770,13 +741,11 @@ void fiber::run(int max_ms) {
         auto *chan = ref_cast<channel>(chanr);
         if (chan == nullptr) {
           throw cedar::make_exception("unable to send on invalid channel: ",
-                                      chan);
+                                      chanr);
         }
 
         sender s{this, item};
-
         bool sent = chan->send(s);
-
 
         // should return nil
         PUSH(nullptr);
@@ -797,7 +766,7 @@ void fiber::run(int max_ms) {
         auto *chan = ref_cast<channel>(chanr);
         if (chan == nullptr) {
           throw cedar::make_exception("unable to recv on invalid channel: ",
-                                      chan);
+                                      chanr);
         }
 
         ref *slot = stack + SP()++;
@@ -819,22 +788,9 @@ void fiber::run(int max_ms) {
 
 
   exit:
-    state = STOPPED;
     done = true;
     return_value = POP();
     state.store(STOPPED);
     return;
 
-
-  } catch (ref & ex) {
-    std::cout << ex << std::endl;
-    print_callstack();
-    PROG()->code->print(IP());
-    exit(0);
-  } catch (std::exception & ex) {
-    std::cout << ex.what() << std::endl;
-    print_callstack();
-    PROG()->code->print(IP());
-    exit(0);
-  }
 }

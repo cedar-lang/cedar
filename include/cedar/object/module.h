@@ -25,6 +25,7 @@
 #pragma once
 
 #include <cedar/object.h>
+#include <cedar/object/lambda.h>
 #include <cedar/object/symbol.h>
 #include <flat_hash_map.hpp>
 
@@ -50,6 +51,7 @@ namespace cedar {
 
     void def(std::string, ref);
     void def(std::string, bound_function);
+    void def(std::string, native_callback);
 
     // set a private module field. Will only be accessed via a `find` from
     // within the same module. The way private is inforced is by making getattr

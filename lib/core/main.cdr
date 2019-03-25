@@ -352,7 +352,7 @@
     (recur (inc c) (rest xs))))
 
 (def (count coll)
-  (cond (vector? coll) (size coll)
+  (cond (vector? coll) (len coll)
         :else (count* 0 coll)))
 ;;;;
 
@@ -522,11 +522,8 @@
 
 
 
-
-;; fire off a fiber and don't return anything
-;; TODO: decide if this should return the fiber or not
 (defmacro go (& body)
-  `(go* (fn nil (do ~@body))))
+  `(go* (fn () (do ~@body))))
 
 ;; channel related macros and functions. These must exist because chan-send* and
 ;; chan-recv* are "special form" function calls because they require opcode
@@ -555,6 +552,8 @@
               :else (throw (str "Unknown import argument on 'for': " val)))
         :else (throw (str "Unknown import argument " arg))))
 
+
+
 ;; expand import options as if they were a dict
 (def (import-opt-expand name opts)
   (let [table (map (fn (o) (apply vector o)) (partition 2 opts))]
@@ -566,6 +565,9 @@
 (defmacro import (name & opts)
   `(do (def ~name (require ~(str name)))
      ~@(import-opt-expand name opts)))
+
+
+(import _core for *)
 
 
 
@@ -790,6 +792,11 @@
 (defmacro lazily (& expr)
   `(lazy-seq (fn () (do ~@expr))))
 
+(defn pr [& more]
+  (apply print (map repr more)))
+
+(defn prn [& more]
+  (apply println (map repr more)))
 
 
 
@@ -810,17 +817,7 @@
   (. stream (write (apply str things))))
 
 
-(def (sprint v)
-  (. v (write-stream *out*)))
 
-;; redefine print and println in terms of
-;; *out* the stream class system
-(def (print & things)
-  (when-not (nil? things)
-    (. *out* (write (join things " ")))))
-
-(def (println & things)
-  (print (str (join things " ") "\n")))
 
 
 

@@ -35,7 +35,7 @@
 
 namespace cedar {
 
-  class bytes : public indexable, public sequence {
+  class bytes : public object {
    private:
     immer::flex_vector<unsigned char> buffer;
 

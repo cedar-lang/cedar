@@ -37,7 +37,7 @@
 #define DICT_DEFAULT_SIZE 10
 namespace cedar {
 
-  class dict : public indexable {
+  class dict : public object {
    private:
     struct bucket {
       u64 hash = 0;

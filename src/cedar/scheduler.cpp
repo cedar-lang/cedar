@@ -77,7 +77,7 @@ class block_timer {
  * This number is an unsigned 64 bit integer, because cedar will eventually
  * be able to run a huge number of these jobs concurrently. :)
  */
-static std::atomic<u64> jobc;
+static std::atomic<i64> jobc;
 
 /**
  * ncpus is how many worker threads to maintain at any given time.
@@ -100,17 +100,30 @@ static std::vector<std::thread> thread_handles;
 
 
 
+struct timeslice {
+  u64 start;
+  u64 end;
+  int wid;
+  int jid;
+};
+std::mutex timeline_lock;
+std::vector<timeslice> timeline;
+
+
+
 static std::mutex jid_mutex;
 int next_jid = 0;
 
 
 static worker_thread *lookup_or_create_worker(std::thread::id tid) {
+  static int next_wid = 0;
   worker_thread_mutex.lock();
   worker_thread *w = worker_thread_map[tid];
   if (w == nullptr) {
     // create w
     w = new worker_thread();
     w->tid = tid;
+    w->wid = next_wid++;
     worker_thread_map[tid] = w;
     worker_threads.push_back(w);
   }
@@ -120,29 +133,26 @@ static worker_thread *lookup_or_create_worker(std::thread::id tid) {
 
 
 void cedar::add_job(fiber *f) {
+  // if there is no worker on a fiber, it is a new fiber. Increment the number
+  // of jobs
+  if (f->worker == nullptr) {
+    jobc++;
+  }
   std::lock_guard guard(worker_thread_mutex);
   int ind = rand() % worker_threads.size();
   worker_threads[ind]->local_queue.push(f);
-  int j = jobc.load();
-  jobc.store(j + 1);
+  f->worker = worker_threads[ind];
   worker_threads[ind]->work_cv.notify_all();
 }
 
 
 
-/**
- * construct and start a worker thread by creating it and pushing it to
- * the worker pool atomically
- *
- * A worker thread will sit and wait for jobs in the following order:
- *     A) A job is waiting in the local job queue
- *     B) POSSIBLY, steal work from other worker threads.
- */
 static std::thread spawn_worker_thread(void) {
   return std::thread([](void) -> void {
     register_thread();
     worker_thread *my_thread =
         lookup_or_create_worker(std::this_thread::get_id());
+    my_thread->internal = true;
     while (true) schedule(my_thread, true);
   });
 }
@@ -184,13 +194,12 @@ struct inout {
 void schedule_job(fiber *proc) {
   // inout p(proc->jid);
   // std::unique_lock lock(proc->lock);
-  static int sched_time = 4;
+  static int sched_time = 2;
   static bool read_env = false;
   static const char *SCHED_TIME_ENV = getenv("CDRTIMESLICE");
   if (SCHED_TIME_ENV != nullptr && !read_env) {
     sched_time = atol(SCHED_TIME_ENV);
-    if (sched_time < 2)
-      throw cedar::make_exception("$CDRTIMESLICE must be larger than 2ms");
+    // throw cedar::make_exception("$CDRTIMESLICE must be larger than 2ms");
   }
   read_env = true;
 
@@ -232,12 +241,17 @@ static void init_scheduler(void) {
   // the number of worker threads is the number of cpus the host machine
   // has, minus one as the main thread does work
   ncpus = std::thread::hardware_concurrency();
-  static const char *CDRMAXPROC = getenv("CDRMAXPROC");
-  if (CDRMAXPROC != nullptr) ncpus = atol(CDRMAXPROC);
+  static const char *CDRMAXPROCS = getenv("CDRMAXPROCS");
+  if (CDRMAXPROCS != nullptr) ncpus = atol(CDRMAXPROCS);
+
+  if (ncpus < 1) ncpus = 1;
 
   // spawn 'ncpus' worker threads
-  for (unsigned i = 0; i < ncpus; i++) spawn_worker_thread().detach();
-  // thread_handles.push_back(spawn_worker_thread());
+  for (unsigned i = 0; i < ncpus; i++) {
+    auto t = spawn_worker_thread();
+
+    t.detach();
+  }
 }
 
 
@@ -302,12 +316,10 @@ TOP:
 
 
   if (internal_worker) {
-    /*
     std::unique_lock lk(worker->lock);
-    worker->work_cv.wait_for(lk, std::chrono::milliseconds(20));
+    worker->work_cv.wait_for(lk, std::chrono::milliseconds(2));
     lk.unlock();
-    */
-    usleep(100);
+    // usleep(2000);
     goto TOP;
   }
 
@@ -315,8 +327,9 @@ TOP:
 
 SCHEDULE:
 
-  schedule_job(work);
+  work->worker = worker;
 
+  schedule_job(work);
 
   bool replace = true;
 
@@ -326,11 +339,19 @@ SCHEDULE:
     replace = false;
   }
 
+  if (state == STOPPED) {
+    jobc--;
+  }
+
   worker->ticks++;
 
   // since we did some work, we should put it back in the local queue
   // but only if it isn't done.
   if (replace) {
+    if (worker->local_queue.size() == 0) {
+      goto SCHEDULE;
+    }
+    // add_job(work);
     worker->local_queue.push(work);
   }
 
@@ -356,7 +377,7 @@ void init_binding(cedar::vm::machine *m);
  */
 void cedar::init(void) {
   init_scheduler();
-  // init_ev();
+  init_ev();
   type_init();
   init_binding(nullptr);
   bind_stdlib();
@@ -388,7 +409,9 @@ ref cedar::eval_lambda(call_state call) {
 
 ref cedar::call_function(lambda *fn, int argc, ref *argv, call_context *ctx) {
   if (fn->code_type == lambda::function_binding_type) {
-    return fn->function_binding(argc, argv, ctx);
+    function_callback c(fn->self, argc, argv, ctx->coro, ctx->mod);
+    fn->call(c);
+    return c.get_return();
   }
   return eval_lambda(fn->prime(argc, argv));
 }

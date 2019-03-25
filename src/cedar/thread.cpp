@@ -26,12 +26,20 @@
 #define GC_THREADS
 #include <gc/gc.h>
 
+#define _GNU_SOURCE
+#include <sched.h>   //cpu_set_t , CPU_SET
+#include <pthread.h> //pthread_t
+#include <stdio.h>
+
 extern "C" int GC_register_my_thread(const struct GC_stack_base *);
 extern "C" int GC_unregister_my_thread(void);
 
 using namespace cedar;
 
+
+
 int cedar::register_thread(void) {
+
   struct GC_stack_base stack_base;
   GC_get_stack_base(&stack_base);
 

@@ -50,22 +50,32 @@
            (inc n)
            j
            (+ i j))))
+
+
 (def (fib max)
   (if (< max 2)
     max
     (fib-iter max 1 0 1)))
 
-(def nums (chan))
-
-(go (let [x 0]
-      (while true
-        (send x nums)
-        (inc= x))))
 
 
-(def x 0)
-(def setter (chan))
-;; sit and set x safely by reading from the channel
-(go (while true (def x (recv setter))))
-;; send increasing values down the setter channel
-(go (while true (send (inc x) setter)))
+
+(let [x 0]
+  (while false
+    (inc= x)
+    (println x)))
+
+
+(defn brackets [n]
+  (if (= 0 n) "println(\"sup\n\");"
+        (str "{" (brackets (dec n)) "}")))
+
+
+(import tcp)
+
+
+(def server (tcp.Server (fn (handle)
+                          (println handle))))
+
+
+(. server (listen 8080 "0.0.0.0"))

@@ -22,6 +22,7 @@
  * SOFTWARE.
  */
 
+#include <cedar/event_loop.h>
 #include <cedar/globals.h>
 #include <cedar/modules.h>
 #include <cedar/object/dict.h>
@@ -38,6 +39,7 @@
 #include <stdlib.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <uv.h>
 #include <mutex>
 
 
@@ -196,21 +198,83 @@ static cedar_binding(os_getenv) {
 }
 
 
-static ref os_panic(int argc, ref *argv, call_context *ctx) {
-  if (argc != 1) throw cedar::make_exception("os.panic requires 1 argument");
+static void os_panic(const function_callback& args) {
+  if (args.len() != 1) throw cedar::make_exception("os.panic requires 1 argument");
 
-  auto *f = ctx->coro;
+  auto *f = args.fiber();
 
 
-  std::cout << "panic: " << argv[0].to_string(true) << std::endl;
+  std::cout << "panic: " << args[0].to_string(true) << std::endl;
   std::cout << "\n";
   f->print_callstack();
   std::cout << "\n";
   exit(-1);
-
-  return nullptr;
 }
 
+static void os_exit(const function_callback& args) {
+  if (args.len() >= 1)
+    throw cedar::make_exception("os.exit requires 0 or 1 argument");
+  if (args.len() == 1) {
+    exit(args[0].to_int());
+  }
+  exit(0);
+}
+
+
+
+
+static void os_hardware_concurrency(const function_callback& args) {
+  args.get_return() = (int)std::thread::hardware_concurrency();
+}
+
+
+
+static void on_fs_open(uv_fs_t *req) {
+  ref fd;
+  ref err;
+  if (req->result >= 0) {
+    fd = req->result;
+    err = nullptr;
+  } else {
+    fd = -1;
+    err = new string(uv_strerror(req->result));
+  }
+
+  ref args[2];
+  args[0] = fd;
+  args[1] = err;
+
+  auto *fn = (lambda *)req->data;
+
+  fiber *f = new fiber(fn->prime(2, args));
+  add_job(f);
+}
+
+static void os_open_raw(const function_callback & args) {
+
+  if (args.len() != 3)
+    throw cedar::make_exception(
+        "os.open requires 2 arguments: (os.open-raw path mode-bits callback)");
+
+  std::string s = args[0].to_string(true);
+  int mode = args[1].to_int();
+  uv_fs_t *open_req = new uv_fs_t();
+  open_req->data = (void *)ref_cast<lambda>(args[2]);
+
+
+  in_ev([=](uv_loop_t *loop) {
+    char *p = new char[s.size() + 1];
+    memcpy(p, s.c_str(), s.size());
+    uv_fs_open(loop, open_req, p, mode, 0, on_fs_open);
+  });
+
+}
+
+
+
+static void test(const function_callback& args) {
+  args.get_return() = (int)args.len();
+}
 
 void bind_os(void) {
   module *mod = new module("os");
@@ -228,6 +292,28 @@ void bind_os(void) {
   mod->def("getppid", os_getppid);
   mod->def("getenv", os_getenv);
   mod->def("panic", os_panic);
+  mod->def("exit", os_exit);
+  mod->def("hardware-concurrency", os_hardware_concurrency);
+
+  mod->def("open-raw", os_open_raw);
+  mod->def("test", test);
+
+
+  mod->def("RDONLY", ref((int)O_RDONLY));
+  mod->def("WRONLY", O_WRONLY);
+  mod->def("RDWR", O_RDWR);
+  mod->def("NONBLOCK", O_NONBLOCK);
+  mod->def("APPEND", O_APPEND);
+  mod->def("CREAT", O_CREAT);
+  mod->def("TRUNC", O_TRUNC);
+  mod->def("EXCL", O_EXCL);
+  mod->def("SHLOCK", O_SHLOCK);
+  mod->def("EXLOCK", O_EXLOCK);
+  mod->def("NOFOLLOW", O_NOFOLLOW);
+  mod->def("SYMLINK", O_SYMLINK);
+  mod->def("EVTONLY", O_EVTONLY);
+  mod->def("CLOEXEC", O_CLOEXEC);
 
   define_builtin_module("os-internal", mod);
 }
+

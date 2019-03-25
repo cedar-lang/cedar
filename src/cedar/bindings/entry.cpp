@@ -39,8 +39,10 @@ void bind_uv(void);
 void bind_tcp(void);
 void bind_importutil(void);
 void bind_bits(void);
+void bind_core(void);
 
 void cedar::bind_stdlib(void) {
+  bind_core();
   bind_os();
   bind_mutex();
   bind_stringutil();

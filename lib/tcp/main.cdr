@@ -1,0 +1,10 @@
+(import _tcp for *)
+
+
+(deftype Server
+  (defn new [self conn-cb]
+    (def self.cb conn-cb))
+  (defn listen [self port ip-string]
+    (println port ip-string)))
+
+

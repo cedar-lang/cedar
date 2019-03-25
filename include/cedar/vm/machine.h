@@ -37,6 +37,7 @@
 #include <mutex>
 
 namespace cedar {
+  class lambda;
   namespace vm {
 
     // check if an id is a macro or not

@@ -1,18 +1,42 @@
 ;; Import the builtin OS module
 (import os-internal for *)
+(import bits)
 
 (defn- id [x] x)
 
-(deftype path
-  ;; path constructor
-  (defn new [self path]
-    (def self.path path))
 
-  (defn absolute [self]
-    self.path)
 
-  ;; string representations for the path object
-  (defn repr [self]
-    (str "(os.path " (repr self.path) ")"))
-  (defn str [self]
-    self.path))
+(deftype File
+  (defn new [self path fd mode]
+    ()))
+
+(defn- convert-mode-char [c]
+  (cond (= c "r") RDONLY
+        (= c "w") WRONLY
+        (= c "a") APPEND
+        :default 0))
+
+
+(defn- convert-open-mode [mode]
+    (reduce (fn (x c) (bits.or x (convert-mode-char c)))
+            (convert-mode-char (first mode)) (rest mode)))
+
+
+
+(defn open [path & more]
+  (let [mode (first more)
+        cb (second more)
+        bit-mode RDONLY]
+    (when (= (type mode) Lambda)
+      (def cb mode)
+      (def mode "r"))
+
+    (open-raw path (convert-open-mode mode) cb)))
+
+
+(defn open-sync [path & more]
+  (let [mode (or (first more) "r")
+        c (chan)]
+    (open path mode (fn (fd err)
+                      (send {:fd fd, :err err} c)))
+    (recv c)))

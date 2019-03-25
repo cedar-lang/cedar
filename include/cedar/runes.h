@@ -42,7 +42,7 @@ namespace cedar {
 
 			container buf;
 
-			void ingest_utf8(std::string);
+			void ingest_utf8(std::string const&);
 
 		public:
 
@@ -57,8 +57,8 @@ namespace cedar {
 			runes(char*);
 			runes(const char*);
 			runes(const char32_t*);
-			runes(std::string);
-			runes(std::u32string);
+			runes(std::string const&);
+			runes(std::u32string const&);
 			runes(const cedar::runes&);
 
 			~runes(void);
@@ -85,7 +85,7 @@ namespace cedar {
 
 			runes& operator+=(const runes&);
 			runes& operator+=(const char *);
-			runes& operator+=(std::string);
+			runes& operator+=(std::string const&);
 			runes& operator+=(char);
 			runes& operator+=(int);
 			runes& operator+=(rune);

@@ -61,7 +61,7 @@ ref &cedar::closure::at(int i) {
 
 cedar::lambda::lambda() {
   m_type = cedar::lambda_type;
-  code = new cedar::vm::bytecode();
+  code = nullptr;
 }
 
 cedar::lambda::lambda(vm::bytecode *bc) {
@@ -70,13 +70,33 @@ cedar::lambda::lambda(vm::bytecode *bc) {
   code = bc;
 }
 
+// provide a wrapper around the old native calling convention
+// TODO: remove this and bound_function
 cedar::lambda::lambda(bound_function func) {
+  m_type = cedar::lambda_type;
+  code_type = function_binding_type;
+  function_binding = [=] (const function_callback & args) -> void {
+    call_context c;
+    c.coro = args.fiber();
+    c.mod = args.module();
+    args.get_return() = func(args.len(), args.argv(), &c);
+  };
+}
+
+
+cedar::lambda::lambda(native_callback func) {
   m_type = cedar::lambda_type;
   code_type = function_binding_type;
   function_binding = func;
 }
 
 cedar::lambda::~lambda() {}
+
+
+void lambda::call(const function_callback & args) {
+  function_binding(args);
+}
+
 
 
 u64 lambda::hash(void) {

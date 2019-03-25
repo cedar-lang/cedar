@@ -77,7 +77,6 @@ namespace cedar {
   };
 
   // forward declaration
-  class lambda;
   class fiber;
   class scheduler;
   class module;
@@ -110,10 +109,12 @@ namespace cedar {
   class worker_thread {
    public:
     u64 ticks = 0;
+    int wid = 0;
     std::thread::id tid;
     std::mutex lock;
     std::condition_variable work_cv;
     cl_deque<fiber *> local_queue;
+    bool internal = false;
   };
 
 

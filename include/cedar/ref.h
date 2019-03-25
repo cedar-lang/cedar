@@ -36,6 +36,7 @@
 #include <cedar/types.h>
 #include <cxxabi.h>
 #include <bitset>
+#include <mutex>
 #include <cedar/exception.hpp>
 
 namespace cedar {
@@ -57,7 +58,6 @@ namespace cedar {
 #define FLAG_FLT 2
 #define FLAG_INT 3
 #define FLAG_OBJ 4
-#define FLAG_PTR 5
 
   enum ref_type {
     ref_obj,
@@ -113,7 +113,6 @@ namespace cedar {
       if (is_obj()) return ref_obj;
       if (is_flt()) return ref_flt;
       if (is_int()) return ref_int;
-      if (is_ptr()) return ref_ptr;
       return ref_obj;
     };
 
@@ -121,7 +120,6 @@ namespace cedar {
     inline bool is_flt(void) const { return flags[FLAG_FLT]; }
     inline bool is_int(void) const { return flags[FLAG_INT]; }
     inline bool is_obj(void) const { return flags[FLAG_OBJ]; }
-    inline bool is_ptr(void) const { return flags[FLAG_PTR]; }
 
     // clear all the type flags. Useful when changing
     // the value stored inside the ref
@@ -129,22 +127,12 @@ namespace cedar {
       flags[FLAG_OBJ] = 0;
       flags[FLAG_FLT] = 0;
       flags[FLAG_INT] = 0;
-      flags[FLAG_PTR] = 0;
     }
 
     bool is_nil(void) const;
 
     inline ref(const ref &other) { operator=(other); }
     inline ref(ref &&other) { operator=(other); }
-
-    // for storing arbitrary pointers. This behavior is for low-level
-    // VM operations and should ignore all refcounting after assigning this
-    inline ref &store_ptr(void *ptr) {
-      clear_type_flags();
-      flags[FLAG_PTR] = true;
-      m_ptr = ptr;
-      return *this;
-    }
 
 
     inline object *get(void) {
@@ -248,7 +236,7 @@ namespace cedar {
     template <typename T>
     inline T *as() const {
       if (is_obj()) {
-        return dynamic_cast<T*>(m_obj);
+        return static_cast<T*>(m_obj);
       }
       return nullptr;
     }
@@ -349,6 +337,10 @@ namespace cedar {
       ref self = const_cast<ref &>(*this);
       if (!is_number() || !other.is_number()) {
         return self.hash() - other.hash();
+      }
+
+      if (other.get_type() != get_type()) {
+        return -1;
       }
       return binary_op(sub, self, other).to_int();
     }

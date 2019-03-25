@@ -24,13 +24,14 @@
 
 #pragma once
 
+#include <cedar/call_state.h>
 #include <cedar/object.h>
 #include <cedar/ref.h>
 #include <cedar/runes.h>
 #include <cedar/vm/binding.h>
 #include <cedar/vm/bytecode.h>
 #include <cedar/vm/machine.h>
-#include <cedar/call_state.h>
+#include <exception>
 #include <functional>
 
 #include <gc/gc_cpp.h>
@@ -44,6 +45,52 @@
 namespace cedar {
 
   class module;
+  class fiber;
+
+
+  class function_callback {
+    size_t m_argc = 0;
+    ref *m_argv = nullptr;
+    ref m_self = nullptr;
+    fiber *m_fiber = nullptr;
+    module *m_mod = nullptr;
+    ref thrown = nullptr;
+    bool threw = false;
+
+    ref return_value;
+
+   public:
+    inline function_callback(ref self, int argc, ref *argv, fiber *f,
+                             module *mod) {
+      m_self = self;
+      m_argc = argc;
+      m_argv = argv;
+      m_fiber = f;
+      m_mod = mod;
+    }
+    // index into the argument list
+    inline ref &operator[](size_t ind) const {
+      if (ind > m_argc) {
+        throw std::out_of_range("invalid number of args");
+      }
+      return m_argv[ind];
+    }
+
+    inline size_t len(void) const { return m_argc; }
+    inline ref self(void) const { return m_self; }
+    inline fiber *fiber(void) const { return m_fiber; }
+    inline module *module(void) const { return m_mod; }
+    inline void throw_obj(ref obj) {
+      threw = true;
+      thrown = obj;
+    }
+    inline ref & get_return(void) const { return const_cast<ref&>(return_value); }
+    inline ref *argv(void) const {
+      return m_argv;
+    }
+  };
+
+  using native_callback = std::function<void(const function_callback&)>;
 
   // closure represents a wraper around closed values
   // in functions, also known as "freevars" in LC
@@ -84,17 +131,20 @@ namespace cedar {
     i16 arg_index = 0;
     i8 argc = 0;
     bool vararg = false;
-    bound_function function_binding;
+    native_callback function_binding;
 
 
 
 
     lambda(void);
-    lambda(cedar::vm::bytecode *);
-    lambda(cedar::bound_function);
+    lambda(vm::bytecode *);
+    lambda(bound_function);
+    lambda(native_callback);
     ~lambda(void);
     u64 hash(void);
     lambda *copy(void);
+
+    void call(const function_callback&);
 
     call_state prime(int argc = 0l, ref *argv = nullptr);
     void set_args_closure(closure *, int argc = 0, ref *argv = nullptr);

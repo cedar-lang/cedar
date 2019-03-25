@@ -26,6 +26,6 @@
 #include <cedar/object/list.h>
 using namespace cedar;
 
-ref sequence::cons(ref f) {
+ref sequence_::cons(ref f) {
   return new list(f, this);
 }

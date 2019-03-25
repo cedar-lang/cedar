@@ -65,7 +65,6 @@ using namespace cedar;
 void hook_color(std::string const &str, Replxx::colors_t &colors, module *mod);
 
 int main(int argc, char **argv) {
-
   srand((unsigned int)time(nullptr));
 
   init();
@@ -109,7 +108,7 @@ int main(int argc, char **argv) {
     // there are also args, so make that vector...
     ref args = new cedar::vector();
     for (int i = optind; i < argc; i++) {
-      args = cedar::idx_append(args, new cedar::string(argv[i]));
+      // args = cedar::idx_append(args, new cedar::string(argv[i]));
     }
     require("os")->def("args", args);
 
@@ -170,10 +169,6 @@ int main(int argc, char **argv) {
       }
     }
 
-
-    while (!all_work_done()) {
-      usleep(200);
-    }
 
   } catch (std::exception &e) {
     std::cerr << "Uncaught exception: " << e.what() << std::endl;
@@ -273,10 +268,10 @@ void hook_color(std::string const &context, Replxx::colors_t &colors,
       // numbers
       {"[\\-|+]{0,1}[0-9]+", cl::YELLOW},           // integers
       {"[\\-|+]{0,1}[0-9]*\\.[0-9]+", cl::YELLOW},  // decimals
-      // strings
-      {"\"(?:[^\"\\\\]|\\\\.)*\"", cl::BRIGHTGREEN},  // double quotes
       {"\\w+", cl::ERROR},
       {":\\w+", cl::RED},
+      // strings
+      {"\"(?:[^\"\\\\]|\\\\.)*\"", cl::BRIGHTGREEN},  // double quotes
   };
 
   // highlight matching regex sequences
@@ -290,6 +285,16 @@ void hook_color(std::string const &context, Replxx::colors_t &colors,
       std::string prefix(match.prefix().str());
       pos += utf8_strlen(prefix.c_str(), static_cast<int>(prefix.length()));
       int len(utf8_strlen(c.c_str(), static_cast<int>(c.length())));
+
+      if (c == "self") {
+        for (int i = 0; i < len; ++i) {
+          colors.at(pos + i) = cl::CYAN;
+        }
+
+        pos += len;
+        str = match.suffix();
+        continue;
+      }
 
 
       cl color = e.second;

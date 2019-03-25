@@ -575,7 +575,8 @@ static void init_dict_type() {
   dict_type->set_field("new", bind_lambda(argc, argv, machine) {
     auto *self = argv[0].as<dict>();
     for (int i = 1; i < argc; i += 2) {
-      idx_set(self, argv[i], argv[i + 1]);
+      self->set(argv[i], argv[i+1]);
+      // idx_set(self, argv[i], argv[i + 1]);
     }
     return nullptr;
   });

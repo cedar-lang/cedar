@@ -134,7 +134,7 @@ void vm::compiler::compile_object(ref obj, vm::bytecode &code, scope *sc,
     return compile_list(obj, code, sc, ctx);
   }
 
-  if (obj.is<cedar::vector>()) {
+  if (obj.isa(vector_type)) {
     return compile_vector(obj, code, sc, ctx);
   }
 
@@ -142,10 +142,10 @@ void vm::compiler::compile_object(ref obj, vm::bytecode &code, scope *sc,
     return compile_number(obj, code, sc, ctx);
   }
 
-  if (obj.is<cedar::symbol>()) {
+  if (obj.isa(symbol_type)) {
     return compile_symbol(obj, code, sc, ctx);
   }
-  if (obj.is<cedar::nil>()) {
+  if (obj.is_nil()) {
     code.write_op(OP_NIL);
     return;
   }
@@ -199,7 +199,6 @@ void vm::compiler::compile_list(ref obj, vm::bytecode &code, scope *sc,
     if (name_obj.get_type() != symbol_type) {
       throw cedar::make_exception("def-private* requires a symbol as a name");
     }
-    // std::cout << "priv " << name_obj << " = " << val_obj << std::endl;
     compile_object(val_obj, code, sc, ctx);
     auto intern = symbol::intern(name_obj.to_string(true));
     code.write_op(OP_SET_PRIVATE, intern);
@@ -319,7 +318,6 @@ void vm::compiler::compile_list(ref obj, vm::bytecode &code, scope *sc,
 
   if (list_is_call_to("+", obj)) {
     obj = obj.rest();
-
     if (obj.is_nil()) {
       compile_object(0, code, sc, ctx);
       return;
@@ -347,7 +345,7 @@ void vm::compiler::compile_list(ref obj, vm::bytecode &code, scope *sc,
     while (!curr.is_nil()) {
       ref a = curr.first();
 
-      if (a.is<symbol>()) {
+      if (a.isa(symbol_type)) {
         // compile getattr
         auto *s = a.as<symbol>();
         auto id = s->id;
@@ -355,15 +353,17 @@ void vm::compiler::compile_list(ref obj, vm::bytecode &code, scope *sc,
         // a symbol may be followed by a := in order to set the value
         // so we need to check it and set instead of get
         ref next = curr.rest().first();
-        if (keyword *kw = ref_cast<keyword>(next); kw != nullptr) {
-          if (kw->get_content() == ":=") {
-            ref val = curr.rest().rest().first();
-            compile_object(val, code, sc, ctx);
-            code.write_op(OP_SET_ATTR, id);
-            break;
-          } else {
-            throw cedar::make_exception("Unknown keyword '", next,
-                                        "' in dot syntax: ", obj);
+        if (next.isa(keyword_type)) {
+          if (keyword *kw = ref_cast<keyword>(next); kw != nullptr) {
+            if (kw->get_content() == ":=") {
+              ref val = curr.rest().rest().first();
+              compile_object(val, code, sc, ctx);
+              code.write_op(OP_SET_ATTR, id);
+              break;
+            } else {
+              throw cedar::make_exception("Unknown keyword '", next,
+                                          "' in dot syntax: ", obj);
+            }
           }
         }
         code.write_op(OP_GET_ATTR, id);
@@ -376,7 +376,7 @@ void vm::compiler::compile_list(ref obj, vm::bytecode &code, scope *sc,
         // duplicate the top of the stack
         code.write_op(OP_DUP, 1);
 
-        if (!method_ref.is<symbol>()) {
+        if (!method_ref.isa(symbol_type)) {
           throw cedar::make_exception(
               "invalid syntax in dot special form: ", obj, " method call '",
               method_ref, "' must be a symbol");
@@ -666,7 +666,7 @@ void vm::compiler::compile_lambda_expression(ref expr, bytecode &code,
 
   ref name = nullptr;
   if (!args.isa(list_type) && !args.is_nil()) {
-    if (args.is<symbol>()) {
+    if (args.isa(symbol_type)) {
       name = args;
     } else {
       throw cedar::make_exception("unknown name option on lambda literal: ",
@@ -676,7 +676,6 @@ void vm::compiler::compile_lambda_expression(ref expr, bytecode &code,
     args = expr.rest().first();
   }
 
-  // std::cout << "(fn " << name << " " << args << " " << ")\n";
   i32 argc = 0;
   i32 arg_index = ctx->closure_size;
   bool vararg = false;
@@ -742,7 +741,6 @@ void vm::compiler::compile_lambda_expression(ref expr, bytecode &code,
 void vm::compiler::compile_quasiquote(ref obj, vm::bytecode &bc, vm::scope *sc,
                                       vm::compiler_ctx *ctx) {
   printf("HERE\n");
-  // std::cout << obj << std::endl;
   if (obj.is_nil()) {
     bc.write((u8)OP_NIL);
     bc.write((u8)OP_CONS);

@@ -28,12 +28,12 @@
 #include <functional>
 #include <cedar/scheduler.h>
 
-
 // just forward declare machine
 namespace cedar {namespace vm { class machine; }}
 
 namespace cedar {
   using bound_function = std::function<ref(int, ref*, call_context*)>;
+  // using native_callback = std::function<void(const function_callback&)>;
 }
 
 #define cedar_binding_sig(name) cedar::ref name(int argc, cedar::ref *argv, cedar::call_context *ctx)

@@ -45,7 +45,7 @@ static std::u32string to_utf32(std::string const & s) {
 }
 
 
-void runes::ingest_utf8(std::string s) { buf = to_utf32(s); }
+void runes::ingest_utf8(std::string const& s) { buf = to_utf32(s); }
 
 
 runes::runes() {}
@@ -63,7 +63,7 @@ runes::runes(const char32_t* s) {
   }
 }
 
-runes::runes(std::string s) { ingest_utf8(s); }
+runes::runes(std::string const& s) { ingest_utf8(s); }
 // copy constructor
 runes::runes(const cedar::runes& other) {
   buf = other.buf;
@@ -71,7 +71,7 @@ runes::runes(const cedar::runes& other) {
 }
 
 
-runes::runes(std::u32string s) { buf = s; }
+runes::runes(std::u32string const& s) { buf = s; }
 
 
 runes& runes::operator=(const runes& o) {
@@ -113,7 +113,7 @@ runes& runes::operator+=(const runes& other) {
 runes& runes::operator+=(const char* other) { return operator+=(runes(other)); }
 
 
-runes& runes::operator+=(std::string other) { return operator+=(runes(other)); }
+runes& runes::operator+=(std::string const& other) { return operator+=(runes(other)); }
 
 
 runes& runes::operator+=(char c) {

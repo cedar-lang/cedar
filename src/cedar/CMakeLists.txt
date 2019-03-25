@@ -37,6 +37,7 @@ add_library(cedar-lib SHARED
 	src/cedar/bindings/mutex.cpp
 	src/cedar/bindings/os.cpp
 	src/cedar/bindings/importutil.cpp
+	src/cedar/bindings/core.cpp
 	src/cedar/bindings/tcp.cpp
 	src/cedar/bindings/entry.cpp
 	src/cedar/bindings/uv.cpp
