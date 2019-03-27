@@ -201,7 +201,7 @@ static cedar_binding(os_getenv) {
 static void os_panic(const function_callback& args) {
   if (args.len() != 1) throw cedar::make_exception("os.panic requires 1 argument");
 
-  auto *f = args.fiber();
+  auto *f = args.get_fiber();
 
 
   std::cout << "panic: " << args[0].to_string(true) << std::endl;
@@ -307,11 +307,7 @@ void bind_os(void) {
   mod->def("CREAT", O_CREAT);
   mod->def("TRUNC", O_TRUNC);
   mod->def("EXCL", O_EXCL);
-  mod->def("SHLOCK", O_SHLOCK);
-  mod->def("EXLOCK", O_EXLOCK);
   mod->def("NOFOLLOW", O_NOFOLLOW);
-  mod->def("SYMLINK", O_SYMLINK);
-  mod->def("EVTONLY", O_EVTONLY);
   mod->def("CLOEXEC", O_CLOEXEC);
 
   define_builtin_module("os-internal", mod);

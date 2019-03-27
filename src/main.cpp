@@ -46,7 +46,6 @@
 #include <typeinfo>
 #define GC_THREADS
 #include <cedar/thread.h>
-#include <ffi/ffi.h>
 #include <gc/gc.h>
 #include <cedar/util.hpp>
 
@@ -158,10 +157,23 @@ int main(int argc, char **argv) {
         rx.history_add(input);
 
         try {
+          // auto start = std::chrono::steady_clock::now();
           cedar::runes r = input;
           ref res = eval_string_in_module(r, repl_mod);
           repl_mod->def("$$", res);
+
+          // auto end = std::chrono::steady_clock::now();
+
+
+
           std::cout << "\x1B[33m" << res << "\x1B[0m" << std::endl;
+
+          
+          /*
+          std::cout
+              << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
+              << "ms" << std::endl;
+          */
 
         } catch (std::exception &e) {
           std::cerr << "Uncaught Exception: " << e.what() << std::endl;

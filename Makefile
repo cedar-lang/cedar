@@ -7,12 +7,12 @@ BINDIR = bin
 
 default:
 	@mkdir -p $(BINDIR)
-	@cd $(BINDIR); cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_DIR=${PWD} ../; make -j
+	@cd $(BINDIR); cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_DIR=${PWD} ../; $(MAKE) -j --no-print-directory
 
 debug:
 	@printf "DEBUG\n"
 	@mkdir -p $(BINDIR)
-	@cd $(BINDIR); cmake -DBUILD_DIR=${PWD} -DCMAKE_BUILD_TYPE=Debug ../; make -j
+	@cd $(BINDIR); cmake -DCMAKE_BUILD_TYPE=Debug -DBUILD_DIR=${PWD} ../; $(MAKE) -j --no-print-directory
 
 
 gen:

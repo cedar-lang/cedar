@@ -77,8 +77,8 @@ cedar::lambda::lambda(bound_function func) {
   code_type = function_binding_type;
   function_binding = [=] (const function_callback & args) -> void {
     call_context c;
-    c.coro = args.fiber();
-    c.mod = args.module();
+    c.coro = args.get_fiber();
+    c.mod = args.get_module();
     args.get_return() = func(args.len(), args.argv(), &c);
   };
 }
@@ -112,7 +112,7 @@ u64 lambda::hash(void) {
 }
 
 lambda *lambda::copy(void) {
-  static std::mutex l;
+  // static std::mutex l;
   lambda *new_lambda = new lambda();
   *new_lambda = *this;
   return new_lambda;

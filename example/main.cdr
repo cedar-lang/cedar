@@ -1,4 +1,5 @@
 (import os)
+
 (import bits)
 
 (def (fact n)
@@ -71,13 +72,9 @@
         (str "{" (brackets (dec n)) "}")))
 
 
-(import tcp)
+
+(defmacro go-forever (& body)
+  `(go (while true (do ~@body))))
 
 
-(def server (tcp.Server (fn (handle)
-                          (println handle))))
-
-
-(. server (listen 8080 "0.0.0.0"))
-
-
+(ofib 27)

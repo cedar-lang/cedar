@@ -78,8 +78,8 @@ namespace cedar {
 
     inline size_t len(void) const { return m_argc; }
     inline ref self(void) const { return m_self; }
-    inline fiber *fiber(void) const { return m_fiber; }
-    inline module *module(void) const { return m_mod; }
+    inline fiber *get_fiber(void) const { return m_fiber; }
+    inline module *get_module(void) const { return m_mod; }
     inline void throw_obj(ref obj) {
       threw = true;
       thrown = obj;

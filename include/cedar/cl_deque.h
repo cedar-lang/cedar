@@ -122,7 +122,6 @@ class cl_deque {
 
   int64_t size(void) {
     int64_t b = bottom.load(std::memory_order_relaxed);
-    std::atomic_thread_fence(std::memory_order_seq_cst);
     int64_t t = top.load(std::memory_order_relaxed);
     return b-t;
   }

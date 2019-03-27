@@ -43,7 +43,6 @@ namespace cedar {
     frame *caller = nullptr;
     call_state call;
     int sp;
-    int fp;
     u8 *ip;
   };
 

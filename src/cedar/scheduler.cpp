@@ -45,26 +45,6 @@
 using namespace cedar;
 
 
-class block_timer {
-  const char *m_msg;
-
-  std::chrono::time_point<std::chrono::system_clock> start;
-
- public:
-  inline block_timer(const char *msg) {
-    m_msg = msg;
-    start = std::chrono::system_clock::now();
-  }
-
-  inline ~block_timer(void) {
-    auto now = std::chrono::system_clock::now();
-    auto d = now - start;
-
-    printf("%15s: %5lldms %12lldns\n", m_msg,
-           std::chrono::duration_cast<std::chrono::milliseconds>(d).count(),
-           std::chrono::duration_cast<std::chrono::nanoseconds>(d).count());
-  }
-};
 
 
 
@@ -94,25 +74,9 @@ static unsigned ncpus = 8;
 static std::mutex worker_thread_mutex;
 static std::vector<worker_thread *> worker_threads;
 static ska::flat_hash_map<std::thread::id, worker_thread *> worker_thread_map;
-
 static std::vector<std::thread> thread_handles;
 
 
-
-
-struct timeslice {
-  u64 start;
-  u64 end;
-  int wid;
-  int jid;
-};
-std::mutex timeline_lock;
-std::vector<timeslice> timeline;
-
-
-
-static std::mutex jid_mutex;
-int next_jid = 0;
 
 
 static worker_thread *lookup_or_create_worker(std::thread::id tid) {
@@ -120,7 +84,6 @@ static worker_thread *lookup_or_create_worker(std::thread::id tid) {
   worker_thread_mutex.lock();
   worker_thread *w = worker_thread_map[tid];
   if (w == nullptr) {
-    // create w
     w = new worker_thread();
     w->tid = tid;
     w->wid = next_wid++;
@@ -136,7 +99,7 @@ void cedar::add_job(fiber *f) {
   // if there is no worker on a fiber, it is a new fiber. Increment the number
   // of jobs
   if (f->worker == nullptr) {
-    jobc++;
+    // jobc++;
   }
   std::lock_guard guard(worker_thread_mutex);
   int ind = rand() % worker_threads.size();
@@ -160,46 +123,22 @@ static std::thread spawn_worker_thread(void) {
 
 
 
-struct inout {
-  int m_id;
-  int ind;
-  void *ptr;
-  inout(int id) {
-    static std::mutex l;
-    static int nind = 0;
 
-    l.lock();
-    ind = nind++;
-    l.unlock();
-    m_id = id;
-    u64 time = std::chrono::duration_cast<std::chrono::microseconds>(
-                   std::chrono::system_clock::now().time_since_epoch())
-                   .count();
-    ptr = lookup_or_create_worker(std::this_thread::get_id());
-    printf("+ %p %d %d %lu\n", ptr, ind, m_id, time);
-  }
 
-  ~inout(void) {
-    u64 time = std::chrono::duration_cast<std::chrono::microseconds>(
-                   std::chrono::system_clock::now().time_since_epoch())
-                   .count();
-    printf("- %p %d %d %lu\n", ptr, ind, m_id, time);
-  }
-};
 
 /**
  * schedule a single job on the caller thread, it's up to the caller to manage
  * where the job goes after the job yields
  */
 void schedule_job(fiber *proc) {
-  // inout p(proc->jid);
-  // std::unique_lock lock(proc->lock);
-  static int sched_time = 2;
+  static int sched_time = 50;
   static bool read_env = false;
-  static const char *SCHED_TIME_ENV = getenv("CDRTIMESLICE");
-  if (SCHED_TIME_ENV != nullptr && !read_env) {
-    sched_time = atol(SCHED_TIME_ENV);
-    // throw cedar::make_exception("$CDRTIMESLICE must be larger than 2ms");
+  if (!read_env) {
+    static const char *SCHED_TIME_ENV = getenv("CDRTIMESLICE");
+    if (SCHED_TIME_ENV != nullptr) sched_time = atol(SCHED_TIME_ENV);
+    if (sched_time < 2) {
+      throw cedar::make_exception("$CDRTIMESLICE must be larger than 2ms");
+    }
   }
   read_env = true;
 
@@ -249,7 +188,6 @@ static void init_scheduler(void) {
   // spawn 'ncpus' worker threads
   for (unsigned i = 0; i < ncpus; i++) {
     auto t = spawn_worker_thread();
-
     t.detach();
   }
 }
@@ -258,68 +196,50 @@ static void init_scheduler(void) {
 
 
 void cedar::schedule(worker_thread *worker, bool internal_worker) {
-  static std::mutex l;
   if (worker == nullptr) {
     worker = lookup_or_create_worker(std::this_thread::get_id());
   }
 
   bool steal = true;
-
+  bool wait_for_work_cv = true;
   size_t pool_size = 0;
   int i1, i2;
   worker_thread *w1, *w2;
 
 TOP:
 
-
-#ifdef SHOW_WORK_COUNT
-  worker_thread_mutex.lock();
-  int c = 0;
-  for (auto w : worker_threads) {
-    c += w->local_queue.size();
-  }
-  worker_thread_mutex.unlock();
-
-#endif
-
   // work is the thing that will eventually be done, while looking for work,
   // it will be set and checked for equality to nullptr. If at any point it
   // is not nullptr, it will immediately be scheduled.
   fiber *work = nullptr;
-
-
   // first check the local queue
   work = worker->local_queue.steal();
   if (work != nullptr) goto SCHEDULE;
-
   if (steal) {
     worker_thread_mutex.lock();
     // now look through other threads in the thread pool for work to steal
     pool_size = worker_threads.size();
-
     i1 = rand() % pool_size;
     i2 = rand() % pool_size;
     w1 = worker_threads[i1];
     w2 = worker_threads[i2];
-    worker_thread_mutex.unlock();
-
     if (w1->local_queue.size() > w2->local_queue.size()) {
       work = w1->local_queue.steal();
     } else {
       work = w2->local_queue.steal();
     }
-
+    worker_thread_mutex.unlock();
     if (work != nullptr) {
       goto SCHEDULE;
     }
   }
 
-
   if (internal_worker) {
-    std::unique_lock lk(worker->lock);
-    worker->work_cv.wait_for(lk, std::chrono::milliseconds(2));
-    lk.unlock();
-    // usleep(2000);
+    if (wait_for_work_cv) {
+      std::unique_lock lk(worker->lock);
+      worker->work_cv.wait_for(lk, std::chrono::milliseconds(2));
+      lk.unlock();
+    }
     goto TOP;
   }
 
@@ -328,27 +248,21 @@ TOP:
 SCHEDULE:
 
   work->worker = worker;
-
+  worker->ticks++;
   schedule_job(work);
 
   bool replace = true;
 
   auto state = work->state.load();
 
-  if (state == STOPPED || state == BLOCKING) {
-    replace = false;
-  }
+  if (state == STOPPED || state == BLOCKING) replace = false;
+  // if (state == STOPPED) jobc--;
 
-  if (state == STOPPED) {
-    jobc--;
-  }
-
-  worker->ticks++;
 
   // since we did some work, we should put it back in the local queue
   // but only if it isn't done.
   if (replace) {
-    if (worker->local_queue.size() == 0) {
+    if (false || worker->local_queue.size() == 0) {
       goto SCHEDULE;
     }
     // add_job(work);
@@ -381,6 +295,27 @@ void cedar::init(void) {
   type_init();
   init_binding(nullptr);
   bind_stdlib();
+
+
+  /*
+  std::thread([]() {
+    while (true) {
+      int total = 0;
+      for (int i = 0; i < worker_threads.size(); i++) {
+        int c = worker_threads[i]->local_queue.size();
+        total += c;
+        printf("%5d ", c);
+      }
+      printf("  avg = %d", total / (int)worker_threads.size());
+      printf(" total = %d", total);
+      printf("\n");
+      usleep(10000);
+    }
+  })
+      .detach();
+  */
+
+
   core_mod = require("core");
 }
 
@@ -398,10 +333,9 @@ ref cedar::eval_lambda(call_state call) {
   fiber f(call);
   worker_thread *my_worker =
       lookup_or_create_worker(std::this_thread::get_id());
-  my_worker->local_queue.push(&f);
-  while (!f.done) {
-    schedule(my_worker);
-  }
+  add_job(&f);
+  // my_worker->local_queue.push(&f);
+  while (!f.done) schedule(my_worker);
   return f.return_value;
 }
 
