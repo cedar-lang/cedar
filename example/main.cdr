@@ -76,5 +76,24 @@
 (defmacro go-forever (& body)
   `(go (while true (do ~@body))))
 
+(def (lazy-filter pred coll)
+  (if (nil? coll) nil
+    (let (f (first coll)
+          r (rest coll))
+      (if (pred f)
+        (lazily (cons f (lazy-filter pred r)))
+        (lazy-filter pred r)))))
 
-(ofib 27)
+
+
+(def (prime-filter p)
+  (fn (x) (not= (mod x p) 0)))
+
+(def (sieve _ps)
+  (let (p  (first _ps)
+        ps (rest _ps))
+    (lazily (cons p (sieve (lazy-filter (prime-filter p) ps))))))
+
+
+
+(def primes (sieve (walk 2)))

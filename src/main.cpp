@@ -162,14 +162,10 @@ int main(int argc, char **argv) {
           ref res = eval_string_in_module(r, repl_mod);
           repl_mod->def("$$", res);
 
-          // auto end = std::chrono::steady_clock::now();
-
-
-
           std::cout << "\x1B[33m" << res << "\x1B[0m" << std::endl;
 
-          
           /*
+          auto end = std::chrono::steady_clock::now();
           std::cout
               << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
               << "ms" << std::endl;
