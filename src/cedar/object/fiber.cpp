@@ -54,7 +54,7 @@ static frame *alloc_frame(void) {
 }
 
 static void dispose_frame(frame *f) {
-  delete f;
+  //delete f;
 }
 
 

@@ -20,6 +20,13 @@ add_definitions(-DPOINTER_MASK=0x0000FFFFFFFFFFFF)
 
 # build dependencies before setting up project deets
 add_subdirectory(dep/libuv)
+
+
+set(BUILD_SHARED_LIBS OFF)
+
+option(REPLXX_BuildExamples "Build the examples." OFF)
+set(REPLXX_BuildExamples OFF)
+
 add_subdirectory(dep/replxx)
 # add_subdirectory(dep/bdwgc EXCLUDE_FROM_ALL)
 

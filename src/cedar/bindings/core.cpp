@@ -30,6 +30,7 @@
 #include <cedar/object/module.h>
 #include <cedar/object/string.h>
 #include <cedar/object/vector.h>
+
 #include <cedar/objtype.h>
 #include <cedar/scheduler.h>
 #include <cedar/vm/binding.h>

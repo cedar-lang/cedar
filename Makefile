@@ -7,12 +7,12 @@ BINDIR = bin
 
 default:
 	@mkdir -p $(BINDIR)
-	@cd $(BINDIR); cmake -G "Ninja"  -DCMAKE_BUILD_TYPE=Release -DBUILD_DIR=${PWD} ../; ninja
+	@cd $(BINDIR); cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_DIR=${PWD} ../; make -j
 
 debug:
 	@printf "DEBUG\n"
 	@mkdir -p $(BINDIR)
-	@cd $(BINDIR); cmake -G "Ninja" -DBUILD_DIR=${PWD} -DCMAKE_BUILD_TYPE=Debug ../; ninja
+	@cd $(BINDIR); cmake -DBUILD_DIR=${PWD} -DCMAKE_BUILD_TYPE=Debug ../; make -j
 
 
 gen:
