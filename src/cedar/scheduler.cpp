@@ -309,12 +309,10 @@ void cedar::init(void) {
       printf("  avg = %d", total / (int)worker_threads.size());
       printf(" total = %d", total);
       printf("\n");
-      usleep(10000);
+      usleep(1000);
     }
-  })
-      .detach();
+  }).detach();
   */
-
 
   core_mod = require("core");
 }

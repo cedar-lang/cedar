@@ -41,6 +41,7 @@
 #include <unistd.h>
 #include <regex>
 #include <thread>
+#include <cedar/mutex.h>
 
 #include <gc/gc.h>
 
@@ -504,6 +505,7 @@ std::vector<cedar::runes> regex_matches(
 }
 
 
+static std::mutex print_mutex;
 
 
 void init_binding(cedar::vm::machine *m) {
@@ -552,21 +554,25 @@ void init_binding(cedar::vm::machine *m) {
 
 
   def_global("println", bind_lambda(argc, argv, machine) {
+    print_mutex.lock();
     for (int i = 0; i < argc; i++) {
       std::string s = argv[i].to_string(true);
       printf("%s", s.c_str());
       if (i < argc-1) printf(" ");
     }
     printf("\n");
+    print_mutex.unlock();
     return nullptr;
   });
 
   def_global("print", bind_lambda(argc, argv, machine) {
+      print_mutex.lock();
     for (int i = 0; i < argc; i++) {
       std::string s = argv[i].to_string(true);
       printf("%s", s.c_str());
       if (i < argc-1) printf(" ");
     }
+    print_mutex.unlock();
     return nullptr;
   });
 
@@ -691,16 +697,6 @@ void init_binding(cedar::vm::machine *m) {
   });
 
 
-
-  def_global("go*", bind_lambda(argc, argv, machine) {
-    ref fn = argv[0];
-    if (fn.get_type() == lambda_type) {
-      fiber *fi = new fiber(fn.as<lambda>()->prime(0, nullptr));
-      add_job(fi);
-      return fi;
-    }
-    throw cedar::make_exception("go* requires a lambda as an argument");
-  });
 
 
   // this is really dumb, but it works

@@ -10,8 +10,8 @@
  * copies of the Software, and to permit persons to whom the Software is
  * furnished to do so, subject to the following conditions:
  *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
  *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -22,4 +22,37 @@
  * SOFTWARE.
  */
 
-#define CEDAR_VERSION "0.8.9"
+
+#pragma once
+
+#ifndef _CDRMUTEX
+#define _CDRMUTEX
+
+#include <cedar/scheduler.h>
+
+namespace cedar {
+
+  class mutex {
+    std::mutex m_lock;
+
+    public:
+    inline void lock(void) {
+      while (m_lock.try_lock()) {
+        schedule();
+      }
+      return;
+    }
+
+    inline void unlock(void) {
+      m_lock.unlock();
+    }
+
+    inline bool try_lock(void) {
+      return m_lock.try_lock();
+    }
+  };
+
+};
+
+
+#endif

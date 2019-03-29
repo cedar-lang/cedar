@@ -154,7 +154,7 @@ void lambda::set_args_closure(closure *c, int a_argc, ref *a_argv) {
       if (a_argc != argc) {
         throw cedar::make_exception(
             "invalid arg count passed to function. given: ", a_argc,
-            " expected: ", argc, " - ", this->to_string());
+            ". ", this->to_string());
       }
     }
 
@@ -179,6 +179,7 @@ call_state lambda::prime(int a_argc, ref *a_argv) {
   call_state p;
   p.func = this;
   p.locals = new closure(argc, m_closure, arg_index);
+  p.locals->func = this;
   // printf("%p %p\n", p.func, p.locals);
   set_args_closure(p.locals, a_argc, a_argv);
   return p;

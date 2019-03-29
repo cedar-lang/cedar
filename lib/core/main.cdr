@@ -38,6 +38,7 @@
                 (cons 'do body)))))
 
 
+
 (def* t 't)
 
 ;; have true and false resolve to themselves.
@@ -47,6 +48,8 @@
 ;; thing to have
 (def* true 'true)
 (def* false 'false)
+
+
 
 
 ;; define dumb logical operators. These will be replaced
@@ -261,12 +264,14 @@
 
 
 
-
-(def (put item coll)
+(defn put [coll item]
   (. coll (put item)))
-(def (pop coll)
+
+
+(defn pop [coll]
   (. coll (pop)))
-(def (peek coll)
+
+(defn peek [coll]
   (. coll (peek)))
 
 
@@ -283,19 +288,16 @@
 (def (constantly x)
   (fn (& a) x))
 
-;; TODO: add this to the stdlib
 (def (contains? coll k)
   (cond (nil? coll) false
         (= (first coll) k) true
         :otherwise (recur (rest coll) k)))
 
-;; TODO: add to stdlib
 (def (contains-where? coll pred)
   (cond (nil? coll) nil
         (pred (first coll)) true
         :otherwise (recur (rest coll) pred)))
 
-;; TODO: add all flavours to stdlib
 (def (contains-number? coll)
   (contains-where? coll number?))
 
@@ -514,11 +516,22 @@
                ((fn ~names (do ~@body)) ~@names))
            (map nilify names)))))
 
+(defmacro loop (defs & body)
+  (do (when (odd? (len defs))
+            (throw (str "Error in loop syntax. bindings must be of even length: " defs "")))
+      `(LET ~(partition 2 defs) ~@body)))
+
+
+
 (defmacro let (defs & body)
   (do (when (odd? (len defs))
             (throw (str "Error in let syntax. bindings must be of even length: " defs "")))
-      `(LET ~(partition 2 defs) ~@body)))
-
+      (let* ((bindings (partition 2 defs)))
+        (let* ((names (map first bindings))
+               (vals (map second bindings)))
+          `(scope* ~(apply vector names)
+                   (do ~@(map (fn (x) (cons 'def x)) bindings)
+                       ~@body))))))
 
 
 
@@ -569,6 +582,12 @@
 
 (import _core for *)
 
+
+
+(defmacro scope (vars & body)
+  (if (not (vector? vars))
+    (throw "scope macro requires a vector of variable names")
+    `(scope* ~vars (do ~@body))))
 
 
 
@@ -900,3 +919,136 @@
              (go (send (func x) ch))
              ch))
          xs)))
+
+
+(defn int [n] (bits.or n 0))
+(defn float [n] (+ n 0.0))
+
+
+(defn- char-is-number? [c]
+  (contains? "0123456789" c))
+
+
+;; (format "1 2 {} 4" 3) -> "1 2 3 4"
+
+(defn- svprintf [fmt args]
+  (let [buf ""]
+
+    (while (not (nil? fmt))
+      (let [c (first fmt)]
+        (cond (= c "%") (do (def fmt (rest fmt))
+                            (cond (= (first fmt) "s") (do (+= buf (str (first args)))
+                                                          (def args (rest args)))
+                                  (= (first fmt) "r") (do (+= buf (repr (first args)))
+                                                          (def args (rest args)))
+                                  (= (first fmt) "d") (do (if (number? (first args))
+                                                            (+= buf (int (first args)))
+                                                            (throw "d format directive requires a number"))
+                                                          (def args (rest args)))
+                                  (= (first fmt) "f") (do (if (number? (first args))
+                                                            (+= buf (float (first args)))
+                                                            (throw "f format directive requires a number"))
+                                                          (def args (rest args)))
+                                  (= (first fmt) "%") (+= buf "%")
+                                  :else (throw (str "Unknown format directive %" (first fmt))))
+                            (def fmt (rest fmt)))
+              :else (do (+= buf c)
+                        (def fmt (rest fmt))))))
+
+    (return buf)))
+
+(defn printf [fmt & args]
+    (print (svprintf fmt args)))
+
+(defn format [fmt & args]
+  (svprintf fmt args))
+
+
+
+(def next rest)
+
+(defn some [pred coll]
+  (when coll
+    (or (pred (first coll))
+        (some pred (rest coll)))))
+
+(defn seq [x] x)
+
+(defn destructure [bindings]
+  (let [bents (partition 2 bindings)
+        pb (fn (bvec b v)
+             (let [pvec (fn (bvec b val)
+                          (let [gvec (gensyms "vec__")
+                                gseq (gensyms "seq__")
+                                gfirst (gensyms "first__")
+                                has-rest (some (fn (x) (get {'& true} x false)) b)]
+                            (let [ret (let [ret (put (put bvec gvec) val)]
+                                        (if has-rest
+                                          (put (put ret gseq) (list 'seq gvec))
+                                          ret))
+                                  n 0
+                                  bs b
+                                  seen-rest? false]
+                               (if (not bs)
+                                  ret
+                                  (let [firstb (first bs)]
+                                    (cond
+                                      (= firstb '&) (recur (pb ret (second bs) gseq)
+                                                          n
+                                                          (rest (rest bs))
+                                                          true)
+                                      (= firstb :as) (pb ret (second bs) gvec)
+                                      :else (if seen-rest?
+                                              (throw (format "Unsupported binding form, only :as can follow & parameter"))
+                                              (recur (pb (if has-rest
+                                                              (-> ret
+                                                                  (put gfirst)
+                                                                  (put `(first ~gseq))
+                                                                  (put gseq)
+                                                                  (put `(rest ~gseq)))
+                                                              ret)
+                                                        firstb
+                                                        (if has-rest
+                                                          gfirst
+                                                          ;; TODO: determine if
+                                                          ;; get needs to be get
+                                                          ;; or not instead
+                                                          (list 'get gvec n nil)))
+                                                    (inc n)
+                                                    (next bs)
+                                                    seen-rest?))))))))]
+
+              (cond
+                 (symbol? b) (-> bvec (put b) (put v))
+                 (vector? b) (pvec bvec b v)
+                 :else (throw (format "Unsupported binding form: %s" b)))))
+        process-entry (fn (bvec b) (pb bvec (first b) (second b)))]
+    (if (every? symbol? (map first bents))
+      bindings
+      (reduce process-entry [] bents))))
+
+
+
+
+
+
+
+
+(defmacro for
+  (seq-exprs body-expr)
+  (let [to-groups (fn (seq-exprs) (reduce (fn (groups _vk)
+                                            (let [v (first _vk)
+                                                  k (second _vk)]
+                                              (if (keyword? k)
+                                                (put (pop groups) (put (peek groups) [k v]))
+                                                (put groups [k v]))))
+                                     [] (partition 2 seq-exprs)))
+
+
+        err (fn (& msg) (throw (format "Illegal Arguments to for: %s" (apply str msg))))
+
+        emit-bind (fn (_arg)
+                    (let))]
+
+    `(let [iter# ~(emit-bind (to-groups seq-exprs))]
+        (iter# ~(second seq-exprs)))))

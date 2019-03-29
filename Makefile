@@ -1,9 +1,6 @@
-
 .PHONY: clean install gen debug
 
 BINDIR = bin
-
-
 
 default:
 	@mkdir -p $(BINDIR)

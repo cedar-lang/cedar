@@ -86,12 +86,8 @@ void type::set_field(cedar::runes k, bound_function val) {
 static cedar_binding(type_str_lambda) {
   type *self = argv[0].stat_cast<type *>();
   cedar::runes s;
-  s += "<type '";
+  s += "<type ";
   s += self->m_name;
-  s += "' at ";
-  char buf[20];
-  sprintf(buf, "%p", self);
-  s += buf;
   s += ">";
   return new string(s);
 };

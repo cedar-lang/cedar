@@ -38,11 +38,9 @@ static gc_startup init;
 
 
 void* operator new(size_t size) {
-  // printf("%50zu\n", size);
   return allocate(size);
 }
 void* operator new[](size_t size) {
-  // printf("%50zu\n", size);
   return allocate(size);
 }
 

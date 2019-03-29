@@ -316,6 +316,46 @@ void vm::compiler::compile_list(ref obj, vm::bytecode &code, scope *sc,
   }
 
 
+  if (list_is_call_to("scope*", obj)) {
+    ref rvars = obj.rest().first();
+    ref rbody = obj.rest().rest().first();
+
+    vector *vars = ref_cast<vector>(rvars);
+    auto argc = vars->size();
+
+
+    scope *new_scope = new scope(sc);
+
+    compiler_ctx new_ctx;
+    new_ctx.closure_size = ctx->closure_size;
+    int arg_index = ctx->closure_size;
+
+    for (int i = 0; i < argc; i++) {
+      ref arg = vars->get(i);
+
+      if (auto *sym = ref_cast<cedar::symbol>(arg); sym != nullptr) {
+        new_scope->set(arg, new_ctx.closure_size);
+        new_ctx.closure_size++;
+      } else {
+        if (arg.is_nil()) {
+          throw cedar::make_exception("scope* arguments must be symbols: ",
+                                      obj);
+        }
+      }
+    }
+
+    code.write_op(OP_INT, arg_index);
+    code.write_op(OP_INT, new_ctx.closure_size);
+    code.write_op(OP_MAKE_SCOPE);
+
+    compile_object(rbody, code, new_scope, &new_ctx);
+
+    code.write_op(OP_POP_SCOPE);
+    return;
+  }
+
+
+
   if (list_is_call_to("+", obj)) {
     obj = obj.rest();
     if (obj.is_nil()) {

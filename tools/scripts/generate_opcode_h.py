@@ -58,6 +58,10 @@ new_op('CALL_EXCEPTIONAL', 'imm_int', effect=0)
 new_op('MAKE_FUNC', 'imm_int', effect=1)
 
 
+new_op('MAKE_SCOPE', effect=0);
+new_op('POP_SCOPE', effect=0);
+
+
 # arg_pop pops one value from the argument list and updates the list
 # at the argument index in the stack call frame
 new_op('ARG_POP', 'imm_int', effect=1);
@@ -91,6 +95,9 @@ new_op('LOAD_SELF', effect=1)
 
 new_op('RECV', effect=0)
 new_op('SEND', effect=0)
+
+
+
 
 def main(outfile):
     with open(outfile, 'w') as f:

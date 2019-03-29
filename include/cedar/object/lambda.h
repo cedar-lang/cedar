@@ -102,6 +102,7 @@ namespace cedar {
     i32 m_size = 0;
     i32 m_index = 0;
     closure *m_parent;
+    lambda *func = nullptr;
 
     std::vector<ref> m_vars;
     // constructor to allocate n vars of closure space

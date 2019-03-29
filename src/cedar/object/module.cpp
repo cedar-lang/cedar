@@ -50,13 +50,15 @@ void module::def(std::string name, ref val) {
 
 void module::def(std::string name, bound_function val) {
   u64 id = symbol::intern(name);
-  ref func = new lambda(val);
+  lambda *func = new lambda(val);
+  func->name = new symbol(name);
   setattr_fast(id, func);
 }
 
 void module::def(std::string name, native_callback val) {
   u64 id = symbol::intern(name);
-  ref func = new lambda(val);
+  lambda *func = new lambda(val);
+  func->name = new symbol(name);
   setattr_fast(id, func);
 }
 

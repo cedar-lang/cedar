@@ -102,17 +102,49 @@ frame *fiber::pop_call_frame(void) {
 
 
 
+static std::mutex jid_mutex;
+static int next_jid = 0;
 
 fiber::fiber(call_state entry) {
-  static std::mutex jid_mutex;
-  static int next_jid = 0;
-
   m_type = fiber_type;
-  add_call_frame(entry);
 
   jid_mutex.lock();
   jid = next_jid++;
   jid_mutex.unlock();
+
+
+  add_call_frame(entry);
+}
+
+fiber::fiber(fiber *other) {
+  m_type = fiber_type;
+  jid_mutex.lock();
+  jid = next_jid++;
+  jid_mutex.unlock();
+
+  stack = new ref[other->stack_size];
+  stack_size = other->stack_size;
+
+  for (int i = 0; i < stack_size; i++) stack[i] = other->stack[i];
+
+  call_stack = new frame();
+
+  auto *s = call_stack;
+  auto *o = other->call_stack;
+  while (o != nullptr) {
+    *s = *o;
+    s->caller = new frame();
+    s = s->caller;
+    o = o->caller;
+  }
+
+  done = other->done;
+  return_value = other->return_value;
+  sleep = other->sleep;
+  ticks = other->ticks;
+  reductions = other->reductions;
+  state = other->state.load();
+  worker = nullptr;
 }
 
 
@@ -181,12 +213,12 @@ void fiber::run(int max_ms) {
 
 
 
-#define LOAD_CTX()                 \
-  sp = call_stack->sp;             \
+#define LOAD_CTX()     \
+  sp = call_stack->sp; \
   ip = call_stack->ip;
 
-#define STORE_CTX()                \
-  call_stack->sp = sp;             \
+#define STORE_CTX()    \
+  call_stack->sp = sp; \
   call_stack->ip = ip;
 
   LOAD_CTX();
@@ -237,6 +269,10 @@ void fiber::run(int max_ms) {
     SET_LABEL(OP_APPEND);
     SET_LABEL(OP_CALL);
     SET_LABEL(OP_MAKE_FUNC);
+
+    SET_LABEL(OP_MAKE_SCOPE);
+    SET_LABEL(OP_POP_SCOPE);
+
     SET_LABEL(OP_RETURN);
     SET_LABEL(OP_EXIT);
     SET_LABEL(OP_SKIP);
@@ -310,9 +346,7 @@ loop:
     }
 
 
-    TARGET(OP_NOP) {
-      DISPATCH;
-    }
+    TARGET(OP_NOP) { DISPATCH; }
 
     TARGET(OP_NIL) {
       PRELUDE;
@@ -542,6 +576,22 @@ loop:
     }
 
 
+    TARGET(OP_MAKE_SCOPE) {
+      PRELUDE;
+      auto size = POP().to_int();
+      auto ind = POP().to_int();
+      call_stack->call.locals = new closure(size, call_stack->call.locals, ind);
+      DISPATCH;
+    }
+
+
+    TARGET(OP_POP_SCOPE) {
+      PRELUDE;
+      call_stack->call.locals = call_stack->call.locals->m_parent;
+      DISPATCH;
+    }
+
+
 
 
     TARGET(OP_RETURN) {
@@ -617,6 +667,10 @@ loop:
 
       int abp = sp - argc; /* argumement base pointer, represents the base
                               of the argument list */
+
+      while (LOCALS()->func == nullptr) {
+        LOCALS() = LOCALS()->m_parent;
+      }
 
       PROG()->set_args_closure(LOCALS(), argc, stack + abp);
       ip = PROG()->code->code;

@@ -18,3 +18,8 @@
     [(- (* (y U) (z V)) (* (z U) (y V)))
      (- (* (z U) (x V)) (* (x U) (z V)))
      (- (* (x U) (y V)) (* (y U) (x V)))]))
+
+(defn- square [x] (* x x))
+
+(defn mag [V]
+  (sqrt (reduce + 0 (map square V))))

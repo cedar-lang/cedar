@@ -49,6 +49,7 @@
 #include "cedar/memory.h"
 #include "cedar/object.h"
 #include "cedar/runes.h"
+#include "cedar/mutex.h"
 #include "cedar/fractional.h"
 #include "cedar/ref.h"
 #include "cedar/vm/compiler.h"

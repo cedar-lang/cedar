@@ -42,7 +42,6 @@ namespace cedar {
 		// forwared declaration
 
 		struct compiler_ctx {
-      bool inside_catch = false;
 			u64 closure_size = 0;
 			u16 lambda_depth = 0;
 		};

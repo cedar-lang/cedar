@@ -43,7 +43,7 @@ using namespace cedar;
 
 void bind_core(void) {
   module *mod = new module("_core");
-  mod->def("hash", [&] (const function_callback & args) {
+  mod->def("hash", [=] (const function_callback & args) {
         if (args.len() != 1) {
           throw make_exception("hash requires 1 argument");
         }
@@ -51,5 +51,24 @@ void bind_core(void) {
       });
 
 
+
+  mod->def("go*", [=] (const function_callback & args) {
+    if (args.len() != 1) {
+      return;
+    }
+
+    lambda *fn = ref_cast<lambda>(args[0]);
+    if (fn == nullptr) {
+      // throw here
+      return;
+    }
+
+    fiber *c = new fiber(fn->prime());
+    add_job(c);
+    args.get_return() = c;
+  });
+
+  // the name "_core" is used so the core file can include it and spread
+  // it into the actual core module
   define_builtin_module("_core", mod);
 }

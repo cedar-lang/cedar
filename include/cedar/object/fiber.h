@@ -87,6 +87,7 @@ namespace cedar {
     int fid = 0;
 
     fiber(call_state);
+    fiber(fiber *);
     ~fiber(void);
 
     int get_state(void);

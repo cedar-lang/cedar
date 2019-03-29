@@ -18,6 +18,7 @@
   (lazily (cons start (walk (inc start)))))
 
 
+
 (def (hexchar x)
   (get "0123456789ABCDEF" (bits.and x 0x0F)))
 
@@ -85,7 +86,6 @@
         (lazy-filter pred r)))))
 
 
-
 (def (prime-filter p)
   (fn (x) (not= (mod x p) 0)))
 
@@ -97,3 +97,12 @@
 
 
 (def primes (sieve (walk 2)))
+
+
+(defn go-each [xs f]
+  (if (nil? xs)
+    nil
+    (do (let [elm (first xs)] (go (f elm)))
+        (recur (rest xs) f))))
+
+(defn square [x] (* x x))
