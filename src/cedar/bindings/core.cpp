@@ -30,36 +30,38 @@
 #include <cedar/object/module.h>
 #include <cedar/object/string.h>
 #include <cedar/object/vector.h>
+#include <cedar/serialize.h>
 
+#include <cedar/jit.h>
 #include <cedar/objtype.h>
 #include <cedar/scheduler.h>
 #include <cedar/vm/binding.h>
 #include <uv.h>
 
 
+
 using namespace cedar;
-
-
-
 void bind_core(void) {
+
   module *mod = new module("_core");
-  mod->def("hash", [=] (const function_callback & args) {
-        if (args.len() != 1) {
-          throw make_exception("hash requires 1 argument");
-        }
-        args.get_return() = (i64)args[0].hash();
-      });
-
-
-
-  mod->def("go*", [=] (const function_callback & args) {
+  mod->def("hash", [=](const function_callback &args) {
     if (args.len() != 1) {
+      args.throw_obj(new string("hash requires 1 argument"));
+    }
+    args.get_return() = (i64)args[0].hash();
+  });
+
+
+
+  mod->def("go*", [=](const function_callback &args) {
+    if (args.len() != 1) {
+      args.throw_obj(new string("go requires a lambda as its argument"));
       return;
     }
 
     lambda *fn = ref_cast<lambda>(args[0]);
     if (fn == nullptr) {
-      // throw here
+      args.throw_obj(new string("go requires a lambda as its argument"));
       return;
     }
 
@@ -68,7 +70,39 @@ void bind_core(void) {
     args.get_return() = c;
   });
 
+
+
+
+  mod->def("enc", [=](const function_callback &args) {
+    ref thing = args[0];
+    FILE *fp = fopen("enc-test", "wc");
+    serializer s(fp);
+    s.write(thing);
+    fclose(fp);
+  });
+
+
+  mod->def("denc", [=](const function_callback &args) {
+    FILE *fp = fopen("enc-test", "r");
+    serializer s(fp);
+    ref thing = s.read();
+    fclose(fp);
+
+    args.get_return() = thing;
+  });
+
+  
+  /*
+  lambda *fn = jit::compile(nullptr, nullptr);
+  mod->def("jittest", fn);
+  */
+
+
   // the name "_core" is used so the core file can include it and spread
   // it into the actual core module
   define_builtin_module("_core", mod);
 }
+
+
+
+

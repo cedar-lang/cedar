@@ -36,8 +36,8 @@
 #include <cedar/types.h>
 #include <cxxabi.h>
 #include <bitset>
-#include <mutex>
 #include <cedar/exception.hpp>
+#include <mutex>
 
 namespace cedar {
 
@@ -55,78 +55,68 @@ namespace cedar {
   object *get_nil_object(void);
   u64 get_object_hash(object *);
 
-#define FLAG_FLT 2
-#define FLAG_INT 3
-#define FLAG_OBJ 4
 
-  enum ref_type {
-    ref_obj,
-    ref_int,
-    ref_flt,
-    ref_ptr,  // unknown ref, just a voidptr
-  };
+#define BIT_READ(x,y) ((0u == (x & (1l<<y)))?0u:1u)
+#define BIT_SET(number, bit) ((number) |= (1l<<(bit)))
+#define BIT_CLR(number, bit) ((number) &= (~(1l<<(bit))))
+
+
 
   class ref {
-   protected:
-    std::bitset<8> flags;
+   public:
+
+
+#ifdef COMPRESSED_REF
+#define FLAG_FLOAT 63
+#define FLAG_INT 62
     union {
-      i64 m_int;
-      f64 m_flt;
       object *m_obj;
-      void *m_ptr;
-      fractional m_frac;
+      int64_t m_flags;
+#pragma pack(push, 1)
+      struct {
+        union {
+          int32_t m_int;
+          float m_flt;
+        };
+        int32_t __buffer;
+      };
+#pragma pack(pop)
     };
+#else
+
+#define FLAG_FLOAT 7
+#define FLAG_INT 6
+
+    union {
+      object *m_obj;
+      int64_t m_int;
+      double m_flt;
+    };
+    u8 m_flags;
+
+#endif
+     /*
+    */
 
    public:
-    inline ~ref() {}
+    ref();
+    ref(object *o);
+    ref(double d);
+    ref(i64 i);
+    ref(int i);
 
-    inline ref() {
-      clear_type_flags();
-      flags[FLAG_OBJ] = true;
-      m_obj = nullptr;
-    }
-
-    inline ref(object *o) {
-      clear_type_flags();
-      store_obj(o);
-    }
-
-    inline ref(double d) {
-      clear_type_flags();
-      flags[FLAG_FLT] = true;
-      m_flt = d;
-    }
-
-    inline ref(i64 i) {
-      clear_type_flags();
-      flags[FLAG_INT] = true;
-      m_int = i;
-    }
-
-    inline ref(int i) {
-      clear_type_flags();
-      flags[FLAG_INT] = true;
-      m_int = i;
-    }
-
-    inline ref_type rtype(void) {
-      if (is_obj()) return ref_obj;
-      if (is_flt()) return ref_flt;
-      if (is_int()) return ref_int;
-      return ref_obj;
-    };
 
     inline bool is_number(void) const { return is_flt() || is_int(); }
-    inline bool is_flt(void) const { return flags[FLAG_FLT]; }
-    inline bool is_int(void) const { return flags[FLAG_INT]; }
-    inline bool is_obj(void) const { return flags[FLAG_OBJ]; }
+    inline bool is_flt(void) const { return BIT_READ(m_flags, FLAG_FLOAT); }
+    inline bool is_int(void) const { return BIT_READ(m_flags, FLAG_INT); }
+    inline bool is_obj(void) const {
+      return !is_flt() && !is_int();
+    }
 
     // clear all the type flags. Useful when changing
     // the value stored inside the ref
     inline void clear_type_flags(void) {
-      flags[FLAG_OBJ] = 0;
-      flags[FLAG_FLT] = 0;
-      flags[FLAG_INT] = 0;
+      m_flags = 0;
     }
 
     bool is_nil(void) const;
@@ -135,43 +125,29 @@ namespace cedar {
     inline ref(ref &&other) { operator=(other); }
 
 
-    inline object *get(void) {
-      return is_obj() ? m_obj : nullptr;
-    }
+    inline object *get(void) { return is_obj() ? m_obj : nullptr; }
 
     inline ref &operator=(const ref &other) {
-      if (other.is_obj()) {
-        store_obj(other.m_obj);
-      } else {
-        // otherwise, copy the whole block of memory
-        m_int = other.m_int;
-      }
-      // copy over the flags
-      flags = other.flags;
+      m_obj = other.m_obj;
+      m_flags = other.m_flags;
       return *this;
     }
 
     inline ref &operator=(ref &&other) {
-      if (other.is_obj()) {
-        store_obj(other.m_obj);
-      } else {
-        // otherwise, copy the whole block of memory
-        m_int = other.m_int;
-      }
-      // copy over the flags
-      flags = other.flags;
+      m_obj = other.m_obj;
+      *this = other;
       return *this;
     }
 
     inline ref &operator=(object *o) {
-      store_obj(o);
+      m_obj = o;
+      m_flags = 0;
       return *this;
     }
 
     inline void store_obj(object *a_obj) {
       m_obj = a_obj;
-      clear_type_flags();
-      flags[FLAG_OBJ] = true;
+      m_flags = 0;
     }
 
     inline object *operator*() const {
@@ -236,7 +212,7 @@ namespace cedar {
     template <typename T>
     inline T *as() const {
       if (is_obj()) {
-        return static_cast<T*>(m_obj);
+        return static_cast<T *>(m_obj);
       }
       return nullptr;
     }

@@ -198,8 +198,9 @@ static cedar_binding(os_getenv) {
 }
 
 
-static void os_panic(const function_callback& args) {
-  if (args.len() != 1) throw cedar::make_exception("os.panic requires 1 argument");
+static void os_panic(const function_callback &args) {
+  if (args.len() != 1)
+    throw cedar::make_exception("os.panic requires 1 argument");
 
   auto *f = args.get_fiber();
 
@@ -211,7 +212,7 @@ static void os_panic(const function_callback& args) {
   exit(-1);
 }
 
-static void os_exit(const function_callback& args) {
+static void os_exit(const function_callback &args) {
   if (args.len() >= 1)
     throw cedar::make_exception("os.exit requires 0 or 1 argument");
   if (args.len() == 1) {
@@ -223,7 +224,7 @@ static void os_exit(const function_callback& args) {
 
 
 
-static void os_hardware_concurrency(const function_callback& args) {
+static void os_hardware_concurrency(const function_callback &args) {
   args.get_return() = (int)std::thread::hardware_concurrency();
 }
 
@@ -250,8 +251,7 @@ static void on_fs_open(uv_fs_t *req) {
   add_job(f);
 }
 
-static void os_open_raw(const function_callback & args) {
-
+static void os_open_raw(const function_callback &args) {
   if (args.len() != 3)
     throw cedar::make_exception(
         "os.open requires 2 arguments: (os.open-raw path mode-bits callback)");
@@ -267,17 +267,110 @@ static void os_open_raw(const function_callback & args) {
     memcpy(p, s.c_str(), s.size());
     uv_fs_open(loop, open_req, p, mode, 0, on_fs_open);
   });
-
 }
 
 
 
-static void test(const function_callback& args) {
-  args.get_return() = (int)args.len();
+
+void os_write_raw(const function_callback &args) {
+  // TODO:
 }
 
+
+struct read_req_data {
+  lambda *cb;
+  uv_buf_t buffer;
+};
+
+
+static void on_read_raw(uv_fs_t *req) {
+  auto *data = (read_req_data *)req->data;
+
+  ref content = nullptr;
+  ref err = nullptr;
+
+  if (req->result < 0) {
+    err = new string(uv_strerror(req->result));
+  } else {
+    if (req->result != 0) {
+      content = new string(data->buffer.base);
+    }
+  }
+
+
+  ref args[2];
+  args[0] = content;
+  args[1] = err;
+
+  auto *fn = data->cb;
+  fiber *f = new fiber(fn->prime(2, args));
+  add_job(f);
+}
+
+
+
+void os_read_raw(const function_callback &args) {
+  // arg order: (os.read-raw fd count callback)
+  if (args.len() != 3)
+    return args.throw_obj(new string(
+        "os.read-raw requires 3 arguments: (os.read-raw fd count callback)"));
+
+  // there is no argument type checking here.
+  // TODO: add 'quick' arg checking
+  int fd = args[0].to_int();
+  int count = args[1].to_int();
+  lambda *cb = ref_cast<lambda>(args[2]);
+
+  uv_fs_t *req = new uv_fs_t();
+  auto *data = new read_req_data();
+  data->cb = cb;
+  data->buffer = uv_buf_init(new char[count + 1], count);
+  data->buffer.base[count] = 0;
+  req->data = (void *)data;
+
+  if (cb == nullptr) {
+    return args.throw_obj(new string("os.read-raw takes a callback function"));
+  }
+
+  in_ev([=](uv_loop_t *loop) {
+    uv_fs_read(loop, req, fd, &data->buffer, 1, -1, on_read_raw);
+  });
+}
+
+
+static void os_timeout_callback(uv_timer_t *handle) {
+  lambda *cb = static_cast<lambda *>(handle->data);
+  add_job(new fiber(cb->prime()));
+}
+
+
+static void os_timeout(const function_callback &args) {
+  // there is no argument type checking here.
+  // TODO: add 'quick' arg checking
+  int time = args[0].to_int();
+  lambda *cb = ref_cast<lambda>(args[1]);
+
+  uv_timer_t *timer = new uv_timer_t();
+
+  timer->data = (void *)cb;
+
+  in_ev([=](uv_loop_t *loop) {
+    uv_timer_init(loop, timer);
+    uv_timer_start(timer, os_timeout_callback, time, 0);
+    uv_update_time(loop);
+  });
+}
+
+
+static void os_close(const function_callback &args) {
+  if (args.len() != 1) {
+    return args.throw_obj(new string("os.close requires 1 argument"));
+  }
+
+  close(args[0].to_int());
+}
 void bind_os(void) {
-  module *mod = new module("os");
+  module *mod = new module("os-internal");
 
   mod->def("shell", os_shell);
   mod->def("fork", os_fork);
@@ -293,10 +386,18 @@ void bind_os(void) {
   mod->def("getenv", os_getenv);
   mod->def("panic", os_panic);
   mod->def("exit", os_exit);
-  mod->def("hardware-concurrency", os_hardware_concurrency);
+  mod->def("get-ncpus", os_hardware_concurrency);
 
+
+  // some filesystem related activities
   mod->def("open-raw", os_open_raw);
-  mod->def("test", test);
+  mod->def("write-raw", os_write_raw);
+  mod->def("read-raw", os_read_raw);
+  mod->def("close", os_close);
+
+
+
+  mod->def("timeout", os_timeout);
 
 
   mod->def("RDONLY", ref((int)O_RDONLY));

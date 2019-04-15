@@ -31,6 +31,7 @@
 #include <cedar/runes.h>
 #include <unordered_map>
 #include <immer/map.hpp>
+#include <cedar/serialize.h>
 
 #include <vector>
 
@@ -67,6 +68,11 @@ namespace cedar {
     ref keys(void);
     ref append(ref);
     inline i64 size(void) { return m_size; }
+
+
+    ref to_constructor_expr(void);
+
+    void encode(serializer *);
 
    protected:
     cedar::runes to_string(bool human = false);

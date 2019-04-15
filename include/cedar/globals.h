@@ -30,6 +30,7 @@
 #include <cedar/ref.h>
 #include <cedar/runes.h>
 #include <cedar/vm/binding.h>
+#include <cedar/native_interface.h>
 
 namespace cedar {
 
@@ -41,6 +42,7 @@ namespace cedar {
   void def_global(ref, ref);
   void def_global(runes, ref);
   void def_global(runes, bound_function);
+  void def_global(runes, native_callback);
 
   bool is_global(u64);
 

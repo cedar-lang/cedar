@@ -22,32 +22,59 @@
  * SOFTWARE.
  */
 
-#include <stdio.h>
 
+#pragma once
+
+#ifndef __CDRJIT__
+#define __CDRJIT__
+
+#include "../../src/asmjit/src/asmjit/asmjit.h"
+
+#include <cedar/ref.h>
+#include <vector>
 
 
 namespace cedar {
-  void bind_stdlib(void);
-}
+  class lambda;
+  class module;
+  namespace jit {
 
 
-using namespace cedar;
-void bind_os(void);
-void bind_mutex(void);
-void bind_stringutil(void);
-void bind_uv(void);
-void bind_tcp(void);
-void bind_importutil(void);
-void bind_bits(void);
-void bind_core(void);
+    using namespace asmjit;
+    using namespace asmjit::x86;
 
-void cedar::bind_stdlib(void) {
-  bind_core();
-  bind_os();
-  bind_mutex();
-  bind_stringutil();
-  bind_uv();
-  bind_tcp();
-  bind_importutil();
-  bind_bits();
-}
+    using reg = X86Gp;
+    using mem = X86Mem;
+
+
+    lambda *compile(ref, module *);
+
+
+    class compiler {
+      ref base_obj;
+      FileLogger logger;
+      CodeHolder code;
+      X86Compiler cc;
+
+      reg cb;
+
+      void init(void);
+
+     public:
+      explicit compiler(ref);
+      explicit compiler(std::string);
+
+      lambda *run(module*);
+
+
+
+      reg compile_object(ref obj);
+      reg compile_list(ref obj);
+      reg compile_number(ref obj);
+      reg compile_symbol(ref obj);
+    };
+
+  }  // namespace jit
+}  // namespace cedar
+
+#endif

@@ -29,8 +29,9 @@
 #include <cedar/object/lambda.h>
 #include <mutex>
 
-namespace cedar {
 
+
+namespace cedar {
 
   // forward declarations
   class scheduler;
@@ -40,8 +41,8 @@ namespace cedar {
 
 
   struct frame {
-    frame *caller = nullptr;
     call_state call;
+    frame *caller;
     int sp;
     u8 *ip;
   };
@@ -56,20 +57,28 @@ namespace cedar {
    private:
     int stack_size = 0;
     ref *stack = nullptr;
+
     // the frame list is a linked list, where the first element
     // is the newest call stack and the last frame in the list
     // is the initial function. Nullptr means to return from the
     // fiber and mark it as done
-    frame *call_stack = nullptr;
-
+    frame *top_frame = nullptr;
+    std::vector<frame> frames;
     void adjust_stack(int);
-
-
     frame *add_call_frame(call_state);
     frame *pop_call_frame(void);
+    void co_run();
 
    public:
 
+    // dependents is a vector of fibers that will be added to the
+    // scheduler once this fiber has been deemed complete. For example,
+    // a fiber can yield until another fiber has completed it's work
+    std::vector<fiber *> dependents;
+
+
+
+    coro co;
     worker_thread *worker = nullptr;
     std::atomic<int> state = PARKED;
 
@@ -87,8 +96,13 @@ namespace cedar {
     int fid = 0;
 
     fiber(call_state);
-    fiber(fiber *);
     ~fiber(void);
+
+
+    ref resume();
+
+    void yield();
+    void yield(ref);
 
     int get_state(void);
     void set_state(fiber_state);

@@ -22,6 +22,7 @@
  * SOFTWARE.
  */
 
+#include <cedar/object/dict.h>
 #include <cedar/object/keyword.h>
 #include <cedar/object/lambda.h>
 #include <cedar/object/list.h>
@@ -37,6 +38,7 @@
 #include <cedar/vm/instruction.h>
 #include <cedar/vm/machine.h>
 #include <cedar/vm/opcode.h>
+#include <cedar/jit.h>
 #include <memory>
 
 using namespace cedar;
@@ -63,10 +65,27 @@ void vm::scope::set(ref &symbol, int ind) {
   m_bindings[symbol.symbol_hash()] = ind;
 }
 
+
 vm::compiler::compiler() {}
 vm::compiler::~compiler() {}
 
+
+
 ref vm::compiler::compile(ref obj, module *mod) {
+
+
+
+  /*
+  // attempt to jit compile first
+  lambda *jit_func = jit::compile(obj, mod);
+  // if it succeeded...
+  if (jit_func != nullptr) {
+    jit_func->m_closure = nullptr;
+    return jit_func;
+  }
+  */
+
+
   // make a top level bytecode object
   auto code = new vm::bytecode();
   // make the top level scope for this expression
@@ -75,7 +94,7 @@ ref vm::compiler::compile(ref obj, module *mod) {
   compile_object(obj, *code, sc, &context);
 
   code->write_op(OP_RETURN);
-  code->write_op(OP_EXIT);
+  // code->write_op(OP_EXIT);
   // finalize the code (sum up stack effect)
   code->finalize();
   // build a lambda around the code
@@ -137,6 +156,10 @@ void vm::compiler::compile_object(ref obj, vm::bytecode &code, scope *sc,
   if (obj.isa(vector_type)) {
     return compile_vector(obj, code, sc, ctx);
   }
+  if (obj.isa(dict_type)) {
+    return compile_dict(obj, code, sc, ctx);
+  }
+
 
   if (obj.is_number()) {
     return compile_number(obj, code, sc, ctx);
@@ -256,6 +279,11 @@ void vm::compiler::compile_list(ref obj, vm::bytecode &code, scope *sc,
     }
     // compile the value onto the stack
     compile_object(val_obj, code, sc, ctx);
+    if (opcode == OP_SET_LOCAL) {
+      code.write_op(opcode);
+      code.write((u8)index);
+      return;
+    }
     // and write the storage opcode for it
     code.write_op(opcode, index);
     return;
@@ -365,13 +393,56 @@ void vm::compiler::compile_list(ref obj, vm::bytecode &code, scope *sc,
     compile_object(obj.first(), code, sc, ctx);
     obj = obj.rest();
     while (true) {
-      compile_object(obj.first(), code, sc, ctx);
-      code.write_op(OP_ADD);
+      if (obj.first() == 1) {
+        code.write_op(OP_INC);
+      } else if (obj.first() == -1) {
+        code.write_op(OP_DEC);
+      } else {
+        compile_object(obj.first(), code, sc, ctx);
+        code.write_op(OP_ADD);
+      }
       if (obj.rest().is_nil()) break;
       obj = obj.rest();
     }
     return;
   }
+
+
+  if (list_is_call_to("-", obj)) {
+    obj = obj.rest();
+
+    // if there are no arguments, return a 0
+    if (obj.is_nil()) {
+      compile_object(0, code, sc, ctx);
+      return;
+    }
+
+
+    // if there is one argument, return negative of that argument
+    if (obj.rest().is_nil()) {
+      compile_object(obj.first(), code, sc, ctx);
+      code.write_op(OP_NEG);
+      return;
+    }
+
+
+    compile_object(obj.first(), code, sc, ctx);
+    obj = obj.rest();
+    while (true) {
+      if (obj.first() == 1) {
+        code.write_op(OP_DEC);
+      } else if (obj.first() == -1) {
+        code.write_op(OP_INC);
+      } else {
+        compile_object(obj.first(), code, sc, ctx);
+        code.write_op(OP_SUB);
+      }
+      if (obj.rest().is_nil()) break;
+      obj = obj.rest();
+    }
+    return;
+  }
+
 
   // dot special form
   if (list_is_call_to(".", obj)) {
@@ -436,6 +507,7 @@ void vm::compiler::compile_list(ref obj, vm::bytecode &code, scope *sc,
         }
 
         code.write_op(OP_CALL, argc);
+
       } else {
         throw cedar::make_exception("invalid syntax in dot special form: ",
                                     obj);
@@ -490,8 +562,11 @@ void vm::compiler::compile_list(ref obj, vm::bytecode &code, scope *sc,
     if (s != nullptr) {
       auto sid = s->id;
 
+
+
+
       if (vm::is_macro(sid)) {
-        ref expanded = macroexpand_1(obj);
+        ref expanded = macroexpand_1(obj, mod);
         if (expanded != obj) {
           return compile_object(expanded, code, sc, ctx);
         }
@@ -572,6 +647,25 @@ void vm::compiler::compile_vector(ref vec_ref, vm::bytecode &code, scope *sc,
 
 
 
+void vm::compiler::compile_dict(ref obj, vm::bytecode &code, scope *sc,
+                                compiler_ctx *ctx) {
+  // static ref dict_sym = new symbol("Dict");
+
+  std::vector<ref> elems;
+  dict *d = ref_cast<dict>(obj);
+
+  if (d == nullptr) {
+    throw cedar::make_exception("compile_dict requires a dict... given ", obj);
+  }
+
+  ref expr = d->to_constructor_expr();
+
+
+  compile_object(expr, code, sc, ctx);
+}
+
+
+
 
 void vm::compiler::compile_number(ref obj, vm::bytecode &code, scope *,
                                   compiler_ctx *) {
@@ -581,6 +675,35 @@ void vm::compiler::compile_number(ref obj, vm::bytecode &code, scope *,
     return;
   }
   if (obj.is_int()) {
+    i64 n = obj.to_int();
+    if (n == -1) {
+      code.write_op(OP_INT_NEG_1);
+      return;
+    }
+    if (n == 0) {
+      code.write_op(OP_INT_0);
+      return;
+    }
+    if (n == 1) {
+      code.write_op(OP_INT_1);
+      return;
+    }
+    if (n == 2) {
+      code.write_op(OP_INT_2);
+      return;
+    }
+    if (n == 3) {
+      code.write_op(OP_INT_3);
+      return;
+    }
+    if (n == 4) {
+      code.write_op(OP_INT_4);
+      return;
+    }
+    if (n == 5) {
+      code.write_op(OP_INT_5);
+      return;
+    }
     code.write_op(OP_INT);
     code.write(obj.to_int());
     return;
@@ -611,6 +734,8 @@ void vm::compiler::compile_symbol(ref sym, bytecode &code, scope *sc,
 
   static ref mod_sym = new symbol("*module*");
   static ref self_sym = new symbol("SELF");
+  static ref func_sym = new symbol("*func*");
+
 
 
 
@@ -621,6 +746,11 @@ void vm::compiler::compile_symbol(ref sym, bytecode &code, scope *sc,
 
   if (sym == mod_sym) {
     code.write_op(OP_GET_MODULE);
+    return;
+  }
+
+  if (sym == func_sym) {
+    code.write_op(OP_GET_CURRENT_FUNC);
     return;
   }
 
@@ -669,7 +799,8 @@ void vm::compiler::compile_symbol(ref sym, bytecode &code, scope *sc,
   // if the symbol is found in the enclosing closure/freevars, just push the
   // constant time 'lookup' instruction
   if (const int ind = sc->find(sym); ind != -1) {
-    code.write_op(OP_LOAD_LOCAL, ind);
+    code.write_op(OP_LOAD_LOCAL);
+    code.write((u8)ind);
     return;
   }
   symbol *symb = sym.as<symbol>();
@@ -687,10 +818,10 @@ void vm::compiler::compile_symbol(ref sym, bytecode &code, scope *sc,
 void vm::compiler::compile_lambda_expression(ref expr, bytecode &code,
                                              scope *sc, compiler_ctx *ctx) {
   static auto amp_sym = newsymbol("&");
-  static auto fn_sym = newsymbol("fn");
-  static auto gen_sym = newsymbol("gen");
+  // static auto fn_sym = newsymbol("fn");
+  // static auto gen_sym = newsymbol("gen");
 
-  ref func_sig_symbol = expr.first();
+  // ref func_sig_symbol = expr.first();
 
   ctx->lambda_depth++;
 
@@ -702,10 +833,11 @@ void vm::compiler::compile_lambda_expression(ref expr, bytecode &code,
   if (is_top_level_lambda) {
   }
 
+
   auto args = expr.rest().first();
 
   ref name = nullptr;
-  if (!args.isa(list_type) && !args.is_nil()) {
+  if (!(args.isa(list_type) || args.isa(vector_type)) && !args.is_nil()) {
     if (args.isa(symbol_type)) {
       name = args;
     } else {
@@ -738,6 +870,8 @@ void vm::compiler::compile_lambda_expression(ref expr, bytecode &code,
       continue;
     }
 
+    if (arg.is_nil()) break;
+
     if (auto *sym = ref_cast<cedar::symbol>(arg); sym != nullptr) {
       new_scope->set(arg, ctx->closure_size);
       ctx->closure_size++;
@@ -756,6 +890,8 @@ void vm::compiler::compile_lambda_expression(ref expr, bytecode &code,
     args = args.rest();
   }
 
+  // printf("args: %d\n", argc);
+
   auto body = expr.rest().rest().first();
 
   compile_object(body, *new_code, new_scope, ctx);
@@ -763,6 +899,8 @@ void vm::compiler::compile_lambda_expression(ref expr, bytecode &code,
 
   ctx->lambda_depth--;
 
+
+  // std::cout << expr << std::endl;
   new_code->finalize();
   auto *new_lambda = new lambda(new_code);
   new_lambda->vararg = vararg;
@@ -779,42 +917,4 @@ void vm::compiler::compile_lambda_expression(ref expr, bytecode &code,
 
 
 void vm::compiler::compile_quasiquote(ref obj, vm::bytecode &bc, vm::scope *sc,
-                                      vm::compiler_ctx *ctx) {
-  printf("HERE\n");
-  if (obj.is_nil()) {
-    bc.write((u8)OP_NIL);
-    bc.write((u8)OP_CONS);
-    return;
-  }
-
-  if (list_is_call_to("unquote", obj)) {
-    compile_object(obj.rest().first(), bc, sc, ctx);
-    bc.write((u8)OP_CONS);
-    return;
-  }
-  if (list_is_call_to("unquote-splicing", obj)) {
-    compile_object(obj.rest().first(), bc, sc, ctx);
-    bc.write((u8)OP_APPEND);
-    return;
-  }
-
-  if (obj.isa(list_type)) {
-    ref first = obj.first();
-    ref rest = obj.rest();
-
-    if (rest.is_nil()) {
-      bc.write((u8)OP_NIL);
-    } else {
-      compile_quasiquote(rest, bc, sc, ctx);
-    }
-    compile_quasiquote(first, bc, sc, ctx);
-    return;
-  }
-
-  auto ind = bc.push_const(obj);
-  bc.write((u8)OP_CONST);
-  bc.write((u64)ind);
-  bc.write((u8)OP_CONS);
-
-  return;
-}
+                                      vm::compiler_ctx *ctx) {}

@@ -36,8 +36,17 @@ new_op('FLOAT', 'imm_float', effect=1)
 
 
 new_op('INT',   'imm_int', effect=1)
-new_op('LOAD_LOCAL', 'imm_int', effect=1)
-new_op('SET_LOCAL', 'imm_int', effect=0)
+
+new_op('INT_NEG_1', effect=1);
+new_op('INT_0', effect=1);
+new_op('INT_1', effect=1);
+new_op('INT_2', effect=1);
+new_op('INT_3', effect=1);
+new_op('INT_4', effect=1);
+new_op('INT_5', effect=1);
+
+new_op('LOAD_LOCAL', 'imm_byte', effect=1)
+new_op('SET_LOCAL', 'imm_byte', effect=0)
 
 # pop the name off the stack, look it up, then push the value found,
 # otherwise throw because it wasn't found
@@ -89,13 +98,19 @@ new_op('SLEEP', effect=-1)
 new_op('GET_MODULE', effect=1)
 
 new_op('ADD', effect=-1)
+new_op('SUB', effect=-1)
+new_op('NEG', effect=0)
+
+new_op('DEC', effect=0)
+new_op('INC', effect=0)
 
 new_op('LOAD_SELF', effect=1)
 
-
 new_op('RECV', effect=0)
 new_op('SEND', effect=0)
+new_op('DICT_SET', effect=-2)
 
+new_op('GET_CURRENT_FUNC', effect=1)
 
 
 

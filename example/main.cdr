@@ -1,6 +1,6 @@
-(import os)
+(use os)
 
-(import bits)
+(use bits)
 
 (def (fact n)
   (cond (<= n 1) 1
@@ -11,13 +11,12 @@
 (defn ofib (n)
   (if (< n 2)
     n
-    (+ (ofib (- n 2)) (ofib (- n 1)))))
+    (+ (*func* (- n 2)) (*func* (- n 1)))))
+
 
 
 (def (walk start)
   (lazily (cons start (walk (inc start)))))
-
-
 
 (def (hexchar x)
   (get "0123456789ABCDEF" (bits.and x 0x0F)))
@@ -26,14 +25,15 @@
   (if (= (first s) "0")
     (trim-zeros (rest s))
     s))
+
+
 (def (hex x)
   (let (s "" i 0)
     (while (< i 16)
       (def s (str (hexchar (bits.and x 0x0F)) s))
       (def x (bits.shift-right x 4))
       (def i (inc i)))
-    (trim-zeros s)))
-
+    (or (trim-zeros s) "0")))
 
 (def (memoize f)
   (let (mem {}
@@ -44,7 +44,6 @@
           (set mem args (apply f args))
           r)))))
 
-
 (def (fib-iter max n i j)
   (if (= n max)
     j
@@ -53,26 +52,19 @@
            j
            (+ i j))))
 
-
 (def (fib max)
   (if (< max 2)
     max
     (fib-iter max 1 0 1)))
-
-
-
 
 (let [x 0]
   (while false
     (inc= x)
     (println x)))
 
-
 (defn brackets [n]
   (if (= 0 n) "println(\"sup\n\");"
         (str "{" (brackets (dec n)) "}")))
-
-
 
 (defmacro go-forever (& body)
   `(go (while true (do ~@body))))
@@ -94,10 +86,7 @@
         ps (rest _ps))
     (lazily (cons p (sieve (lazy-filter (prime-filter p) ps))))))
 
-
-
 (def primes (sieve (walk 2)))
-
 
 (defn go-each [xs f]
   (if (nil? xs)
@@ -106,3 +95,20 @@
         (recur (rest xs) f))))
 
 (defn square [x] (* x x))
+
+(defn foo [n] (os.timeout n (fn () (printf "timeout: %s\n", n))))
+
+
+(defmacro foo [x] x)
+
+(use linear for *)
+
+
+(defmacro loopinc [sym]
+  `(do (def ~sym 0)
+       (go (while true (def ~sym (+ ~sym 1))))))
+
+;; (loopinc x)
+;; (loopinc y)
+;; (loopinc z)
+;; (while true (println x y z))

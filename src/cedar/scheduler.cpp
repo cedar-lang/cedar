@@ -39,11 +39,15 @@
 #include <condition_variable>
 #include <cstdlib>
 #include <flat_hash_map.hpp>
+#include <cedar/jit.h>
 #include <mutex>
 
 
-using namespace cedar;
+#define GC_THREADS
+#include <gc/gc.h>
 
+
+using namespace cedar;
 
 
 
@@ -73,34 +77,40 @@ static unsigned ncpus = 8;
  */
 static std::mutex worker_thread_mutex;
 static std::vector<worker_thread *> worker_threads;
-static ska::flat_hash_map<std::thread::id, worker_thread *> worker_thread_map;
 static std::vector<std::thread> thread_handles;
 
+static thread_local fiber *_current_fiber = nullptr;
+static thread_local worker_thread *_current_worker = nullptr;
+static thread_local bool _is_worker_thread = false;
+static thread_local int sched_depth = 0;
 
 
 
-static worker_thread *lookup_or_create_worker(std::thread::id tid) {
+
+static worker_thread *lookup_or_create_worker() {
   static int next_wid = 0;
-  worker_thread_mutex.lock();
-  worker_thread *w = worker_thread_map[tid];
-  if (w == nullptr) {
-    w = new worker_thread();
-    w->tid = tid;
-    w->wid = next_wid++;
-    worker_thread_map[tid] = w;
-    worker_threads.push_back(w);
+
+  if (_current_worker != nullptr) {
+    return _current_worker;
   }
+
+
+  worker_thread_mutex.lock();
+
+  worker_thread *w;
+  w = new worker_thread();
+  w->wid = next_wid++;
+  worker_threads.push_back(w);
+  _current_worker = w;
   worker_thread_mutex.unlock();
   return w;
 }
 
 
+fiber *cedar::current_fiber() { return _current_fiber; }
+
+
 void cedar::add_job(fiber *f) {
-  // if there is no worker on a fiber, it is a new fiber. Increment the number
-  // of jobs
-  if (f->worker == nullptr) {
-    // jobc++;
-  }
   std::lock_guard guard(worker_thread_mutex);
   int ind = rand() % worker_threads.size();
   worker_threads[ind]->local_queue.push(f);
@@ -110,18 +120,31 @@ void cedar::add_job(fiber *f) {
 
 
 
-static std::thread spawn_worker_thread(void) {
-  return std::thread([](void) -> void {
-    register_thread();
-    worker_thread *my_thread =
-        lookup_or_create_worker(std::this_thread::get_id());
-    my_thread->internal = true;
-    while (true) schedule(my_thread, true);
-  });
+
+void _do_schedule_callback(uv_idle_t *handle) {
+  auto *t = static_cast<worker_thread *>(handle->data);
+  schedule(t);
+  if (t->local_queue.size() == 0) {
+    uv_idle_stop(handle);
+  }
 }
 
 
 
+
+static std::thread spawn_worker_thread(void) {
+  return std::thread([](void) -> void {
+    register_thread();
+    _is_worker_thread = true;
+    worker_thread *thd = lookup_or_create_worker();
+    thd->internal = true;
+
+    while (true) schedule(thd, true);
+
+    deregister_thread();
+    return;
+  });
+}
 
 
 
@@ -131,8 +154,10 @@ static std::thread spawn_worker_thread(void) {
  * where the job goes after the job yields
  */
 void schedule_job(fiber *proc) {
-  static int sched_time = 50;
+  static int sched_time = 2;
   static bool read_env = false;
+
+
   if (!read_env) {
     static const char *SCHED_TIME_ENV = getenv("CDRTIMESLICE");
     if (SCHED_TIME_ENV != nullptr) sched_time = atol(SCHED_TIME_ENV);
@@ -154,15 +179,33 @@ void schedule_job(fiber *proc) {
       return;
     }
   }
-  /* "context switch" into the job for sched_time milliseconds
-   * and return back here, with a modified ctx */
-  proc->run(sched_time);
+
+// #define LOG_RUN_TIME
+#ifdef LOG_RUN_TIME
+  auto start = std::chrono::steady_clock::now();
+#endif
+
+
+  fiber *old_fiber = _current_fiber;
+  _current_fiber = proc;
+  proc->resume();
+  _current_fiber = old_fiber;
+
+
+#ifdef LOG_RUN_TIME
+  auto end = std::chrono::steady_clock::now();
+  std::cout << "ran: "
+            << std::chrono::duration_cast<std::chrono::microseconds>(end -
+                                                                     start)
+                   .count()
+            << " us" << std::endl;
+#endif
+
   /* store the last time of execution in the job. This is an
    * approximation as getting the ms from epoch takes too long */
   proc->last_ran = time + sched_time;
   /* and increment the ticks for this job */
   proc->ticks++;
-  return;
 }
 
 
@@ -173,6 +216,7 @@ bool cedar::all_work_done(void) {
   // if there are no pending jobs, we must be done with all work.
   return jobc.load() == 0;
 }
+
 
 
 
@@ -196,8 +240,9 @@ static void init_scheduler(void) {
 
 
 void cedar::schedule(worker_thread *worker, bool internal_worker) {
+  sched_depth++;
   if (worker == nullptr) {
-    worker = lookup_or_create_worker(std::this_thread::get_id());
+    worker = lookup_or_create_worker();
   }
 
   bool steal = true;
@@ -208,6 +253,11 @@ void cedar::schedule(worker_thread *worker, bool internal_worker) {
 
 TOP:
 
+  if (false && (current_fiber() != nullptr || sched_depth > 1)) {
+    printf("worker: %14p %d  current: %14p   depth: %d\n", worker,
+           _is_worker_thread, current_fiber(), sched_depth);
+  }
+
   // work is the thing that will eventually be done, while looking for work,
   // it will be set and checked for equality to nullptr. If at any point it
   // is not nullptr, it will immediately be scheduled.
@@ -215,6 +265,8 @@ TOP:
   // first check the local queue
   work = worker->local_queue.steal();
   if (work != nullptr) goto SCHEDULE;
+
+
   if (steal) {
     worker_thread_mutex.lock();
     // now look through other threads in the thread pool for work to steal
@@ -239,10 +291,12 @@ TOP:
       std::unique_lock lk(worker->lock);
       worker->work_cv.wait_for(lk, std::chrono::milliseconds(2));
       lk.unlock();
+      goto TOP;
     }
-    goto TOP;
   }
 
+CLEANUP:
+  sched_depth--;
   return;
 
 SCHEDULE:
@@ -256,22 +310,25 @@ SCHEDULE:
   auto state = work->state.load();
 
   if (state == STOPPED || state == BLOCKING) replace = false;
-  // if (state == STOPPED) jobc--;
 
+  if (state == STOPPED) {
+    for (auto &j : work->dependents) {
+      add_job(j);
+    }
+    work->dependents.clear();
+  }
 
   // since we did some work, we should put it back in the local queue
   // but only if it isn't done.
   if (replace) {
-    if (false || worker->local_queue.size() == 0) {
-      goto SCHEDULE;
-    }
-    // add_job(work);
     worker->local_queue.push(work);
   }
 
   if (internal_worker) {
     goto TOP;
   }
+
+  goto CLEANUP;
 }
 
 
@@ -283,8 +340,6 @@ namespace cedar {
 };
 void init_binding(cedar::vm::machine *m);
 
-
-
 /**
  * this is the primary entry point for cedar, this function
  * should be called before ANY code is run.
@@ -295,25 +350,6 @@ void cedar::init(void) {
   type_init();
   init_binding(nullptr);
   bind_stdlib();
-
-
-  /*
-  std::thread([]() {
-    while (true) {
-      int total = 0;
-      for (int i = 0; i < worker_threads.size(); i++) {
-        int c = worker_threads[i]->local_queue.size();
-        total += c;
-        printf("%5d ", c);
-      }
-      printf("  avg = %d", total / (int)worker_threads.size());
-      printf(" total = %d", total);
-      printf("\n");
-      usleep(1000);
-    }
-  }).detach();
-  */
-
   core_mod = require("core");
 }
 
@@ -328,18 +364,30 @@ void cedar::init(void) {
  * such a call
  */
 ref cedar::eval_lambda(call_state call) {
-  fiber f(call);
-  worker_thread *my_worker =
-      lookup_or_create_worker(std::this_thread::get_id());
-  add_job(&f);
+  fiber *f = new fiber(call);
+  worker_thread *my_worker = lookup_or_create_worker();
+  add_job(f);
+
+  // printf("eval_lambda %d\n", sched_depth);
+
+  fiber *cur = current_fiber();
+  if (false && cur != nullptr) {
+    f->dependents.push_back(cur);
+    cur->set_state(fiber_state::BLOCKING);
+    yield();
+    return f->return_value;
+  }
   // my_worker->local_queue.push(&f);
-  while (!f.done) schedule(my_worker);
-  return f.return_value;
+  while (!f->done) {
+    schedule(my_worker);
+  }
+  return f->return_value;
 }
 
 
 
 ref cedar::call_function(lambda *fn, int argc, ref *argv, call_context *ctx) {
+  // printf("%p\n", fn);
   if (fn->code_type == lambda::function_binding_type) {
     function_callback c(fn->self, argc, argv, ctx->coro, ctx->mod);
     fn->call(c);
@@ -347,3 +395,157 @@ ref cedar::call_function(lambda *fn, int argc, ref *argv, call_context *ctx) {
   }
   return eval_lambda(fn->prime(argc, argv));
 }
+
+
+
+
+// yield is just a wrapper around yield nil
+void cedar::yield() { cedar::yield(nullptr); }
+
+void cedar::yield(ref val) {
+  auto current = current_fiber();
+  if (current == nullptr) {
+    throw std::logic_error("Attempt to yield without a current fiber failed\n");
+  }
+  current->yield(val);
+}
+
+
+
+//////////////////////////////////////////////////////////////////////////////
+
+
+
+static void *cedar_unoptimisable;
+
+
+
+#define cedar_setsp(x) \
+  cedar_unoptimisable = alloca((char *)alloca(sizeof(size_t)) - (char *)(x));
+
+
+
+static size_t cedar_stack_size = 4096 * 4;
+
+static size_t get_stack_size(void) { return cedar_stack_size; }
+
+
+
+/* Get memory page size. The query is done once. The value is cached. */
+static size_t get_page_size(void) {
+  static long pgsz = 0;
+  if (pgsz != 0) return (size_t)pgsz;
+  pgsz = sysconf(_SC_PAGE_SIZE);
+  return (size_t)pgsz;
+}
+
+
+static thread_local std::vector<char *> stacks;
+
+
+
+
+void finalizer(void *ptr, void *data) { printf("finalized %p\n", ptr); }
+
+static char *stackalloc() {
+  char *stk;
+
+
+
+  stk = (char *)GC_MALLOC_UNCOLLECTABLE(get_stack_size());
+
+  return stk;
+}
+
+
+extern "C" void *get_sp(void);
+extern "C" void *GC_call_with_stack_base(GC_stack_base_func, void *);
+extern "C" int GC_register_my_thread(const struct GC_stack_base *);
+extern "C" int GC_unregister_my_thread(void);
+
+
+coro::coro(std::function<void(coro *)> fn) {
+  set_func(fn);
+  coro();
+}
+
+
+
+coro::coro() {
+  stk = stackalloc();
+  stack_base = stk;
+  stack_base += get_stack_size();
+}
+
+void coro::set_func(std::function<void(coro *)> fn) { func = fn; }
+
+coro::~coro(void) {
+}
+
+
+bool coro::is_done(void) { return done; }
+void coro::yield(void) { yield(nullptr); }
+
+void coro::yield(ref v) {
+  value = v;
+  if (!setjmp(ctx)) {
+    longjmp(return_ctx, 1);
+  }
+}
+
+
+
+
+ref coro::resume(void) {
+  if (done) {
+    fprintf(stderr, "Error: Resuming a complete coroutine\n");
+    return nullptr;
+  }
+
+  if (!setjmp(return_ctx)) {
+    if (!initialized) {
+      initialized = true;
+      // calculate the new stack pointer
+      size_t sp = (size_t)(stk);
+      sp += get_stack_size();
+      sp &= ~15;
+      // inline assembly macro to set the stack pointer
+
+
+      struct GC_stack_base stack_base;
+      GC_get_stack_base(&stack_base);
+      stack_base.mem_base = (void *)sp;
+      GC_register_my_thread(&stack_base);
+
+
+      cedar_setsp(sp-8);
+      func(this);
+      done = true;
+      // switch back to the calling context
+      longjmp(return_ctx, 1);
+      return value;
+    }
+    longjmp(ctx, 1);
+    return value;
+  }
+
+  return value;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

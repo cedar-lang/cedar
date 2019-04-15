@@ -9,37 +9,50 @@
 #define OP_CONST                    0x02
 #define OP_FLOAT                    0x03
 #define OP_INT                      0x04
-#define OP_LOAD_LOCAL               0x05
-#define OP_SET_LOCAL                0x06
-#define OP_LOAD_GLOBAL              0x07
-#define OP_SET_GLOBAL               0x08
-#define OP_SET_PRIVATE              0x09
-#define OP_CONS                     0x0a
-#define OP_APPEND                   0x0b
-#define OP_CALL                     0x0c
-#define OP_CALL_EXCEPTIONAL         0x0d
-#define OP_MAKE_FUNC                0x0e
-#define OP_MAKE_SCOPE               0x0f
-#define OP_POP_SCOPE                0x10
-#define OP_ARG_POP                  0x11
-#define OP_RETURN                   0x12
-#define OP_EXIT                     0x13
-#define OP_SKIP                     0x14
-#define OP_JUMP                     0x15
-#define OP_JUMP_IF_FALSE            0x16
-#define OP_RECUR                    0x17
-#define OP_DUP                      0x18
-#define OP_SWAP                     0x19
-#define OP_GET_ATTR                 0x1a
-#define OP_SET_ATTR                 0x1b
-#define OP_DEF_MACRO                0x1c
-#define OP_EVAL                     0x1d
-#define OP_SLEEP                    0x1e
-#define OP_GET_MODULE               0x1f
-#define OP_ADD                      0x20
-#define OP_LOAD_SELF                0x21
-#define OP_RECV                     0x22
-#define OP_SEND                     0x23
+#define OP_INT_NEG_1                0x05
+#define OP_INT_0                    0x06
+#define OP_INT_1                    0x07
+#define OP_INT_2                    0x08
+#define OP_INT_3                    0x09
+#define OP_INT_4                    0x0a
+#define OP_INT_5                    0x0b
+#define OP_LOAD_LOCAL               0x0c
+#define OP_SET_LOCAL                0x0d
+#define OP_LOAD_GLOBAL              0x0e
+#define OP_SET_GLOBAL               0x0f
+#define OP_SET_PRIVATE              0x10
+#define OP_CONS                     0x11
+#define OP_APPEND                   0x12
+#define OP_CALL                     0x13
+#define OP_CALL_EXCEPTIONAL         0x14
+#define OP_MAKE_FUNC                0x15
+#define OP_MAKE_SCOPE               0x16
+#define OP_POP_SCOPE                0x17
+#define OP_ARG_POP                  0x18
+#define OP_RETURN                   0x19
+#define OP_EXIT                     0x1a
+#define OP_SKIP                     0x1b
+#define OP_JUMP                     0x1c
+#define OP_JUMP_IF_FALSE            0x1d
+#define OP_RECUR                    0x1e
+#define OP_DUP                      0x1f
+#define OP_SWAP                     0x20
+#define OP_GET_ATTR                 0x21
+#define OP_SET_ATTR                 0x22
+#define OP_DEF_MACRO                0x23
+#define OP_EVAL                     0x24
+#define OP_SLEEP                    0x25
+#define OP_GET_MODULE               0x26
+#define OP_ADD                      0x27
+#define OP_SUB                      0x28
+#define OP_NEG                      0x29
+#define OP_DEC                      0x2a
+#define OP_INC                      0x2b
+#define OP_LOAD_SELF                0x2c
+#define OP_RECV                     0x2d
+#define OP_SEND                     0x2e
+#define OP_DICT_SET                 0x2f
+#define OP_GET_CURRENT_FUNC         0x30
 
 /* Instruction opcode foreach macro for code generation */
 /* Arg order: (name, bytecode, type, stack effect */
@@ -49,8 +62,15 @@
   V(CONST, OP_CONST, imm_int, 1) \
   V(FLOAT, OP_FLOAT, imm_float, 1) \
   V(INT, OP_INT, imm_int, 1) \
-  V(LOAD_LOCAL, OP_LOAD_LOCAL, imm_int, 1) \
-  V(SET_LOCAL, OP_SET_LOCAL, imm_int, 0) \
+  V(INT_NEG_1, OP_INT_NEG_1, no_arg, 1) \
+  V(INT_0, OP_INT_0, no_arg, 1) \
+  V(INT_1, OP_INT_1, no_arg, 1) \
+  V(INT_2, OP_INT_2, no_arg, 1) \
+  V(INT_3, OP_INT_3, no_arg, 1) \
+  V(INT_4, OP_INT_4, no_arg, 1) \
+  V(INT_5, OP_INT_5, no_arg, 1) \
+  V(LOAD_LOCAL, OP_LOAD_LOCAL, imm_byte, 1) \
+  V(SET_LOCAL, OP_SET_LOCAL, imm_byte, 0) \
   V(LOAD_GLOBAL, OP_LOAD_GLOBAL, imm_int, 1) \
   V(SET_GLOBAL, OP_SET_GLOBAL, imm_int, 0) \
   V(SET_PRIVATE, OP_SET_PRIVATE, imm_int, 0) \
@@ -77,8 +97,14 @@
   V(SLEEP, OP_SLEEP, no_arg, -1) \
   V(GET_MODULE, OP_GET_MODULE, no_arg, 1) \
   V(ADD, OP_ADD, no_arg, -1) \
+  V(SUB, OP_SUB, no_arg, -1) \
+  V(NEG, OP_NEG, no_arg, 0) \
+  V(DEC, OP_DEC, no_arg, 0) \
+  V(INC, OP_INC, no_arg, 0) \
   V(LOAD_SELF, OP_LOAD_SELF, no_arg, 1) \
   V(RECV, OP_RECV, no_arg, 0) \
-  V(SEND, OP_SEND, no_arg, 0)
+  V(SEND, OP_SEND, no_arg, 0) \
+  V(DICT_SET, OP_DICT_SET, no_arg, -2) \
+  V(GET_CURRENT_FUNC, OP_GET_CURRENT_FUNC, no_arg, 1)
 
 #endif

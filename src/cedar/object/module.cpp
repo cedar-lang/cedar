@@ -23,9 +23,9 @@
  */
 #include <cedar/globals.h>
 #include <cedar/modules.h>
+#include <cedar/object/lambda.h>
 #include <cedar/object/module.h>
 #include <cedar/object/string.h>
-#include <cedar/object/lambda.h>
 #include <cedar/objtype.h>
 
 using namespace cedar;
@@ -65,8 +65,7 @@ void module::def(std::string name, native_callback val) {
 
 void module::import_into(module *other) {
   for (auto &kv : m_fields) {
-    if (kv.second.type == PUBLIC)
-      other->m_fields[kv.first] = kv.second;
+    if (kv.second.type == PUBLIC) other->m_fields[kv.first] = kv.second;
   }
 }
 
@@ -100,24 +99,90 @@ ref module::find(u64 id, bool *valid, module *from) {
 }
 
 
+static std::mutex write_lock;
+
+
+#define FILE_NAME_SIZE 100
+
+static int file_name(char *name, module *m) {
+  try {
+    static auto name_id = symbol::intern("*name*");
+
+    bool found;
+    ref namev = m->find(name_id, &found, nullptr);
+    if (!found) return -1;
+
+    std::string sname = namev.to_string(true);
+    snprintf(name, FILE_NAME_SIZE, "%s.mod", sname.c_str());
+    for (int i = 0; i < 100; i++) {
+      if (name[i] == '/') name[i] = '@';
+    }
+    if (name[0] == '.') {
+      name[0] = '@';
+    }
+    return 0;
+  } catch (...) {
+    return -1;
+  }
+  return -1;
+}
+
+
+static void store(module *m) {
+  char name[100];
+  if (file_name(name, m) == 0) {
+    FILE *fp = fopen(name, "wb");
+    serializer s(fp);
+    for (auto &i : m->m_fields) {
+      cedar::runes line;
+      symbol sy;
+      sy.id = i.first;
+      try {
+        s.write(ref(&sy));
+        s.write(i.second.val);
+      } catch (...) {
+      }
+    }
+    fclose(fp);
+  }
+}
+
+static void load(module *m) {
+  try {
+    char name[100];
+    if (file_name(name, m) == 0) {
+      FILE *fp = fopen(name, "rb");
+      serializer s(fp);
+      while (!feof(fp)) {
+        cedar::runes line;
+        ref k = s.read();
+        ref v = s.read();
+        std::cout << k << " = " << v << std::endl;
+      }
+      fclose(fp);
+    }
+  } catch (...) {
+  }
+}
+
 
 ref module::getattr_fast(u64 k) {
-  //std::unique_lock l(lock);
   bool found = false;
-
-  // lock.lock();
   ref v = find(k, &found, nullptr);
-  // lock.unlock();
   if (found) return v;
   return object::getattr_fast(k);
 }
+
+
+
 
 void module::setattr_fast(u64 k, ref v) {
   binding b;
   b.type = PUBLIC;
   b.val = v;
-  // lock.lock();
+  if (m_fields.count(k) != 0) {
+    // std::cout << "REASSIGN " << symbol::unintern(k) << std::endl;
+  }
   m_fields[k] = b;
-  // lock.unlock();
 }
 

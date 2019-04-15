@@ -34,17 +34,22 @@ namespace cedar {
 
   class module : public object {
    private:
+
+    std::mutex lock;
+
+
+
+   public:
+
+    std::string path;
+
     enum binding_type { PRIVATE, PUBLIC };
     struct binding {
       binding_type type = PRIVATE;
       ref val;
     };
-
-    std::mutex lock;
-
     ska::flat_hash_map<intern_t, binding> m_fields;
 
-   public:
     module(void);
     module(std::string);
     ~module(void);

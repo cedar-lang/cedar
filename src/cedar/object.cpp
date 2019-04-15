@@ -63,6 +63,7 @@ bool object::is_pair(void) {
 
 
 ref object::getattr_fast(u64 i) {
+
   static auto __class__ID = symbol::intern("__class__");
   static auto __addr__ID = symbol::intern("__addr__");
 
@@ -95,6 +96,7 @@ ref object::getattr_fast(u64 i) {
     val = object_type->get_field_fast(i);
     goto FOUND;
   }
+
 
   throw cedar::make_exception("attribute '", symbol::unintern(i),
                               "' on object not found");
@@ -259,6 +261,7 @@ ref attr_map::at(u64 i) {
     }
     b = b->next;
   }
+
   throw cedar::make_exception("attribute '", symbol::unintern(i),
                               "' not found");
 };

@@ -48,6 +48,7 @@ namespace cedar {
 
   class type : public object {
    public:
+
     using method = std::function<ref(int, ref *, vm::machine *)>;
     std::vector<type *> m_parents;
     cedar::runes m_name;
@@ -55,6 +56,7 @@ namespace cedar {
     attr_map m_fields;
     void set_field(ref, ref);
     void set_field(cedar::runes, bound_function);
+    void set_field(cedar::runes, native_callback);
     ref get_field(ref);
     ref get_field_fast(u64);
 
@@ -80,11 +82,13 @@ namespace cedar {
 
 
 
-  inline ref self_callv(ref self, const cedar::runes func, int argc, ref *argv) {
+  inline ref self_callv(ref self, const cedar::runes func, int argc,
+                        ref *argv) {
     ref s = new symbol(func);
     ref attr = self.getattr(s);
     if (!attr.is<lambda>()) {
-      throw cedar::make_exception("self call failed, unable to call non-lambda");
+      throw cedar::make_exception(
+          "self call failed, unable to call non-lambda");
     }
 
     call_context ctx;

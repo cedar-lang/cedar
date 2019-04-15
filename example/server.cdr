@@ -1,4 +1,4 @@
-(import tcp)
+(use tcp)
 
 (def server (tcp.Server (fn (sock) (println "connection"))))
 

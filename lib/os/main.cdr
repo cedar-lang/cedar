@@ -1,19 +1,19 @@
 ;; Import the builtin OS module
-(import os-internal for *)
-(import bits)
+(use os-internal for *)
+(use bits)
 
 (defn- id [x] x)
 
 
 
-(deftype File
-  (defn new [self path fd mode]
-    ()))
+
+
 
 (defn- convert-mode-char [c]
   (cond (= c "r") RDONLY
         (= c "w") WRONLY
         (= c "a") APPEND
+        (= c "c") CREAT
         :default 0))
 
 
@@ -30,7 +30,6 @@
     (when (= (type mode) Lambda)
       (def cb mode)
       (def mode "r"))
-
     (open-raw path (convert-open-mode mode) cb)))
 
 
@@ -39,4 +38,19 @@
         c (chan)]
     (open path mode (fn (fd err)
                       (send {:fd fd, :err err} c)))
-    (recv c)))
+    (let [res (recv c)]
+      (if (:err res)
+        (throw (:err res))
+        (:fd res)))))
+
+
+(def read read-raw)
+
+(defn read-sync [fd count]
+  (let [c (chan)]
+    (read fd count (fn (content err)
+                     (send {:content content, :err err} c)))
+    (let [res (recv c)]
+      (if (:err res)
+        (throw (:err res))
+        (:content res)))))

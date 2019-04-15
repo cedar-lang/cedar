@@ -42,6 +42,7 @@ namespace cedar {
 			imm_float,
 			imm_int,
 			imm_ptr,
+      imm_byte,
 		};
 
 		// an instruction is an internal representation of

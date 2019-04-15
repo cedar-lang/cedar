@@ -56,15 +56,17 @@
 ;; by macros later on, but there are useful for passing
 ;; into functions
 (def* not (fn (x) (if x nil t)))
-(def* or (fn (x y) (if x x y)))
-(def* and (fn (x y) (if x y x)))
+;;(def* or (fn (x y) (if x x y)))
+;;(def* and (fn (x y) (if x y x)))
+
+
+
 
 (def* not= (fn not= (a b) (not (= a b))))
 
 (def* len
   (fn (x)
     (. x (len))))
-
 
 
 (def* nil? (fn (v) (= (type v) Nil)))
@@ -78,15 +80,35 @@
 
 
 
-;; since eval is a special form, there needs to
-;; be a function that calls it. It looks weird
-;; but it makes sense if you think about it
 (def* eval (fn (obj) (eval obj)))
 
 ;; define the identity function, just returns the arg
 (def* identity (fn (x) x))
 
-;; (def* read-string (fn (str) (Reader str)))
+
+
+
+
+(def* inc (fn (n) (+ n 1)))
+(def* dec (fn (n) (- n 1)))
+
+(def* symbol cedar/symbol)
+
+(let* ((gensym-id 0))
+  (def* gensyms
+    (fn (s)
+      (do (def* gensym-id (inc gensym-id))
+          (symbol (str s gensym-id)))))
+  (def* gensym (fn () (gensyms "G__"))))
+
+(defmacro or (x y)
+  (let* ((sym (gensyms "OR-")))
+    (list 'let* (list (list sym x)) (list 'if sym sym y))))
+
+(defmacro and (x y)
+  (let* ((sym (gensyms "AND-")))
+    (list 'let* (list (list sym x)) (list 'if sym y sym))))
+
 
 ;; a sequence is defined as an object that has a first
 ;; and rest method
@@ -95,8 +117,11 @@
 ;; internal catch* function
 (def* seq?
   (fn (v)
-    (catch* (fn () (and (and (has-attr? v 'first) (has-attr? v 'rest)) true))
-        (fn (e) false))))
+    (and (and (has-attr? v 'first) (has-attr? v 'rest)) true)))
+
+
+
+
 
 
 
@@ -163,9 +188,6 @@
   (list 'def-private* name
         (list 'fn name args (cons 'do body))))
 
-(defn inc (n) (+ n 1))
-(defn dec (n) (- n 1))
-
 
 
 
@@ -180,22 +202,7 @@
   (list 'if c nil (cons 'do body)))
 
 
-(def* symbol cedar/symbol)
 
-(let* ((gensym-id 0))
-  (defn gensyms (s)
-      (do (def* gensym-id (inc gensym-id))
-          (symbol (str s gensym-id))))
-  (defn gensym () (gensyms "G__")))
-
-
-(defmacro or (x y)
-  (let* ((sym (gensyms "OR-")))
-    (list 'let* (list (list sym x)) (list 'if sym sym y))))
-
-(defmacro and (x y)
-  (let* ((sym (gensyms "AND-")))
-    (list 'let* (list (list sym x)) (list 'if sym y sym))))
 
 
 
@@ -242,6 +249,9 @@
                    names)))
 
 
+
+
+
 (def (not x)
   (if x nil true))
 
@@ -274,6 +284,12 @@
 (defn peek [coll]
   (. coll (peek)))
 
+
+
+(defn nth [coll index]
+  (if (<= index 0)
+    (first coll)
+    (recur (rest coll) (dec index))))
 
 (def (every? pred coll)
   (cond (nil? coll) t
@@ -361,8 +377,6 @@
 
 (defn inc (n) (+ n 1))
 (defn dec (n) (- n 1))
-(defmacro inc (n) (list '+ n 1))
-(defmacro dec (n) (list '- n 1))
 
 (def bits (require "bits"))
 
@@ -442,16 +456,10 @@
 
 
 (defmacro quasiquote (form)
-    (qq/transform-quasiquote-arg form))
+      (qq/transform-quasiquote-arg form))
 
-;;;;;;;;;;;;;;;;;;;;;;;;;; QUASIQUOTE IS VALID NOW ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;; QUASIQUOTE IS VALID NOW ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defmacro first (x)
-  `(. ~x (first)))
-(defmacro rest (x)
-  `(. ~x (rest)))
-(defmacro len (x)
-  `(. ~x (len)))
 
 
 
@@ -471,44 +479,39 @@
   `(def ~id (/ ~id ~n)))
 
 
-(def (interleave s1 s2)
-  (when (and s1 s2)
-    (cons (first s1)
-          (cons (first s2) 
-                (interleave (rest s1) (rest s2))))))
-(def (drop n l)
-  (cond (= n 0) l
-        (nil? l) nil
-        :else (drop (dec n) (rest l))))
+(def interleave
+  (fn (s1 s2)
+      (when (and s1 s2)
+        (cons (first s1)
+              (cons (first s2) 
+                    (interleave (rest s1)
+                                (rest s2)))))))
+(def drop
+  (fn (n l)
+      (cond (= n 0) l
+            (nil? l) nil
+            :else (drop (dec n) (rest l)))))
 
-(def (take n l)
-  (cond (= n 0) nil
-        (nil? l) nil
-        :else (cons (first l) (take (dec n) (rest l)))))
+(def take
+  (fn (n l)
+    (cond
+      (= n 0) nil
+      (nil? l) nil
+      :else (cons (first l) (take (dec n) (rest l))))))
 
-(def (partition n coll)
-  (if (= 0 (count coll)) nil
-    (do
-      (let* ((p (take n coll)))
-        (cond (nil? p) nil
-              (= n (count p)) (cons p (partition n (drop n coll)))
-              :else (list p))))))
+(def partition
+  (fn (n coll)
+      (if (= 0 (count coll)) nil
+        (do
+          (let* ((p (take n coll)))
+            (cond (nil? p) nil
+                  (= n (count p)) (cons p (partition n (drop n coll)))
+                  :else (list p)))))))
 
 
 (def nilify (fn (& args) nil))
 
-
-(defmacro locals (names & body)
-  (do (if (not= (type names) Vector)
-        (throw "'locals' macro requires a vector of names"))
-      (cons (list 'fn (map identity names) (cons 'do body)) (map nilify names))))
-
-
-
-(defn LETEXPAND (bindings & body))
-
-
-(defmacro LET (bindings & body)
+(defmacro LOOP (bindings & body)
   (let* ((names (map first bindings))
          (vals (map second bindings)))
     `((fn ~names
@@ -516,13 +519,13 @@
                ((fn ~names (do ~@body)) ~@names))
            (map nilify names)))))
 
+
 (defmacro loop (defs & body)
   (do (when (odd? (len defs))
             (throw (str "Error in loop syntax. bindings must be of even length: " defs "")))
-      `(LET ~(partition 2 defs) ~@body)))
+      `(LOOP ~(partition 2 defs) ~@body)))
 
-
-
+;; define a quick let form, will be replaced with destructuring later
 (defmacro let (defs & body)
   (do (when (odd? (len defs))
             (throw (str "Error in let syntax. bindings must be of even length: " defs "")))
@@ -535,6 +538,8 @@
 
 
 
+
+
 (defmacro go (& body)
   `(go* (fn () (do ~@body))))
 
@@ -542,45 +547,9 @@
 ;; chan-recv* are "special form" function calls because they require opcode
 ;; level actions
 (defn send [o c] (chan-send* o c))
-(defmacro send (o c) `(chan-send* ~o ~c))
 (defn recv [c] (chan-recv* c))
-(defmacro recv (c) `(chan-recv* ~c))
 
 
-(def importutil (require "importutil"))
-
-;; expand a single import option
-(def (import-opt-expand-1 mod-name arg val)
-  (cond (or (= arg 'for) (= arg :for))
-        (cond (= (type val) Vector) (cons 'do (map (fn (n)
-                                                     `(def ~n (. ~mod-name ~n)))
-                                                 val))
-              ;; handle merge
-              (= val '*) `(do (importutil.merge-here ~mod-name))
-              ;; when importing a single thing from the module, have it act
-              ;; as if you are importing a vector of that thing instead.
-              ;; so...
-              ;;     (import foo for bar) -> (import foo for [bar])
-              (= (type val) Symbol) (import-opt-expand-1 mod-name arg [val])
-              :else (throw (str "Unknown import argument on 'for': " val)))
-        :else (throw (str "Unknown import argument " arg))))
-
-
-
-;; expand import options as if they were a dict
-(def (import-opt-expand name opts)
-  (let [table (map (fn (o) (apply vector o)) (partition 2 opts))]
-    (map (fn (a) (import-opt-expand-1 name (0 a) (1 a)))
-        table)))
-
-
-
-(defmacro import (name & opts)
-  `(do (def ~name (require ~(str name)))
-     ~@(import-opt-expand name opts)))
-
-
-(import _core for *)
 
 
 
@@ -592,10 +561,10 @@
 
 
 (defmacro while (test & body)
-  `(let* ()
+  `((fn ()
      (when ~test
        ~@body
-       (recur))))
+       (recur)))))
 
 
 
@@ -604,14 +573,15 @@
 ;; list already. If there are more forms, inserts the first form as the
 ;; second item in second form, etc.
 
-(def (->transform  x forms)
-  (if forms
-    (let (form (first forms))
-      (let (threaded (if (seq? form)
-                        `(~(first form) ~x ~@(rest form))
-                        (list form x)))
-          (->transform threaded (rest forms))))
-    x))
+(def ->transform
+  (fn (x forms)
+      (if forms
+        (let (form (first forms))
+          (let (threaded (if (seq? form)
+                            `(~(first form) ~x ~@(rest form))
+                            (list form x)))
+              (->transform threaded (rest forms))))
+        x)))
 
 
 (defmacro ->
@@ -619,14 +589,15 @@
   (->transform x forms))
 
 
-(def (->>transform x forms)
-  (if forms
-    (let (form (first forms))
-      (let (threaded (if (seq? form)
-                        `(~(first form) ~@(rest form) ~x)
-                        (list form x)))
-          (->>transform threaded (rest forms))))
-    x))
+(def ->>transform
+  (fn (x forms)
+      (if forms
+        (let (form (first forms))
+          (let (threaded (if (seq? form)
+                            `(~(first form) ~@(rest form) ~x)
+                            (list form x)))
+              (->>transform threaded (rest forms))))
+        x)))
 
 
 (defmacro ->>
@@ -644,24 +615,6 @@
 
 
 
-
-
-
-
-;; since setting dict entries with keys as idents is
-;; so common, this macro automatically quotes the key
-;; identifier so you dont have to think about it.
-(defmacro setq (coll name val)
-  `(set ~coll (quote ~name) ~val))
-
-;; define a macro for use inside classes to clean up
-;; the (set self 'name val) form. Cause it's ugly.
-(defmacro sets (name val)
-  `(setattr self ~name ~val))
-
-(defmacro gets (name & r)
-  (if (nil? r) `(. self ~name)
-    `(catch ~(gensym) (. self  ~name) ~@r)))
 
 
 
@@ -696,36 +649,6 @@
 
 (def (instance? ta val)
   (extends? ta (type val)))
-
-;; the stream class is a basic io class
-;; it offers .write and .read
-(deftype Stream
-  (def write nil)
-  (def read nil))
-
-
-(deftype FileDescriptor [Stream]
-  (def fd nil)
-  ;; constructor that
-  (def (new self fd_arg)
-    (sets fd fd_arg))
-  (def (write self s)
-    (os-write (. self fd) s))
-  (def (read self n)
-    (os-read (.self self.fd) n))
-  (def (close self)
-    (do (os-close (. self fd))
-        (sets fd nil))))
-
-(def (fopen-flags path flags)
-  (let (fd (os-open path flags))
-    (cond (= fd -1)  (throw (str "unable to open file '" path "'"))
-          :otherwise (FileDescriptor fd))))
-
-(def (fopen path)
-  (fopen-flags path (bit-or O_RDWR O_APPEND O_CREAT)))
-
-
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -768,18 +691,23 @@
 (deftype lazy-seq
   ;; the function that will be called eventually
   (def func nil)
+
   ;; if the lazy sequence has been evaluated yet
   (def evaluated nil)
+
   ;; the value stored in the list. will be filled
   ;; when .seq is called
   (def value nil)
+
   ;; constructor. Takes the function that will be
   ;; evaluated on .seq
   (def (new self f)
     (setattr self func f))
+
   ;; implementations of first and rest
   (def (first self) (first (. self (seq))))
   (def (rest self) (rest (. self (seq))))
+
   ;; the seq function "steps" this lazy sequence.
   ;; this means it checks if it's been evaluated
   ;; yet, and if it needs to, evaluates the function
@@ -808,33 +736,241 @@
         (if curr (. stream (write " ")))))
     (. stream (write ")"))))
 
+
+
 (defmacro lazily (& expr)
   `(lazy-seq (fn () (do ~@expr))))
 
-(defn pr [& more]
-  (apply print (map repr more)))
-
-(defn prn [& more]
-  (apply println (map repr more)))
 
 
 
-(def *in*  (FileDescriptor 0))
-(def *out* (FileDescriptor 1))
-(def *err* (FileDescriptor 2))
 
 
-(. Object (set-field 'write-stream (fn (self stream)
-                                     (. stream (write (str self))))))
+;; hacky conversions of numbers into ints and floats based on some underlying
+;; actions of bitwise or and fload addition.
+(defn int [n] (bits.or n 0))
+(defn float [n] (+ n 0.0))
 
 
-(. Number (set-field 'first (fn (self) self)))
-(. Number (set-field 'rest (fn (self) (inc self))))
 
 
-(def (write stream & things)
-  (. stream (write (apply str things))))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;                   Format and printf related functions
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(defn- char-is-number? [c]
+  (contains? "0123456789" c))
+
+(defn- svprintf [fmt args]
+  (let [buf ""]
+
+    (while (not (nil? fmt))
+      (let [c (first fmt)]
+        (cond (= c "%") (do (def fmt (rest fmt))
+                            (cond (= (first fmt) "s") (do (+= buf (str (first args)))
+                                                          (def args (rest args)))
+                                  (= (first fmt) "r") (do (+= buf (repr (first args)))
+                                                          (def args (rest args)))
+                                  (= (first fmt) "d") (do (if (number? (first args))
+                                                            (+= buf (int (first args)))
+                                                            (throw "d format directive requires a number"))
+                                                          (def args (rest args)))
+                                  (= (first fmt) "f") (do (if (number? (first args))
+                                                            (+= buf (float (first args)))
+                                                            (throw "f format directive requires a number"))
+                                                          (def args (rest args)))
+                                  (= (first fmt) "%") (+= buf "%")
+                                  :else (throw (str "Unknown format directive %" (first fmt))))
+                            (def fmt (rest fmt)))
+              :else (do (+= buf c)
+                        (def fmt (rest fmt))))))
+
+    (return buf)))
+
+(defn printf [fmt & args]
+    (print (svprintf fmt args)))
+
+(defn format [fmt & args]
+  (svprintf fmt args))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defn some [pred coll]
+  (when coll
+    (or (pred (first coll))
+        (some pred (rest coll)))))
+
+(defn seq [x] x)
+
+
+
+;; Shamelessly Stolen from the clojure stdlib `core.clj`
+(defn destructure [bindings]
+  (let [bents (partition 2 bindings)
+        pb (fn (bvec b v)
+             (let [pvec (fn (bvec b val)
+                          (let [gvec (gensyms "__vec__")
+                                gseq (gensyms "__seq__")
+                                gfirst (gensyms "__first__")
+                                has-rest (some (fn (x) (get {'& true} x false)) b)]
+                            (loop [ret (let [ret (put (put bvec gvec) val)]
+                                         (if has-rest
+                                           (put (put ret gseq) (list 'seq gvec))
+                                           ret))
+                                   n 0
+                                   bs b
+                                   seen-rest? false]
+                               (if (not bs)
+                                  ret
+                                  (let [firstb (first bs)]
+                                    (cond
+                                      (= firstb '&) (recur (pb ret (second bs) gseq)
+                                                          n
+                                                          (rest (rest bs))
+                                                          true)
+                                      (= firstb :as) (pb ret (second bs) gvec)
+                                      :else (if seen-rest?
+                                              (throw (format "Unsupported binding form, only :as can follow & parameter"))
+                                              (recur (pb (if has-rest
+                                                              (-> ret
+                                                                  (put gfirst)
+                                                                  (put `(first ~gseq))
+                                                                  (put gseq)
+                                                                  (put `(rest ~gseq)))
+                                                              ret)
+                                                        firstb
+                                                        (if has-rest
+                                                          gfirst
+                                                          (list 'nth gvec n)))
+                                                    (inc n)
+                                                    (rest bs)
+                                                    seen-rest?))))))))]
+
+              (cond
+                 (symbol? b) (-> bvec (put b) (put v))
+                 (vector? b) (pvec bvec b v)
+                 :else (throw (format "Unsupported binding form: %s" b)))))
+        process-entry (fn (bvec b) (pb bvec (first b) (second b)))]
+    (if (every? symbol? (map first bents))
+      bindings
+      (reduce process-entry [] bents))))
+
+
+;; redefine let with destructuring
+;; TODO: there is alot of duplicated code here... I feel like I need to fix that
+;;       and 'reuse' a function or something
+(defmacro let (defs & body)
+  (do (when (odd? (len defs))
+            (throw (str "Error in let syntax. bindings must be of even length: " defs "")))
+      (let* ((bindings (partition 2 (destructure defs))))
+          (let* ((names (map first bindings))
+                 (vals (map second bindings)))
+            `(scope* ~(apply vector names)
+                     (do ~@(map (fn (x) (cons 'def x)) bindings)
+                         ~@body))))))
+
+
+
+
+(defmacro var (& bindings)
+  `(do ~@(map (fn (x) (cons 'def x)) (partition 2 (destructure bindings)))))
+
+
+
+
+
+
+
+
+
+
+
+(defmacro use (name & more)
+  (let [msym (gensyms "import__")
+        iutil (gensyms "iutil__")
+        path (str name)
+        opteq (fn (arg opt)
+                (let [s (str arg)]
+                  (or (= s (str ":" opt))
+                      (= s opt))))
+        parse-for (fn (v)
+                    (cond
+                      (or (= (type v) Vector) (= (type v) List))
+                      `(~@(map (fn (id)
+                                 `(def ~id (. ~msym ~id)))
+                             v))
+                      (= v '*) `(((. ~iutil merge-here) ~msym))
+                      (= (type v) Symbol) `((def ~v (. ~msym ~v)))))
+
+        parse (fn (args opts)
+                (if (nil? args) opts
+                    (let [[k v & r] args]
+                      (cond
+                        (opteq k "as") (recur r (set opts :as v))
+                        (opteq k "for") (recur r (set opts :for (parse-for v)))))))
+
+        expand (fn (opts)
+                 `(let* ((~msym      (require ~path))
+                         (~iutil (require "importutil")))
+                    (do (def ~(:as opts) ~msym)
+                      ~@(:for opts)
+                      ~msym)))]
+
+    (expand (parse more {:as name, :for nil}))))
+
+
+;; spread the internal _core module into the cedar core implementation
+(use _core for *)
+
+
+
+
+
+
+(defn- for-to-groups [seq-exprs])
+  ;;
+
+(defn- for-emit-bind [_args])
+  ;;
+
+
+(defmacro for
+  (seq-exprs body-expr)
+  (let [to-groups for-to-groups
+
+        err (fn (& msg) (throw (format "Illegal Arguments to for: %s" (apply str msg))))
+
+        emit-bind for-emit-bind]
+
+    `(let [iter# ~(emit-bind (to-groups seq-exprs))]
+        (iter# ~(second seq-exprs)))))
+
+
+
+
+
+(defn sleep [n]
+  (sleep n))
+
+
+;; parallel map.
+;; Will apply func to every element of xs and return a new list containing the
+;; return value. This particular map flavor will do things in fibers and await
+;; on channels
+(defn parmap [func xs]
+  (map recv
+    (map (fn (x)
+           (let [ch (chan)]
+             (go (send (func x) ch))
+             ch))
+         xs)))
+
+
+
+
+(defmacro wait-until (check & body)
+  `(do (while (not ~check) (sleep 0))
+      ~@body))
 
 
 
@@ -880,175 +1016,3 @@
 (defmacro defmethod (multifn dispatch-val & fn-tail)
   `(. ~multifn (set-method ~dispatch-val (fn ~@fn-tail))))
 
-
-
-(defmacro wait-until (check & body)
-  `(do (while (not ~check) (sleep 0))
-      ~@body))
-
-;; call the function 'pred' every i ms,
-;; stopping when pred returns false/nil
-(def (interval* i pred)
-  (if (or (nil? i) (= i 0))
-    ;; if there is no i interval, don't yield to
-    ;; the scheduler with (sleep) and let the scheduler
-    ;; preempt the fiber
-    (go (while (pred)))
-    ;; otherwise we need to yield to the scheduler
-    ;; every time around
-    (go (while (pred)
-          (sleep i)))))
-
-(defmacro interval (i & body)
-  `(interval* ~i (fn () (do ~@body))))
-
-
-(def *print-chan* (chan))
-(go (while true
-      (print (recv *print-chan*))))
-
-
-(defn sleep [n]
-  (sleep n))
-
-
-(defn parmap [func xs]
-  (map recv
-    (map (fn (x)
-           (let [ch (chan)]
-             (go (send (func x) ch))
-             ch))
-         xs)))
-
-
-(defn int [n] (bits.or n 0))
-(defn float [n] (+ n 0.0))
-
-
-(defn- char-is-number? [c]
-  (contains? "0123456789" c))
-
-
-;; (format "1 2 {} 4" 3) -> "1 2 3 4"
-
-(defn- svprintf [fmt args]
-  (let [buf ""]
-
-    (while (not (nil? fmt))
-      (let [c (first fmt)]
-        (cond (= c "%") (do (def fmt (rest fmt))
-                            (cond (= (first fmt) "s") (do (+= buf (str (first args)))
-                                                          (def args (rest args)))
-                                  (= (first fmt) "r") (do (+= buf (repr (first args)))
-                                                          (def args (rest args)))
-                                  (= (first fmt) "d") (do (if (number? (first args))
-                                                            (+= buf (int (first args)))
-                                                            (throw "d format directive requires a number"))
-                                                          (def args (rest args)))
-                                  (= (first fmt) "f") (do (if (number? (first args))
-                                                            (+= buf (float (first args)))
-                                                            (throw "f format directive requires a number"))
-                                                          (def args (rest args)))
-                                  (= (first fmt) "%") (+= buf "%")
-                                  :else (throw (str "Unknown format directive %" (first fmt))))
-                            (def fmt (rest fmt)))
-              :else (do (+= buf c)
-                        (def fmt (rest fmt))))))
-
-    (return buf)))
-
-(defn printf [fmt & args]
-    (print (svprintf fmt args)))
-
-(defn format [fmt & args]
-  (svprintf fmt args))
-
-
-
-(def next rest)
-
-(defn some [pred coll]
-  (when coll
-    (or (pred (first coll))
-        (some pred (rest coll)))))
-
-(defn seq [x] x)
-
-(defn destructure [bindings]
-  (let [bents (partition 2 bindings)
-        pb (fn (bvec b v)
-             (let [pvec (fn (bvec b val)
-                          (let [gvec (gensyms "vec__")
-                                gseq (gensyms "seq__")
-                                gfirst (gensyms "first__")
-                                has-rest (some (fn (x) (get {'& true} x false)) b)]
-                            (let [ret (let [ret (put (put bvec gvec) val)]
-                                        (if has-rest
-                                          (put (put ret gseq) (list 'seq gvec))
-                                          ret))
-                                  n 0
-                                  bs b
-                                  seen-rest? false]
-                               (if (not bs)
-                                  ret
-                                  (let [firstb (first bs)]
-                                    (cond
-                                      (= firstb '&) (recur (pb ret (second bs) gseq)
-                                                          n
-                                                          (rest (rest bs))
-                                                          true)
-                                      (= firstb :as) (pb ret (second bs) gvec)
-                                      :else (if seen-rest?
-                                              (throw (format "Unsupported binding form, only :as can follow & parameter"))
-                                              (recur (pb (if has-rest
-                                                              (-> ret
-                                                                  (put gfirst)
-                                                                  (put `(first ~gseq))
-                                                                  (put gseq)
-                                                                  (put `(rest ~gseq)))
-                                                              ret)
-                                                        firstb
-                                                        (if has-rest
-                                                          gfirst
-                                                          ;; TODO: determine if
-                                                          ;; get needs to be get
-                                                          ;; or not instead
-                                                          (list 'get gvec n nil)))
-                                                    (inc n)
-                                                    (next bs)
-                                                    seen-rest?))))))))]
-
-              (cond
-                 (symbol? b) (-> bvec (put b) (put v))
-                 (vector? b) (pvec bvec b v)
-                 :else (throw (format "Unsupported binding form: %s" b)))))
-        process-entry (fn (bvec b) (pb bvec (first b) (second b)))]
-    (if (every? symbol? (map first bents))
-      bindings
-      (reduce process-entry [] bents))))
-
-
-
-
-
-
-
-
-(defmacro for
-  (seq-exprs body-expr)
-  (let [to-groups (fn (seq-exprs) (reduce (fn (groups _vk)
-                                            (let [v (first _vk)
-                                                  k (second _vk)]
-                                              (if (keyword? k)
-                                                (put (pop groups) (put (peek groups) [k v]))
-                                                (put groups [k v]))))
-                                     [] (partition 2 seq-exprs)))
-
-
-        err (fn (& msg) (throw (format "Illegal Arguments to for: %s" (apply str msg))))
-
-        emit-bind (fn (_arg)
-                    (let))]
-
-    `(let [iter# ~(emit-bind (to-groups seq-exprs))]
-        (iter# ~(second seq-exprs)))))

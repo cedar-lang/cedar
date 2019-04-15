@@ -29,6 +29,7 @@
 #include <cedar/object/list.h>
 #include <cedar/object/module.h>
 #include <cedar/objtype.h>
+#include <cedar/thread.h>
 #include <cedar/vm/compiler.h>
 #include <cedar/vm/machine.h>
 #include <cedar/vm/opcode.h>
@@ -63,6 +64,30 @@ static u64 time_microseconds(void) {
 
 
 
+
+static std::mutex jid_mutex;
+static int next_jid = 0;
+
+fiber::fiber(call_state entry) {
+  m_type = fiber_type;
+
+  jid_mutex.lock();
+  jid = next_jid++;
+  jid_mutex.unlock();
+  fiber *self = this;
+  co.set_func([self](coro *c) { self->co_run(); });
+  add_call_frame(entry);
+}
+
+
+
+fiber::~fiber(void) {
+  delete[] stack;
+}
+
+
+
+
 void fiber::adjust_stack(int required) {
   if (required == 0) required = 32;
   if (required >= 0 && (stack_size < required || stack == nullptr)) {
@@ -81,104 +106,63 @@ void fiber::adjust_stack(int required) {
 
 
 inline frame *fiber::add_call_frame(call_state call) {
-  frame *frm = alloc_frame();
+
+  frame *frm = new frame();
   frm->call = call;
-  frm->caller = call_stack;
-  frm->sp = call_stack == nullptr ? 0 : call_stack->sp;
+  frm->caller = top_frame;
+  frm->sp = top_frame == nullptr ? 0 : top_frame->sp;
   frm->ip = call.func->code->code;
-  call_stack = frm;
+  top_frame = frm;
   adjust_stack(frm->sp + call.func->code->stack_size);
   return frm;
-}
 
+
+  frame &old = frames.back();
+  frames.push_back(frame{});
+  frame &back = frames.back();
+  back.call = call;
+  back.sp = top_frame == nullptr ? 0 : old.sp;
+  back.ip = call.func->code->code;
+  top_frame = &back;
+  adjust_stack(back.sp + call.func->code->stack_size);
+  return &back;
+}
 
 
 
 frame *fiber::pop_call_frame(void) {
-  frame *frm = call_stack;
-  call_stack = call_stack->caller;
+  frame *frm = top_frame;
+  top_frame = top_frame->caller;
   return frm;
 }
 
 
 
-static std::mutex jid_mutex;
-static int next_jid = 0;
 
-fiber::fiber(call_state entry) {
-  m_type = fiber_type;
-
-  jid_mutex.lock();
-  jid = next_jid++;
-  jid_mutex.unlock();
-
-
-  add_call_frame(entry);
+ref fiber::resume() {
+  run(4);
+  return return_value;
+  return co.resume();
 }
 
-fiber::fiber(fiber *other) {
-  m_type = fiber_type;
-  jid_mutex.lock();
-  jid = next_jid++;
-  jid_mutex.unlock();
-
-  stack = new ref[other->stack_size];
-  stack_size = other->stack_size;
-
-  for (int i = 0; i < stack_size; i++) stack[i] = other->stack[i];
-
-  call_stack = new frame();
-
-  auto *s = call_stack;
-  auto *o = other->call_stack;
-  while (o != nullptr) {
-    *s = *o;
-    s->caller = new frame();
-    s = s->caller;
-    o = o->caller;
-  }
-
-  done = other->done;
-  return_value = other->return_value;
-  sleep = other->sleep;
-  ticks = other->ticks;
-  reductions = other->reductions;
-  state = other->state.load();
-  worker = nullptr;
+void fiber::yield() {
+  // just yield nothing
+  yield(nullptr);
 }
 
-
-fiber::~fiber(void) {
-  // clear out the stack when we're done
-  delete[] stack;
+void fiber::yield(ref v) {
+  co.done = done;
+  co.yield(v);
 }
 
 
 
-int fiber::get_state(void) { return state.load(); }
-void fiber::set_state(fiber_state s) { state = s; }
-
-
-void fiber::print_callstack(void) {
-  static auto name_id = symbol::intern("*name*");
-  printf("Fiber #%d\n", jid);
-  int i = 0;
-  for (frame *f = call_stack; f != nullptr; f = f->caller) {
-    if (i == 0) {
-      printf("* ");
-    } else {
-      printf("  ");
-    }
-    printf("frame #%d: ", i++);
-    std::cout << ref(f->call.func);
-
-    std::cout << " in ";
-    ref mod_name = f->call.func->mod->getattr_fast(name_id);
-    std::cout << mod_name;
-    printf("\n");
+void fiber::co_run(void) {
+  while (!done) {
+    run(4);
+    yield(return_value);
   }
 }
-
 
 // run a fiber for its first return value
 // be it a yield or a real return
@@ -192,8 +176,6 @@ ref fiber::run(void) {
 
 // the primary run loop for fibers in cedar
 void fiber::run(int max_ms) {
-  std::unique_lock rlock(run_lock);
-
   state = RUNNING;
   u64 max_time = max_ms * 1000;
   // this function should have very minimal initialization code at the start
@@ -209,26 +191,31 @@ void fiber::run(int max_ms) {
   u8 op = 0;
   u64 ran = 0;
   state.store(RUNNING);
-  u64 instructions_per_check = 100;
+  u64 instructions_per_check = 1000;
 
 
 
-#define LOAD_CTX()     \
-  sp = call_stack->sp; \
-  ip = call_stack->ip;
 
-#define STORE_CTX()    \
-  call_stack->sp = sp; \
-  call_stack->ip = ip;
+#define LOAD_CTX()            \
+  if (top_frame != nullptr) { \
+    sp = top_frame->sp;       \
+    ip = top_frame->ip;       \
+  }
+
+#define STORE_CTX()           \
+  if (top_frame != nullptr) { \
+    top_frame->sp = sp;       \
+    top_frame->ip = ip;       \
+  }
 
   LOAD_CTX();
 
 
-#define PROG() call_stack->call.func
-#define LOCALS() call_stack->call.locals
+#define PROG() top_frame->call.func
+#define LOCALS() top_frame->call.locals
 
-  // #define SP() call_stack->sp
-  // #define IP() call_stack->ip
+  // #define SP() top_frame->sp
+  // #define IP() top_frame->ip
 
 #define PUSH(val) (stack[sp++] = (val))
 #define POP() (stack[--sp])
@@ -244,7 +231,8 @@ void fiber::run(int max_ms) {
 
 #define YIELD() \
   STORE_CTX();  \
-  return;
+  return; \
+  yield();
 
 
 #define OP_UNKNOWN 0xFF
@@ -260,6 +248,15 @@ void fiber::run(int max_ms) {
     SET_LABEL(OP_CONST);
     SET_LABEL(OP_FLOAT);
     SET_LABEL(OP_INT);
+    SET_LABEL(OP_INT_NEG_1);
+    SET_LABEL(OP_INT_0);
+    SET_LABEL(OP_INT_1);
+    SET_LABEL(OP_INT_2);
+    SET_LABEL(OP_INT_3);
+    SET_LABEL(OP_INT_4);
+    SET_LABEL(OP_INT_5);
+
+
     SET_LABEL(OP_LOAD_LOCAL);
     SET_LABEL(OP_SET_LOCAL);
     SET_LABEL(OP_LOAD_GLOBAL);
@@ -287,10 +284,20 @@ void fiber::run(int max_ms) {
     SET_LABEL(OP_EVAL);
     SET_LABEL(OP_SLEEP);
     SET_LABEL(OP_GET_MODULE);
+
     SET_LABEL(OP_ADD);
+    SET_LABEL(OP_SUB);
+    SET_LABEL(OP_NEG);
+    SET_LABEL(OP_INC);
+    SET_LABEL(OP_DEC);
+
+
+
     SET_LABEL(OP_LOAD_SELF);
     SET_LABEL(OP_SEND);
     SET_LABEL(OP_RECV);
+    SET_LABEL(OP_DICT_SET);
+    SET_LABEL(OP_GET_CURRENT_FUNC);
     created_thread_labels = true;
   }
 
@@ -298,7 +305,7 @@ void fiber::run(int max_ms) {
 
 
 #define PRELUDE \
-  if (sp > stack_size - 10) adjust_stack(stack_size * 2);
+  if (sp > stack_size - 10) adjust_stack(stack_size + 200);
 
 
 #define DISPATCH goto loop;
@@ -319,27 +326,32 @@ void fiber::run(int max_ms) {
 loop:
 
   if (ran > instructions_per_check) {
+    auto t = time_microseconds();
     auto elapsed = time_microseconds() - start_time;
     ran = 0;
     if (elapsed > max_time) {
       state.store(PARKED);
+      start_time = t;
       YIELD();
     }
   }
+
+
+
 
   // grab the next opcode and increment the instruction pointer
   op = *ip;
   ip++;
   ran++;
 
-  // printf("%02x %p\n", op, call_stack);
+  // printf("%02x %p\n", op, top_frame);
 
   goto *threaded_labels[op];
 
   switch (op) {
     TARGET(OP_UNKNOWN) {
       PRELUDE;
-      fprintf(stderr, "Unhandled instruction %02x in lambda ", op);
+      fprintf(stderr, "Unhandled instruction 0x%02x in lambda ", op);
       std::cout << PROG()->defining << std::endl;
       exit(-1);
       DISPATCH;
@@ -380,10 +392,48 @@ loop:
     }
 
 
+    TARGET(OP_INT_NEG_1) {
+      PRELUDE;
+      PUSH(ref{(i64)-1});
+      DISPATCH;
+    }
+
+    TARGET(OP_INT_0) {
+      PRELUDE;
+      PUSH(ref{(i64)0});
+      DISPATCH;
+    }
+    TARGET(OP_INT_1) {
+      PRELUDE;
+      PUSH(ref{(i64)1});
+      DISPATCH;
+    }
+    TARGET(OP_INT_2) {
+      PRELUDE;
+      PUSH(ref{(i64)2});
+      DISPATCH;
+    }
+    TARGET(OP_INT_3) {
+      PRELUDE;
+      PUSH(ref{(i64)3});
+      DISPATCH;
+    }
+    TARGET(OP_INT_4) {
+      PRELUDE;
+      PUSH(ref{(i64)4});
+      DISPATCH;
+    }
+    TARGET(OP_INT_5) {
+      PRELUDE;
+      PUSH(ref{(i64)5});
+      DISPATCH;
+    }
+
+
     TARGET(OP_LOAD_LOCAL) {
       PRELUDE;
-      auto ind = CODE_READ(u64);
-      CODE_SKIP(u64);
+      auto ind = CODE_READ(u8);
+      CODE_SKIP(u8);
       auto val = LOCALS()->at(ind);
       PUSH(val);
 
@@ -393,8 +443,8 @@ loop:
 
     TARGET(OP_SET_LOCAL) {
       PRELUDE;
-      auto ind = CODE_READ(u64);
-      CODE_SKIP(u64);
+      auto ind = CODE_READ(u8);
+      CODE_SKIP(u8);
       LOCALS()->at(ind) = stack[sp - 1];
       DISPATCH;
     }
@@ -479,6 +529,7 @@ loop:
 
 
 
+
     TARGET(OP_CALL) {
       PRELUDE;
 
@@ -497,6 +548,7 @@ loop:
 
         if (new_program->code_type == lambda::bytecode_type) {
           auto call = new_program->prime(argc, stack + abp);
+
 
           sp = new_fp;
           STORE_CTX();
@@ -580,14 +632,14 @@ loop:
       PRELUDE;
       auto size = POP().to_int();
       auto ind = POP().to_int();
-      call_stack->call.locals = new closure(size, call_stack->call.locals, ind);
+      top_frame->call.locals = new closure(size, top_frame->call.locals, ind);
       DISPATCH;
     }
 
 
     TARGET(OP_POP_SCOPE) {
       PRELUDE;
-      call_stack->call.locals = call_stack->call.locals->m_parent;
+      top_frame->call.locals = top_frame->call.locals->m_parent;
       DISPATCH;
     }
 
@@ -598,15 +650,14 @@ loop:
       PRELUDE;
       ref val = POP();
 
-      frame *old_frame = pop_call_frame();
-      dispose_frame(old_frame);
+      pop_call_frame();
 
-      if (call_stack == nullptr) {
+      if (top_frame == nullptr) {
         state.store(STOPPED);
         done = true;
         return_value = val;
-        return;
         YIELD();
+        return;
       }
       LOAD_CTX();
 
@@ -675,9 +726,12 @@ loop:
       PROG()->set_args_closure(LOCALS(), argc, stack + abp);
       ip = PROG()->code->code;
 
-      sp = call_stack->caller->sp + 1;
+      sp = top_frame->caller->sp + 1;
+
       DISPATCH;
     }
+
+
 
     TARGET(OP_GET_ATTR) {
       PRELUDE;
@@ -688,6 +742,7 @@ loop:
       symbol s;
       // set it's id
       s.id = id;
+
       // actually getattr
       auto attr = val.getattr(&s);
       // push the value
@@ -740,12 +795,38 @@ loop:
     TARGET(OP_DEF_MACRO) {
       PRELUDE;
       auto func = POP();
-      int id = CODE_READ(i64);
+      u64 id = CODE_READ(i64);
       CODE_SKIP(i64);
       vm::set_macro(id, func);
+
+
       auto s = new symbol();
       s->id = id;
-      PUSH(id);
+
+
+
+      PUSH(nullptr);
+      DISPATCH;
+
+      /* Everything below here is experimental */
+
+      lambda *f = ref_cast<lambda>(func);
+      if (f != nullptr) {
+        f->macro = true;
+        if (PROG()->mod != nullptr) {
+          bool found;
+          PROG()->mod->find(id, &found);
+          if (found) {
+            std::cout << "MACRO REASSIGN: " << symbol::unintern(id) << " "
+                      << std::endl;
+          }
+          PROG()->mod->setattr_fast(id, f);
+          PUSH(func);
+          DISPATCH;
+        }
+      }
+
+      PUSH(nullptr);
       DISPATCH;
     }
 
@@ -796,6 +877,36 @@ loop:
       ref b = POP();
       ref a = POP();
       PUSH(a + b);
+      DISPATCH;
+    }
+
+
+    TARGET(OP_SUB) {
+      PRELUDE;
+      ref b = POP();
+      ref a = POP();
+      PUSH(a - b);
+      DISPATCH;
+    }
+
+
+    TARGET(OP_NEG) {
+      PRELUDE;
+      ref a = POP();
+      PUSH(a * -1);
+      DISPATCH;
+    }
+
+    TARGET(OP_INC) {
+      PRELUDE;
+      ref a = POP();
+      PUSH(a + 1);
+      DISPATCH;
+    }
+    TARGET(OP_DEC) {
+      PRELUDE;
+      ref a = POP();
+      PUSH(a - 1);
       DISPATCH;
     }
 
@@ -857,6 +968,23 @@ loop:
 
       DISPATCH;
     }
+
+
+
+
+    TARGET(OP_DICT_SET) {
+      PRELUDE;
+
+      DISPATCH;
+    }
+
+
+
+    TARGET(OP_GET_CURRENT_FUNC) {
+      PRELUDE;
+      PUSH(PROG());
+      DISPATCH;
+    }
   }
 
   goto loop;
@@ -867,4 +995,31 @@ exit:
   return_value = POP();
   state.store(STOPPED);
   YIELD();
+}
+
+
+
+
+int fiber::get_state(void) { return state.load(); }
+void fiber::set_state(fiber_state s) { state = s; }
+
+
+void fiber::print_callstack(void) {
+  static auto name_id = symbol::intern("*name*");
+  printf("Fiber #%d\n", jid);
+  int i = 0;
+  for (auto it = frames.rbegin(); it != frames.rend(); ++it) {
+    if (i == 0) {
+      printf("* ");
+    } else {
+      printf("  ");
+    }
+    printf("frame #%d: ", i++);
+    std::cout << ref(it->call.func);
+
+    std::cout << " in ";
+    ref mod_name = it->call.func->mod->getattr_fast(name_id);
+    std::cout << mod_name;
+    printf("\n");
+  }
 }

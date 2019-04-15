@@ -47,7 +47,7 @@ namespace cedar {
 
 
 
-    ref macroexpand_1(ref);
+    ref macroexpand_1(ref, module *);
 
     // a "var" is a storage cell in the machine. It allows
     // storage of values, docs, etc...

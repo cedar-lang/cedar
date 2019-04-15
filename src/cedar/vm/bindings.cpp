@@ -29,10 +29,11 @@
 #include <cedar.h>
 #include <cedar/globals.h>
 #include <cedar/modules.h>
+#include <cedar/mutex.h>
 #include <cedar/object/bytes.h>
+#include <cedar/objtype.h>
 #include <cedar/thread.h>
 #include <cedar/vm/binding.h>
-#include <cedar/objtype.h>
 #include <fcntl.h>
 #include <math.h>
 #include <stdio.h>
@@ -41,7 +42,6 @@
 #include <unistd.h>
 #include <regex>
 #include <thread>
-#include <cedar/mutex.h>
 
 #include <gc/gc.h>
 
@@ -76,14 +76,20 @@ cedar_binding(cedar_is) {
   return argv[0] == argv[0] ? true_value : nullptr;
 }
 
-cedar_binding(cedar_add) {
-  if (argc == 0) return 0;
-  ref accumulator = argv[0];
-  for (int i = 1; i < argc; i++) {
-    accumulator = accumulator + argv[i];
+
+static void cedar_add(const function_callback &args) {
+  if (args.len() == 0) {
+    args.get_return() = 0;
+    return;
   }
-  return accumulator;
+  ref accumulator = args[0];
+  for (int i = 1; i < args.len(); i++) {
+    accumulator = accumulator + args[i];
+  }
+
+  args.get_return() = accumulator;
 }
+
 
 cedar_binding(cedar_sub) {
   if (argc == 1) {
@@ -206,7 +212,6 @@ cedar_binding(cedar_newdict) {
 
   ref d = cedar::new_obj<cedar::dict>();
   for (int i = 0; i < argc; i += 2) {
-
     // idx_set(d, argv[i], argv[i + 1]);
   }
   return d;
@@ -552,165 +557,181 @@ void init_binding(cedar::vm::machine *m) {
 
 
 
+  def_global(
+      "println", bind_lambda(argc, argv, machine) {
+        print_mutex.lock();
+        for (int i = 0; i < argc; i++) {
+          std::string s = argv[i].to_string(true);
+          printf("%s", s.c_str());
+          if (i < argc - 1) printf(" ");
+        }
+        printf("\n");
+        print_mutex.unlock();
+        return nullptr;
+      });
 
-  def_global("println", bind_lambda(argc, argv, machine) {
-    print_mutex.lock();
-    for (int i = 0; i < argc; i++) {
-      std::string s = argv[i].to_string(true);
-      printf("%s", s.c_str());
-      if (i < argc-1) printf(" ");
+  def_global(
+      "print", bind_lambda(argc, argv, machine) {
+        print_mutex.lock();
+        for (int i = 0; i < argc; i++) {
+          std::string s = argv[i].to_string(true);
+          printf("%s", s.c_str());
+          if (i < argc - 1) printf(" ");
+        }
+        print_mutex.unlock();
+        return nullptr;
+      });
+
+
+  def_global(
+      "repr", bind_lambda(argc, argv, machine) {
+        ERROR_IF_ARGS_PASSED_IS("repr", !=, 1);
+        return new string(argv[0].to_string(false));
+      });
+
+
+
+  def_global(
+      "sqrt", bind_lambda(argc, argv, machine) {
+        ERROR_IF_ARGS_PASSED_IS("sqrt", !=, 1);
+        return sqrt(argv[0].to_float());
+      });
+
+
+  def_global(
+      "ex/type", bind_lambda(argc, argv, machine) { return argv[0]->m_type; });
+
+
+  def_global(
+      "getattr*",
+      bind_lambda(argc, argv, machine) { return argv[0].getattr(argv[1]); });
+  def_global(
+      "setattr*", bind_lambda(argc, argv, machine) {
+        argv[0].setattr(argv[1], argv[2]);
+        return argv[2];
+      });
+
+  def_global(
+      "type", bind_lambda(argc, argv, machine) {
+        ERROR_IF_ARGS_PASSED_IS("type", !=, 1);
+        return argv[0].get_type();
+      });
+
+
+  def_global(
+      "panic", bind_lambda(argc, argv, machine) {
+        ERROR_IF_ARGS_PASSED_IS("panic", !=, 1);
+
+        std::cerr << "PANIC: " << argv[0].to_string(true) << std::endl;
+        exit(-1);
+        return nullptr;
+      });
+
+
+
+
+  def_global("macroexpand-1", [=](const function_callback &args) {
+    if (args.len() != 1) {
+      args.throw_obj(new string("macroexpand requires 1 argument"));
+      return;
     }
-    printf("\n");
-    print_mutex.unlock();
-    return nullptr;
+    ref obj = args[0];
+    args.get_return() = vm::macroexpand_1(obj, args.get_module());
   });
 
-  def_global("print", bind_lambda(argc, argv, machine) {
-      print_mutex.lock();
-    for (int i = 0; i < argc; i++) {
-      std::string s = argv[i].to_string(true);
-      printf("%s", s.c_str());
-      if (i < argc-1) printf(" ");
+
+
+
+  def_global(
+      "path-resolve", bind_lambda(argc, argv, machine) {
+        ERROR_IF_ARGS_PASSED_IS("resolve-source-file", !=, 2);
+        ref p = argv[0];
+        if (p.get_type() != string_type) {
+          throw cedar::make_exception(
+              "resolve-source-file requires string path");
+        }
+        ref b = argv[1];
+        if (b.get_type() != string_type) {
+          throw cedar::make_exception(
+              "resolve-source-file requires string base hint");
+        }
+        cedar::runes path_hint = p.as<string>()->get_content();
+        apathy::Path base = b.as<string>()->get_content();
+        if (base.is_file()) {
+          base = base.up();
+        }
+        return new string(path_resolve(path_hint, base));
+      });
+
+
+  def_global(
+      "read-file", bind_lambda(argc, argv, machine) {
+        ERROR_IF_ARGS_PASSED_IS("read-file", !=, 1);
+        ref p = argv[0];
+        if (p.get_type() != string_type) {
+          throw cedar::make_exception("read-file requires string path");
+        }
+        std::string path = p.to_string(true);
+        apathy::Path pth = path;
+        if (!pth.is_file()) {
+          throw cedar::make_exception("file not found");
+        }
+        return new string(util::read_file(path.c_str()));
+      });
+
+
+  def_global(
+      "re-match", bind_lambda(argc, argv, machine) {
+        ERROR_IF_ARGS_PASSED_IS("re-match", !=, 2);
+        ref re = argv[0];
+        ref str = argv[1];
+        if (re.get_type() != string_type || str.get_type() != string_type) {
+          throw cedar::make_exception("(re-match ...) requires strings");
+        }
+        std::string reg = re.to_string(true);
+        std::string src = str.to_string(true);
+        ref v = new vector();
+        for (auto &c : regex_matches(reg, src, std::regex_constants::icase)) {
+          v = self_call(v, "put", new string(c));
+        }
+        return v;
+      });
+
+
+
+
+  def_global("require", [=](const function_callback &args) {
+    if (args.len() != 1) {
+      args.throw_obj(new string("require takes 1 argument"));
     }
-    print_mutex.unlock();
-    return nullptr;
-  });
-
-
-  def_global("repr", bind_lambda(argc, argv, machine) {
-    ERROR_IF_ARGS_PASSED_IS("repr", !=, 1);
-    return new string(argv[0].to_string(false));
+    std::string path = args[0].to_string(true);
+    args.get_return() = require(path, args.get_module()->path);
   });
 
 
 
-  def_global("sqrt", bind_lambda(argc, argv, machine) {
-    ERROR_IF_ARGS_PASSED_IS("sqrt", !=, 1);
-    return sqrt(argv[0].to_float());
-  });
-
-
-  def_global("ex/type",
-             bind_lambda(argc, argv, machine) { return argv[0]->m_type; });
-
-
-  def_global("getattr*", bind_lambda(argc, argv, machine) {
-    return argv[0].getattr(argv[1]);
-  });
-  def_global("setattr*", bind_lambda(argc, argv, machine) {
-    argv[0].setattr(argv[1], argv[2]);
-    return argv[2];
-  });
-
-  def_global("type", bind_lambda(argc, argv, machine) {
-    ERROR_IF_ARGS_PASSED_IS("type", !=, 1);
-    return argv[0].get_type();
-  });
-
-
-  def_global("panic", bind_lambda(argc, argv, machine) {
-    ERROR_IF_ARGS_PASSED_IS("panic", !=, 1);
-
-    std::cerr << "PANIC: " << argv[0].to_string(true) << std::endl;
-    exit(-1);
-    return nullptr;
-  });
-
-
-
-
-  def_global("macroexpand-1", bind_lambda(argc, argv, machine) {
-    ERROR_IF_ARGS_PASSED_IS("macroexpand-1", !=, 1);
-    ref obj = argv[0];
-    return vm::macroexpand_1(obj);
-    ;
-  });
-
-
-
-
-  def_global("path-resolve", bind_lambda(argc, argv, machine) {
-    ERROR_IF_ARGS_PASSED_IS("resolve-source-file", !=, 2);
-    ref p = argv[0];
-    if (p.get_type() != string_type) {
-      throw cedar::make_exception("resolve-source-file requires string path");
-    }
-    ref b = argv[1];
-    if (b.get_type() != string_type) {
-      throw cedar::make_exception(
-          "resolve-source-file requires string base hint");
-    }
-    cedar::runes path_hint = p.as<string>()->get_content();
-    apathy::Path base = b.as<string>()->get_content();
-    if (base.is_file()) {
-      base = base.up();
-    }
-    return new string(path_resolve(path_hint, base));
-  });
-
-
-  def_global("read-file", bind_lambda(argc, argv, machine) {
-    ERROR_IF_ARGS_PASSED_IS("read-file", !=, 1);
-    ref p = argv[0];
-    if (p.get_type() != string_type) {
-      throw cedar::make_exception("read-file requires string path");
-    }
-    std::string path = p.to_string(true);
-    apathy::Path pth = path;
-    if (!pth.is_file()) {
-      throw cedar::make_exception("file not found");
-    }
-    return new string(util::read_file(path.c_str()));
-  });
-
-
-  def_global("re-match", bind_lambda(argc, argv, machine) {
-    ERROR_IF_ARGS_PASSED_IS("re-match", !=, 2);
-    ref re = argv[0];
-    ref str = argv[1];
-    if (re.get_type() != string_type || str.get_type() != string_type) {
-      throw cedar::make_exception("(re-match ...) requires strings");
-    }
-    std::string reg = re.to_string(true);
-    std::string src = str.to_string(true);
-    ref v = new vector();
-    for (auto &c : regex_matches(reg, src, std::regex_constants::icase)) {
-      v = self_call(v, "put", new string(c));
-    }
-    return v;
-  });
-
-
-
-
-  def_global("require", bind_lambda(argc, argv, machine) {
-    ERROR_IF_ARGS_PASSED_IS("require", !=, 1);
-    std::string path = argv[0].to_string(true);
-    return require(path);
-  });
-
-
-
-  def_global("gc", bind_lambda(argc, argv, machine) {
-    GC_gcollect();
-    return nullptr;
-  });
+  def_global(
+      "gc", bind_lambda(argc, argv, machine) {
+        GC_gcollect();
+        return nullptr;
+      });
 
 
 
 
   // this is really dumb, but it works
-  def_global("has-attr?", bind_lambda(argc, argv, machine) {
-    static symbol *tr = new symbol("true");
-    ref thing = argv[0];
-    ref attr = argv[1];
-    try {
-      thing.getattr(attr);
-      return tr;
-    } catch (...) {
-      return nullptr;
-    }
-  });
+  def_global(
+      "has-attr?", bind_lambda(argc, argv, machine) {
+        static symbol *tr = new symbol("true");
+        ref thing = argv[0];
+        ref attr = argv[1];
+        try {
+          thing.getattr(attr);
+          return tr;
+        } catch (...) {
+          return nullptr;
+        }
+      });
 
 
 
@@ -748,50 +769,53 @@ void init_binding(cedar::vm::machine *m) {
     inline reader_obj() { m_type = reader_type; }
   };
 
-  reader_type->setattr("__alloc__", bind_lambda(argc, argv, machine) {
-    return new reader_obj();
-  });
+  reader_type->setattr(
+      "__alloc__",
+      bind_lambda(argc, argv, machine) { return new reader_obj(); });
 
 
-  reader_type->set_field("new", bind_lambda(argc, argv, machine) {
-    if (argc != 2 || argv[1].get_type() != string_type)
-      throw cedar::make_exception("Reader/new requires a string argument");
+  reader_type->set_field(
+      "new", bind_lambda(argc, argv, machine) {
+        if (argc != 2 || argv[1].get_type() != string_type)
+          throw cedar::make_exception("Reader/new requires a string argument");
 
 
-    reader_obj *self = argv[0].as<reader_obj>();
-    string *s = argv[1].as<string>();
+        reader_obj *self = argv[0].as<reader_obj>();
+        string *s = argv[1].as<string>();
 
-    cedar::runes r = s->get_content();
+        cedar::runes r = s->get_content();
 
-    self->m_parsed = self->m_reader.run(r);
+        self->m_parsed = self->m_reader.run(r);
 
-    return nullptr;
-  });
+        return nullptr;
+      });
 
 
-  reader_type->set_field("rest", bind_lambda(argc, argv, machine) {
-    reader_obj *self = argv[0].as<reader_obj>();
+  reader_type->set_field(
+      "rest", bind_lambda(argc, argv, machine) {
+        reader_obj *self = argv[0].as<reader_obj>();
 
-    if (self->index >= self->m_parsed.size() - 1) {
-      return nullptr;
-    }
+        if (self->index >= self->m_parsed.size() - 1) {
+          return nullptr;
+        }
 
-    auto *next = new reader_obj();
-    next->m_parsed = self->m_parsed;
-    next->index = self->index + 1;
-    return next;
-  });
+        auto *next = new reader_obj();
+        next->m_parsed = self->m_parsed;
+        next->index = self->index + 1;
+        return next;
+      });
 
-  reader_type->set_field("first", bind_lambda(argc, argv, machine) {
-    reader_obj *self = argv[0].reinterpret<reader_obj *>();
+  reader_type->set_field(
+      "first", bind_lambda(argc, argv, machine) {
+        reader_obj *self = argv[0].reinterpret<reader_obj *>();
 
-    auto *next = new reader_obj();
-    next->m_reader = self->m_reader;
-    if (self->index >= self->m_parsed.size()) {
-      return nullptr;
-    }
-    return self->m_parsed[self->index];
-  });
+        auto *next = new reader_obj();
+        next->m_reader = self->m_reader;
+        if (self->index >= self->m_parsed.size()) {
+          return nullptr;
+        }
+        return self->m_parsed[self->index];
+      });
 
   def_global(new symbol("Reader"), reader_type);
 }

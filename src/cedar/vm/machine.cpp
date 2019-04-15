@@ -27,26 +27,27 @@
 #include <chrono>
 #include <ratio>
 
-#include <cedar/scheduler.h>
+#include <cedar/globals.h>
 #include <cedar/object.h>
 #include <cedar/object/dict.h>
+#include <cedar/object/fiber.h>
 #include <cedar/object/lambda.h>
 #include <cedar/object/list.h>
+#include <cedar/object/module.h>
 #include <cedar/object/string.h>
 #include <cedar/object/symbol.h>
-#include <cedar/object/fiber.h>
 #include <cedar/objtype.h>
 #include <cedar/parser.h>
 #include <cedar/ref.h>
+#include <cedar/scheduler.h>
 #include <cedar/types.h>
 #include <cedar/vm/machine.h>
 #include <cedar/vm/opcode.h>
+#include <gc/gc.h>
 #include <unistd.h>
 #include <cedar/util.hpp>
-#include <thread>
-#include <cedar/globals.h>
 #include <flat_hash_map.hpp>
-#include <gc/gc.h>
+#include <thread>
 
 
 using namespace cedar;
@@ -67,13 +68,15 @@ lambda *vm::get_macro(int id) {
 
 void vm::set_macro(int id, ref mac) {
   if (ref_cast<lambda>(mac) == nullptr) {
-    throw cedar::make_exception("unable to add macro ", symbol::unintern(id), " to non-lambda ", mac);
+    throw cedar::make_exception("unable to add macro ", symbol::unintern(id),
+                                " to non-lambda ", mac);
   }
 
   macros[id] = mac;
 }
 
-ref vm::macroexpand_1(ref obj) {
+ref vm::macroexpand_1(ref obj, module *mod) {
+
   if (obj.is<list>()) {
     // loop till the macroexpand doesnt change the object
     ref first = obj.first();
@@ -96,11 +99,50 @@ ref vm::macroexpand_1(ref obj) {
       }
     }
   }
+
+  return obj;
+
+
+
+
+
+
+  if (obj.is<list>()) {
+    ref first = obj.first();
+    symbol *s = ref_cast<symbol>(first);
+    if (s != nullptr) {
+      bool found = false;
+      ref f;
+      try {
+        f = mod->find(s->id, &found, mod);
+      } catch (...) {
+        return obj;
+      }
+
+      if (found) {
+        lambda *mac = ref_cast<lambda>(f);
+        if (mac != nullptr) {
+          if (mac->macro) {
+            int argc = 0;
+            std::vector<ref> argv;
+            ref args = obj.rest();
+            while (!args.is_nil()) {
+              argv.push_back(args.first());
+              argc++;
+              args = args.rest();
+            }
+            call_context ctx;
+            ref expanded = call_function(mac, argc, argv.data(), &ctx);
+            return expanded;
+          }
+        }
+      }
+    }
+  }
   return obj;
 }
 
 
-vm::machine::machine(void) {
-}
+vm::machine::machine(void) {}
 
 vm::machine::~machine() {}

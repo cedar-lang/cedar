@@ -10,8 +10,8 @@
  * copies of the Software, and to permit persons to whom the Software is
  * furnished to do so, subject to the following conditions:
  *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
  *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -25,26 +25,58 @@
 #include <cedar/object.h>
 #include <cedar/object/number.h>
 #include <cedar/runes.h>
-
+#include <cedar/objtype.h>
 #include <string>
 
 using namespace cedar;
 
 
 number::number(void) {
-	throw cedar::make_exception("cedar::number depricated");
+  m_type = number_type;
+  number((i64)0);
 }
-
-number::number(double) {
-	throw cedar::make_exception("cedar::number depricated");
+number::number(double d) {
+  m_type = number_type;
+  ntype = num_type::floating;
+  m_flt = d;
+}
+number::number(i64 i) {
+  m_type = number_type;
+  ntype = num_type::floating;
+  m_int = i;
 }
 
 number::~number(void) {}
 
+
+
+
 cedar::runes number::to_string(bool) {
-	return std::to_string(0);
+  if (is_int()) {
+    return std::to_string(m_int);
+  }
+  if (is_flt()) {
+    auto str = std::to_string(m_flt);
+    long len = str.length();
+    for (int i = len - 1; i > 0; i--) {
+      if (str[i] == '0') {
+        str.pop_back();
+      } else if (str[i] == '.') {
+        str.pop_back();
+        str += ".0";
+        break;
+      } else {
+        break;
+      }
+    }
+    return str;
+  }
+  return "0";
 }
 
-u64 number::hash(void) {
-	return 0lu;
-}
+
+
+u64 number::hash(void) { return 0lu; }
+
+
+

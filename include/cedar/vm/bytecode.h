@@ -35,7 +35,9 @@
 #include <cstring>
 #include <list>
 #include <map>
+#include <cedar/serialize.h>
 #include <vector>
+#include <mutex>
 
 namespace cedar {
 
@@ -47,13 +49,14 @@ namespace cedar {
 
     // bytecode object
     class bytecode {
-     private:
+     protected:
+       friend cedar::serializer;
+
       // size is how many bytes are written into the code pointer
       // it also determines *where* to write when writing new data
       u64 size = 0;
       // cap is the number of bytes allocated for the code pointer
       u64 cap = 32;
-
      public:
       i32 stack_size = 0;
 
@@ -71,10 +74,17 @@ namespace cedar {
         code = new uint8_t[cap];
       }
 
+
+      std::mutex calls_lock;
+      std::map<std::vector<type *>, int> calls;
+
+
       void print(u8 *ip = nullptr);
       ref &get_const(int);
       int push_const(ref);
       void finalize();
+
+      void record_call(int argc, ref *argv);
 
 
       template <typename T>

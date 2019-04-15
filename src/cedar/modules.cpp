@@ -92,6 +92,7 @@ static module *require_file(apathy::Path p) {
   cedar::runes src = str;
 
   module *mod = new module(path);
+  mod->path = path;
   static auto file_id = symbol::intern("*file*");
   mod->setattr_fast(file_id, new string(path));
   eval_string_in_module(src, mod);
@@ -104,7 +105,12 @@ static module *require_file(apathy::Path p) {
 
 
 
-module *cedar::require(std::string name) {
+module *cedar::require(std::string name, std::string base) {
+  if (base == "") {
+    base = apathy::Path::cwd().string();
+  }
+
+
   if (modules.count(name) != 0) {
     return modules.at(name);
   }
@@ -150,6 +156,7 @@ ref cedar::eval_string_in_module(cedar::runes &src, module *mod) {
 
 ref cedar::eval(ref obj, module *mod) {
   vm::compiler c;
+  c.mod = mod;
   ref compiled_lambda = c.compile(obj, mod);
   lambda *raw_program = ref_cast<cedar::lambda>(compiled_lambda);
   raw_program->mod = mod;

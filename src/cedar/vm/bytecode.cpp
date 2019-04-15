@@ -10,8 +10,8 @@
  * copies of the Software, and to permit persons to whom the Software is
  * furnished to do so, subject to the following conditions:
  *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
  *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -28,7 +28,10 @@
 #include <cedar/vm/instruction.h>
 #include <cedar/vm/opcode.h>
 #include <unistd.h>
+#include <cedar/objtype.h>
 #include <functional>
+#include <cedar/ref.h>
+#include <mutex>
 
 using namespace cedar;
 
@@ -42,7 +45,8 @@ int vm::bytecode::push_const(ref val) {
 }
 
 
-static void each_opcode(int size, uint8_t *code, std::function<void(uint8_t)> func) {
+static void each_opcode(int size, uint8_t *code,
+                        std::function<void(uint8_t)> func) {
 #define WALK_OVER(type)   \
   { i += sizeof(type); }; \
   break;
@@ -60,6 +64,8 @@ static void each_opcode(int size, uint8_t *code, std::function<void(uint8_t)> fu
         WALK_OVER(int64_t);
       case vm::imm_ptr:
         WALK_OVER(void *);
+      case vm::imm_byte:
+        WALK_OVER(i8);
       case vm::no_arg: {
       }; break;
     }
@@ -79,7 +85,6 @@ void vm::bytecode::finalize(void) {
     switch (op) { CEDAR_FOREACH_OPCODE(V) }
 #undef V
   });
-
 
   stack_size = stack_effect;
 }
@@ -150,4 +155,24 @@ void vm::bytecode::print(u8 *ip) {
       if (is_current) printf("\x1b[0m");
     }
   }
+}
+
+
+
+void vm::bytecode::record_call(int argc, ref *argv) {
+  calls_lock.lock();
+  if (argv != nullptr) {
+    std::vector<type *> types;
+    for (int i = 0; i < argc; i++) {
+      types.push_back(argv[i].get_type());
+    }
+    if (calls[types] == 0) {
+      printf("new call: ");
+      for (int i = 0; i < argc; i++) std::cout << ref(argv[i].get_type()) << " ";
+
+      printf("\n");
+    }
+    calls[types]++;
+  }
+  calls_lock.unlock();
 }

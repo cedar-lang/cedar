@@ -70,6 +70,12 @@ void cedar::def_global(runes k, bound_function f) {
   def_global(id, func);
 }
 
+void cedar::def_global(runes k, native_callback f) {
+  u64 id = symbol::intern(k);
+  ref func = new lambda(f);
+  def_global(id, func);
+}
+
 
 
 ref cedar::get_global(u64 id) {

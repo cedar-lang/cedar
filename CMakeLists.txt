@@ -1,12 +1,15 @@
 # stop if cmake version below 3.5
 cmake_minimum_required(VERSION 3.5 FATAL_ERROR)
-project(cedar C CXX)
+project(cedar C CXX ASM)
 
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
 endif()
 set (CMAKE_CXX_STANDARD 17)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
+
+SET(CMAKE_ASM_FLAGS "${CFLAGS} -x assembler-with-cpp")
 
 set(CMAKE_CXX_FLAGS_DEBUG "-g -O0 -DBUILD_MODE=Debug -fno-omit-frame-pointer")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3 -g -DBUILD_MODE=Release")
@@ -15,11 +18,15 @@ set(CMAKE_C_FLAGS_DEBUG "-g -O0 -DBUILD_MODE=Debug -fno-omit-frame-pointer")
 set(CMAKE_C_FLAGS_RELEASE "-O3 -g -DBUILD_MODE=Release")
 
 
-include_directories(dep/bdwgc/include)
-add_definitions(-DPOINTER_MASK=0x0000FFFFFFFFFFFF)
+add_definitions(-DPOINTER_MASK=0x0007FFFFFFFFFFFF)
+
+
 
 # build dependencies before setting up project deets
 add_subdirectory(dep/libuv)
+
+add_subdirectory(src/asmjit)
+
 
 
 set(BUILD_SHARED_LIBS OFF)

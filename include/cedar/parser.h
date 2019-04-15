@@ -151,7 +151,7 @@ namespace cedar {
     ref parse_list(void);
 
     ref parse_vector(void);
-    // ref parse_dict(void);
+    ref parse_dict(void);
 
     // parse things like
     //    'a  -> (quote a)

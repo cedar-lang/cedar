@@ -79,6 +79,8 @@ namespace cedar {
 				class context {
         };
 
+        module *mod;
+
 				/*
 				 * given some object reference,
 				 * compile it into bytecode and return
@@ -94,6 +96,7 @@ namespace cedar {
 				void compile_symbol(ref, bytecode &, scope*, compiler_ctx*);
 				void compile_list(ref, bytecode &, scope*, compiler_ctx*);
         void compile_vector(ref, bytecode &, scope*, compiler_ctx*);
+        void compile_dict(ref, bytecode &, scope*, compiler_ctx*);
 				void compile_quasiquote(ref, bytecode &, scope* sc, compiler_ctx*);
 		};
 

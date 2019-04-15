@@ -31,6 +31,7 @@
 #include <cedar/object/keyword.h>
 #include <cedar/object/list.h>
 #include <cedar/object/string.h>
+#include <cedar/object/lambda.h>
 #include <cedar/object/symbol.h>
 #include <cedar/object/vector.h>
 #include <cedar/vm/machine.h>
@@ -80,10 +81,15 @@ void type::set_field(cedar::runes k, bound_function val) {
   ref lam = new lambda(val);
   m_fields.set(i, lam);
 }
+void type::set_field(cedar::runes k, native_callback val) {
+  auto i = symbol::intern(k);
+  ref lam = new lambda(val);
+  m_fields.set(i, lam);
+}
 
 ////////////////////////////////////////////////////////////
 
-static cedar_binding(type_str_lambda) {
+static ref type_str_lambda(int argc, ref *argv, call_context *ctx) {
   type *self = argv[0].stat_cast<type *>();
   cedar::runes s;
   s += "<type ";
@@ -571,7 +577,7 @@ static void init_dict_type() {
   dict_type->set_field("new", bind_lambda(argc, argv, machine) {
     auto *self = argv[0].as<dict>();
     for (int i = 1; i < argc; i += 2) {
-      self->set(argv[i], argv[i+1]);
+      self->set(argv[i], argv[i + 1]);
       // idx_set(self, argv[i], argv[i + 1]);
     }
     return nullptr;
@@ -674,6 +680,10 @@ static void init_lambda_type() {
     lambda *self = argv[0].as<lambda>();
 
     cedar::runes c;
+
+    if (!self->defining.is_nil()) {
+      return new string(self->defining.to_string(true));
+    }
 
     c += "<fn ";
 

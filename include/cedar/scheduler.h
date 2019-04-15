@@ -28,52 +28,77 @@
 #include <cedar/cl_deque.h>
 #include <cedar/ref.h>
 #include <cedar/types.h>
+#include <setjmp.h>
+#include <sys/mman.h>
 #include <uv.h>
 #include <future>
 #include <list>
 #include <mutex>
 #include <thread>
 
+#include <gc/gc.h>
+#include <gc/gc_cpp.h>
+
 /*
  * The cedar scheduler's job is to distribute work across several worker threads
- *
- * It does this by...
- * TODO: Write how it works :)
  */
-
 
 namespace cedar {
 
 
+  class coro {
+    char *stk = nullptr;
+    char *stack_base = nullptr;
+    bool initialized = false;
+    ref value;
+    void run();
+
+   public:
+    jmp_buf ctx;
+    jmp_buf return_ctx;
+    bool done = false;
+    std::function<void(coro *)> func;
+    coro(std::function<void(coro *)>);
+    coro();
+    ~coro(void);
+
+
+    void set_func(std::function<void(coro *)>);
+    void yield(void);
+    void yield(ref v);
+    bool is_done(void);
+    ref resume(void);
+  };
 
 
   template <typename T>
   class locked_queue {
     std::list<T> m_buffer;
     std::mutex m_lock;
-    public:
-      inline T pop(void) {
-        std::lock_guard lock(m_lock);
-        if (m_buffer.size() == 0) return T{};
-        T f = m_buffer.front();
-        m_buffer.pop_front();
-        return f;
-      }
-      inline T steal(void) {
-        std::lock_guard lock(m_lock);
-        if (m_buffer.size() == 0) return T{};
-        T f = m_buffer.back();
-        m_buffer.pop_back();
-        return f;
-      }
-      inline void push(T item) {
-        std::lock_guard lock(m_lock);
-        m_buffer.push_back(item);
-      }
-      inline size_t size(void) {
-        std::lock_guard lock(m_lock);
-        return m_buffer.size();
-      }
+
+   public:
+    inline T pop(void) {
+      std::lock_guard lock(m_lock);
+      if (m_buffer.size() == 0) return T{};
+      T f = m_buffer.front();
+      m_buffer.pop_front();
+      return f;
+    }
+    inline T steal(void) {
+      std::lock_guard lock(m_lock);
+      if (m_buffer.size() == 0) return T{};
+      T f = m_buffer.back();
+      m_buffer.pop_back();
+      return f;
+    }
+    inline void push(T item) {
+      std::lock_guard lock(m_lock);
+      m_buffer.push_back(item);
+    }
+    inline size_t size(void) {
+      std::lock_guard lock(m_lock);
+      return m_buffer.size();
+    }
   };
 
   // forward declaration
@@ -114,7 +139,16 @@ namespace cedar {
     std::mutex lock;
     std::condition_variable work_cv;
     cl_deque<fiber *> local_queue;
+    uv_loop_t loop;
+    uv_idle_t idler;
+    fiber *current_fiber = nullptr;
+    bool continue_working = true;
     bool internal = false;
+  };
+
+  struct internal_worker {
+    std::thread thread;
+    worker_thread *worker;
   };
 
 
@@ -130,6 +164,15 @@ namespace cedar {
    */
   void schedule(worker_thread * = nullptr, bool = false);
 
+
+
+  // yield to the scheduler when inside a fiber. should be able to be
+  // called anywhere within or below the fiber::run's call stack
+  void yield();
+  void yield(ref);
+
+
+  fiber *current_fiber();
 
   ref eval_lambda(call_state);
   ref call_function(lambda *, int argc, ref *argv, call_context *ctx);

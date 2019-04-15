@@ -36,7 +36,7 @@
 namespace cedar {
   class module;
   // primary module require system
-  module *require(std::string);
+  module *require(std::string, std::string = "");
 
   void define_builtin_module(std::string, module*);
 

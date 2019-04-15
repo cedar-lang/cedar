@@ -48,29 +48,31 @@
 #include <cedar/thread.h>
 #include <gc/gc.h>
 #include <cedar/util.hpp>
-
 #include <replxx/replxx.hxx>
 
 
 using Replxx = replxx::Replxx;
-
 
 static void help(void);
 static void usage(void);
 
 using namespace cedar;
 
-
 void hook_color(std::string const &str, Replxx::colors_t &colors, module *mod);
+module *repl_mod;
+
 
 int main(int argc, char **argv) {
+
+
   srand((unsigned int)time(nullptr));
-
   init();
-
   def_global("*cedar-version*", new cedar::string(CEDAR_VERSION));
-
   module *repl_mod = new module("user");
+
+
+  // basic jit
+  jit::compiler("map").run(repl_mod);
 
 
   try {

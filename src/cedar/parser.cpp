@@ -27,6 +27,7 @@
 #include <cedar/runes.h>
 #include <cedar/exception.hpp>
 
+#include <cedar/object/dict.h>
 #include <cedar/object/keyword.h>
 #include <cedar/object/list.h>
 #include <cedar/object/nil.h>
@@ -80,7 +81,8 @@ token lexer::lex() {
 
   // the basic C escape codes
   static std::map<char, char> esc_mappings = {
-      {'a', 0x07}, {'b', 0x08}, {'f', 0x0C}, {'n', 0x0A}, {'r', 0x0D}, {'t', 0x09}, {'v', 0x0B}, {'\\', 0x5C}, {'"', 0x22}, {'e', 0x1B},
+      {'a', 0x07}, {'b', 0x08}, {'f', 0x0C},  {'n', 0x0A}, {'r', 0x0D},
+      {'t', 0x09}, {'v', 0x0B}, {'\\', 0x5C}, {'"', 0x22}, {'e', 0x1B},
   };
 
 
@@ -137,7 +139,8 @@ skip_comment:
       cedar::runes buf;
       while (true) {
         c = next();
-        if ((int32_t)c == -1) throw cedar::make_exception("unterminated string");
+        if ((int32_t)c == -1)
+          throw cedar::make_exception("unterminated string");
         if (c == '"') break;
         if (c == '\\') {
           if (peek() == '"') {
@@ -212,7 +215,8 @@ skip_comment:
         } else {
           c = esc_mappings[e];
           if (c == 0) {
-            throw cedar::make_exception("unknown escape sequence \\", e, " in string");
+            throw cedar::make_exception("unknown escape sequence \\", e,
+                                        " in string");
           }
         }
         escaped = false;
@@ -286,12 +290,15 @@ skip_comment:
     symbol += v;
   }
 
-  if (symbol.length() == 0) throw make_exception("lexer encountered zero-length identifier");
+  if (symbol.length() == 0)
+    throw make_exception("lexer encountered zero-length identifier");
 
   uint8_t type = tok_symbol;
 
   if (symbol[0] == ':') {
-    if (symbol.size() == 1) throw cedar::make_exception("Keyword token must have at least one character after the ':'");
+    if (symbol.size() == 1)
+      throw cedar::make_exception(
+          "Keyword token must have at least one character after the ':'");
     type = tok_keyword;
   }
 
@@ -391,7 +398,7 @@ ref reader::parse_expr(void) {
     case tok_number:
       return parse_number();
     case tok_left_curly:
-      return parse_special_grouping_as_call("Dict", tok_right_curly);
+      return parse_dict();
     case tok_left_bracket:
       return parse_vector();
     case tok_left_paren:
@@ -458,12 +465,30 @@ ref reader::parse_vector(void) {
 
   return vec;
 }
+/////////////////////////////////////////////////////
+ref reader::parse_dict(void) {
+  dict *d = new dict();
+  // skip over the first curly brace
+  next();
+  while (tok.type != tok_right_curly) {
+    if (tok.type == tok_eof) {
+      throw unexpected_eof_error("unexpected eof in list");
+    }
+    ref key = parse_expr();
+    ref val = parse_expr();
+    d->set(key, val);
+  }
+  // skip over the closing curly
+  next();
+  return d;
+}
 
 /////////////////////////////////////////////////////
 ref reader::parse_special_syntax(cedar::runes function_name) {
   // skip over the "special syntax token"
   next();
-  ref obj = new list(new symbol(function_name), new list(parse_expr(), nullptr));
+  ref obj =
+      new list(new symbol(function_name), new list(parse_expr(), nullptr));
   return obj;
 }
 
@@ -528,7 +553,8 @@ ref reader::parse_string(void) {
 }
 
 /////////////////////////////////////////////////////
-ref reader::parse_special_grouping_as_call(cedar::runes name, tok_type closing) {
+ref reader::parse_special_grouping_as_call(cedar::runes name,
+                                           tok_type closing) {
   std::vector<ref> items;
   // skip over the first grouping oper
   next();

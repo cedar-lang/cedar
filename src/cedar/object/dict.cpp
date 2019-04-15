@@ -179,3 +179,30 @@ ref dict::keys(void) {
   }
   return l;
 }
+
+
+void dict::encode(serializer *s) {
+  for (bucket *b : m_buckets) {
+    bucket *c = b;
+    while (c != nullptr) {
+      s->write(c->key);
+      s->write(c->val);
+      c = c->next;
+    }
+  }
+}
+
+
+ref dict::to_constructor_expr() {
+  std::vector<ref> ks;
+  ks.push_back(new symbol("Dict"));
+  for (bucket *b : m_buckets) {
+    bucket *c = b;
+    while (c != nullptr) {
+      ks.push_back(c->key);
+      ks.push_back(c->val);
+      c = c->next;
+    }
+  }
+  return new list(ks);
+}

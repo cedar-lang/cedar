@@ -60,6 +60,10 @@ bool instruction::encode(bytecode & bc) {
 			bc.write<int64_t>(arg_int);
 			break;
 
+		case imm_byte:
+			bc.write<int8_t>(arg_int);
+			break;
+
 		case imm_ptr:
 			bc.write<void*>(arg_voidptr);
 			break;
@@ -100,6 +104,7 @@ std::vector<instruction> cedar::vm::decode_bytecode(bytecode* bc) {
 			case imm_object: READ_INTO(arg_object, object*);
 			case imm_float: READ_INTO(arg_float, double);
 			case imm_int: READ_INTO(arg_int, int64_t);
+			case imm_byte: READ_INTO(arg_int, int8_t);
 			case imm_ptr: READ_INTO(arg_voidptr, void*);
 			// and no_arg is a nop
 			case no_arg: {}; break;
@@ -138,7 +143,8 @@ std::string cedar::vm::instruction::to_string(uint64_t offset) {
 			buf << arg_float;
 			break;
 
-		case imm_int: {
+		case imm_int:
+    case imm_byte: {
 				if (op == OP_JUMP || op == OP_JUMP_IF_FALSE) {
 					sprintf(hexbuf, "0x%lx", (u64)(arg_int));
 					buf << hexbuf;

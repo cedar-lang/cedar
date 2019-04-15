@@ -23,12 +23,12 @@
  */
 
 #include <cedar/object.h>
-#include <cedar/objtype.h>
 #include <cedar/object/list.h>
 #include <cedar/object/nil.h>
 #include <cedar/object/number.h>
 #include <cedar/object/sequence.h>
 #include <cedar/object/symbol.h>
+#include <cedar/objtype.h>
 #include <cedar/ref.h>
 
 #include <mutex>
@@ -39,6 +39,39 @@ using namespace cedar;
 
 static std::mutex refcount_mutex;
 
+
+static number *unopt;
+
+ref::ref(void) {
+  clear_type_flags();
+  m_obj = nullptr;
+}
+
+ref::ref(object *o) {
+  m_flags = 0;
+  store_obj(o);
+}
+
+ref::ref(double d) {
+  m_flags = 0;
+  BIT_SET(m_flags, FLAG_FLOAT);
+  m_flt = d;
+  // unopt = new number(d);
+}
+
+ref::ref(i64 i) {
+  clear_type_flags();
+  BIT_SET(m_flags, FLAG_INT);
+  m_int = i;
+  // unopt = new number(i);
+}
+
+ref::ref(int i) {
+  clear_type_flags();
+  BIT_SET(m_flags, FLAG_INT);
+  m_int = i;
+  // unopt = new number((i64)i);
+}
 
 type *ref::get_type(void) const {
   if (is_nil()) {
@@ -74,9 +107,7 @@ void ref::setattr(ref k, ref v) {
   return m_obj->setattr(k, v);
 }
 
-bool ref::isa(type *t) const {
-  return t == get_type();
-}
+bool ref::isa(type *t) const { return t == get_type(); }
 
 
 bool ref::is_seq(void) {
@@ -100,7 +131,7 @@ ref cedar::ref::first() const {
 
   if (m_obj == nullptr) return nullptr;
 
-  if (m_obj->m_type == list_type) return dynamic_cast<list*>(m_obj)->m_first;
+  if (m_obj->m_type == list_type) return dynamic_cast<list *>(m_obj)->m_first;
 
   return self_call(*this, "first");
 }
@@ -112,7 +143,7 @@ ref cedar::ref::rest() const {
 
   if (m_obj == nullptr) return nullptr;
 
-  if (m_obj->m_type == list_type) return dynamic_cast<list*>(m_obj)->m_rest;
+  if (m_obj->m_type == list_type) return dynamic_cast<list *>(m_obj)->m_rest;
 
   return self_call(*this, "rest");
 }
@@ -130,13 +161,9 @@ ref cedar::ref::rest() const {
 }
 */
 
-ref cedar::ref::cons(ref v) {
-
-  return self_call(*this, "cons", v);
-}
+ref cedar::ref::cons(ref v) { return self_call(*this, "cons", v); }
 
 void cedar::ref::set_first(ref val) {
-  // printf("set_first\n");
   if (!is_obj())
     throw cedar::make_exception("unable to set first of non-object reference");
   if (m_obj == nullptr) return;
@@ -150,7 +177,6 @@ void cedar::ref::set_rest(ref val) {
   if (m_obj == nullptr) return;
   return dynamic_cast<list *>(m_obj)->set_rest(val);
 }
-
 
 
 
@@ -179,7 +205,6 @@ cedar::runes ref::to_string(bool human) {
 
   return m_obj->to_string(human);
 }
-
 
 
 
@@ -242,25 +267,28 @@ bool cedar::ref::operator==(ref other) {
 
 
 
-ref ref::binary_op(binop op, ref & a, ref & b) {
+ref ref::binary_op(binop op, ref &a, ref &b) {
   if (a.is_number() && b.is_number()) {
     switch (op) {
-      #define V(name, op) \
-        case name: {\
-                     return (a.is_flt() || b.is_flt()) ? ref((a.to_float() op b.to_float())) : ref((i64)(a.to_int() op b.to_int())); \
-                   }
+#define V(name, op)                                                           \
+  case name: {                                                                \
+    return (a.is_flt() || b.is_flt()) ? ref((a.to_float() op b.to_float()))   \
+                                      : ref((i64)(a.to_int() op b.to_int())); \
+  }
 
-        FOREACH_OP(V)
-      #undef V
+      FOREACH_OP(V)
+#undef V
       default:
         throw cedar::make_exception("unknown op");
     }
   }
 
   switch (op) {
-    #define V(name, op) case name: return self_call(a, #op, b);
+#define V(name, op) \
+  case name:        \
+    return self_call(a, #op, b);
     FOREACH_OP(V);
-    #undef V
+#undef V
   }
   return 0.0;
 }

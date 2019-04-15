@@ -129,6 +129,7 @@ lambda *lambda::copy(void) {
 }
 
 void lambda::set_args_closure(closure *c, int a_argc, ref *a_argv) {
+  // code->record_call(a_argc, a_argv);
   if (a_argc != 0 && a_argv != nullptr) {
     // here we need to setup some variables which will be derived
     // from the argument state passed in.
@@ -180,7 +181,6 @@ call_state lambda::prime(int a_argc, ref *a_argv) {
   p.func = this;
   p.locals = new closure(argc, m_closure, arg_index);
   p.locals->func = this;
-  // printf("%p %p\n", p.func, p.locals);
   set_args_closure(p.locals, a_argc, a_argv);
   return p;
 }

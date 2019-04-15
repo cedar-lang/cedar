@@ -24,49 +24,48 @@
 
 #include <cedar/event_loop.h>
 #include <cedar/scheduler.h>
+#include <cedar/thread.h>
+#include <unistd.h>
+#include <condition_variable>
 #include <mutex>
 #include <queue>
 #include <thread>
-#include <unistd.h>
 
 using namespace cedar;
 
 static uv_loop_t *main_loop;
-static uv_idle_t *idler;
+static uv_async_t async;
 
 static std::mutex work_mutex;
+std::condition_variable ev_cv;
 static std::queue<std::function<void(uv_loop_t *)>> awaiting_work;
 
 
-// this gets run in the event loop thread and allows thread-safe
-// access to the event loop
-void work_discovery_idle_callback(uv_idle_t *handle) {
+static void pull_event_loop_work(void) {
   std::unique_lock<std::mutex> lock(work_mutex);
-
   while (!awaiting_work.empty()) {
     auto w = awaiting_work.front();
     awaiting_work.pop();
     w(main_loop);
   }
-  usleep(200);
+}
+
+
+
+void async_callback(uv_async_t *handle) {
+  pull_event_loop_work();
 }
 
 void cedar::init_ev(void) {
   auto t = std::thread([] {
-    // create the event loop
+    register_thread();
     main_loop = new uv_loop_t();
     uv_loop_init(main_loop);
-
-    idler = new uv_idle_t();
-    idler->data = &main_loop;
-
-    uv_idle_init(main_loop, idler);
-    uv_idle_start(idler, work_discovery_idle_callback);
-
-
+    async.data = main_loop;
+    uv_async_init(main_loop, &async, async_callback);
     uv_run(main_loop, UV_RUN_DEFAULT);
-
     uv_loop_close(main_loop);
+    deregister_thread();
   });
 
   t.detach();
@@ -77,7 +76,10 @@ void cedar::init_ev(void) {
 void cedar::in_ev(std::function<void(uv_loop_t *)> fn) {
   std::unique_lock<std::mutex> lock(work_mutex);
   awaiting_work.push(fn);
+  uv_async_send(&async);
 }
+
+
 
 
 void set_timeout_cb(uv_timer_t *handle) {

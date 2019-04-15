@@ -39,11 +39,8 @@ namespace cedar {
   // is encountered.
   class list : public object {
    public:
-
     ref m_first = nullptr;
     ref m_rest = nullptr;
-
-
     list(void);
     list(ref, ref);
     list(std::vector<ref> const&);
@@ -51,15 +48,8 @@ namespace cedar {
     ref first(void);
     ref rest(void);
     ref cons(ref);
-
     void set_first(ref);
     void set_rest(ref);
-
-
-    inline const char *object_type_name(void) {
-      if (m_rest.is_nil() && m_first.is_nil()) return "nil";
-      return "list";
-    };
 
     u64 hash(void);
 
