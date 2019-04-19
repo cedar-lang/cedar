@@ -1017,7 +1017,3 @@
   `(. ~multifn (set-method ~dispatch-val (fn ~@fn-tail))))
 
 
-
-
-
-(defmacro idmacro [x] x)

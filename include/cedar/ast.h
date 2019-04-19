@@ -35,8 +35,8 @@
 
 namespace cedar {
   namespace ast {
-
     struct scope;
+    struct function_node;
 
 
     // The old bytecode compiler used closures for every argument. This was more
@@ -140,7 +140,6 @@ namespace cedar {
     };
 
 
-    struct function_node;
 
     struct scope {
       scope *parent;
@@ -148,6 +147,7 @@ namespace cedar {
       function_node *func;
       int closure_size;
       int closure_index;
+      int stack_size;
       bool allocate_closure = false;
       std::vector<scope*> children;
       std::vector<var *> vars;
@@ -184,7 +184,6 @@ namespace cedar {
         return v;
       }
     };
-
 
     //====================================
     //====================================

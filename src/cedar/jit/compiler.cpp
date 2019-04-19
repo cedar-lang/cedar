@@ -47,7 +47,7 @@ using namespace asmjit::x86;
 
 // static JitRuntime rt;
 
-// #define JIT_DEBUG
+#define JIT_DEBUG
 #define JIT_REG_DEBUG
 
 #ifdef JIT_DEBUG
@@ -171,83 +171,7 @@ static reg get_module(X86Compiler &cc, reg cb) {
 }
 
 
-
-
-typedef void (*jit_function)(const function_callback &);
-
-
-
-
-void jitloop(void) {
-  while (true) {
-    CodeHolder code;  // Create a CodeHolder.
-    code.init(CodeInfo(
-        ArchInfo::kTypeHost));  // Initialize it for the host architecture.
-
-    X86Assembler a(&code);  // Create and attach X86Assembler to `code`.
-
-    // Generate a function runnable in both 32-bit and 64-bit architectures:
-    bool isX86 = static_cast<bool>(ASMJIT_ARCH_X86);
-    bool isWin = static_cast<bool>(ASMJIT_OS_WINDOWS);
-
-    // Signature: 'void func(int* dst, const int* a, const int* b)'.
-    X86Gp dst;
-    X86Gp src_a;
-    X86Gp src_b;
-
-    // Handle the difference between 32-bit and 64-bit calling convention.
-    // (arguments passed through stack vs. arguments passed by registers).
-    if (isX86) {
-      dst = x86::eax;
-      src_a = x86::ecx;
-      src_b = x86::edx;
-      a.mov(dst, x86::dword_ptr(x86::esp, 4));  // Load the destination pointer.
-      a.mov(src_a,
-            x86::dword_ptr(x86::esp, 8));  // Load the first source pointer.
-      a.mov(src_b,
-            x86::dword_ptr(x86::esp, 12));  // Load the second source pointer.
-    } else {
-      dst = isWin ? x86::rcx
-                  : x86::rdi;  // First argument  (destination pointer).
-      src_a =
-          isWin ? x86::rdx : x86::rsi;  // Second argument (source 'a' pointer).
-      src_b =
-          isWin ? x86::r8 : x86::rdx;  // Third argument  (source 'b' pointer).
-    }
-
-    a.movdqu(x86::xmm0, x86::ptr(src_a));  // Load 4 ints from [src_a] to XMM0.
-    a.movdqu(x86::xmm1, x86::ptr(src_b));  // Load 4 ints from [src_b] to XMM1.
-    a.paddd(x86::xmm0, x86::xmm1);         // Add 4 ints in XMM1 to XMM0.
-    a.movdqu(x86::ptr(dst), x86::xmm0);    // Store the result to [dst].
-    a.ret();                               // Return from function.
-    size_t size = code.getCodeSize();
-
-    auto ptr = mmap(NULL, size, PROT_READ | PROT_EXEC | PROT_WRITE,
-                    MAP_ANON | MAP_PRIVATE, -1, 0);
-    code.relocate(ptr);  // Relocate & store the output in 'ptr'.
-
-    typedef void (*SumIntsFunc)(int *dst, const int *a, const int *b);
-
-    // Execute the generated function.
-    int inA[4] = {4, 3, 2, 1};
-    int inB[4] = {1, 5, 2, 8};
-    int out[4];
-
-    // This code uses AsmJit's ptr_as_func<> to cast between void* and
-    // SumIntsFunc.
-    ptr_as_func<SumIntsFunc>(ptr)(out, inA, inB);
-    printf("{%d %d %d %d}\n", out[0], out[1], out[2], out[3]);
-
-    // munmap(ptr, size);
-    printf("ran %p\n", ptr);
-  }
-}
-
-
-
-
 lambda *jit::compile(ref obj, module *mod) {
-  // jitloop();
   auto ch = new code_handle(obj, mod);
   return new lambda([=](const function_callback &cb) { ch->apply(cb); });
 }
@@ -324,8 +248,11 @@ void *compiler::run(module *m, size_t *sz) {
   cc.lea(reta, qword_ptr(cb, offsetof(function_callback, return_value)));
 
   compile_node(reta, root);
+  printf("1\n");
   cc.ret();
+  printf("2\n");
   cc.finalize();
+  printf("3\n");
 
   size_t size = code.getCodeSize();
 
@@ -334,7 +261,6 @@ void *compiler::run(module *m, size_t *sz) {
       mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0);
 
   code.relocate(ptr);  // Relocate & store the output in 'ptr'.
-
 
   mprotect(ptr, size, PROT_EXEC | PROT_READ);
 
@@ -351,6 +277,8 @@ void compiler::compile_node(reg dst, ast::node *obj) {
   if (ISA(obj, symbol_node)) return compile_symbol(dst, obj);
   if (ISA(obj, call_node)) return compile_call(dst, obj);
   if (ISA(obj, if_node)) return compile_if(dst, obj);
+
+  if (ISA(obj, string_node)) return compile_string(dst, obj);
 
   return compile_nil(dst);
   return;
@@ -475,8 +403,6 @@ void compiler::compile_if(reg dst, ast::node *obj) {
   cc.cmp(cond_bool, 0);
   cc.je(is_false);
 
-
-
   // true
   compile_node(dst, n->true_body);
   cc.jmp(br_join);
@@ -530,12 +456,43 @@ void compiler::compile_nil(reg dst) {
 
 
 
+void compile_scope_init(ast::scope *sc) {}
+
+
+
+
+static void jit_build_string(ref &dst, const char *src) {
+  printf("%p\n", src);
+  dst = new string(src);
+}
+void compiler::compile_string(reg dst, ast::node *obj) {
+  auto n = static_cast<ast::string_node *>(obj);
+  std::u32string &str = n->val.buf;
+  const char32_t *ptr = str.c_str();
+  X86Mem mem =
+      cc.newConst(kConstScopeLocal, ptr, str.size() * sizeof(char32_t));
+
+  auto pval = cc.newIntPtr("pval");
+  cc.lea(pval, mem);
+  /*
+  // auto str_ptr = cc.newGpz("string literal");
+  // cc.lea(str_ptr, mem);
+
+  auto call =
+      cc.call(imm_ptr(jit_build_string),
+              FuncSignature2<void, ref*, const char *>());
+
+  call->setArg(0, dst);
+  call->setArg(1, str_ptr);
+  */
+}
+
+
+
 static int round_up(int numToRound, int multiple) {
   if (multiple == 0) return numToRound;
-
   int remainder = numToRound % multiple;
   if (remainder == 0) return numToRound;
-
   return numToRound + multiple - remainder;
 }
 
@@ -545,8 +502,6 @@ stkregion compiler::salloc(short size) {
   int region_count = size / alignment;
   stkregion r;
   r.size = size;
-
-
   for (int i = 0; i < regions.size(); i++) {
     r.ind = i;
     bool valid = true;
@@ -558,21 +513,15 @@ stkregion compiler::salloc(short size) {
     }
     if (valid) goto found;
   }
-
   r.ind = sbrk(region_count);
   goto found;
-
-
 found:
   for (int i = 0; i < region_count; i++) {
     regions[r.ind + i] = true;
   }
   r.ptr = cc.newGpz();
   r.used = true;
-
   cc.lea(r.ptr, stk.adjusted(r.ind * alignment));
-
-
 #ifdef JIT_DEBUG
   printf("+ %4d bytes: ", r.size);
   dump_stack();
@@ -618,100 +567,3 @@ void compiler::dump_stack() {
   printf("}\n");
 #endif
 }
-
-
-/*
-
-reg compiler::compile_object(ref obj) {
-  type *ot = obj.get_type();
-
-
-#define HANDLE_TYPE(t) \
-  if (ot == t##_type) return compile_##t(obj);
-
-  HANDLE_TYPE(number);
-  HANDLE_TYPE(list);
-  HANDLE_TYPE(symbol);
-
-  throw cedar::make_exception("unable to jit compile object ", obj);
-}
-
-
-
-reg compiler::compile_number(ref obj) {
-  reg n = alloc_ref(cc);
-
-
-  if (obj.is_int()) {
-    reg arg = cc.newI64("num arg");
-    debug_reg_print(cc, arg, "arg");
-    cc.mov(arg, (int64_t)obj.to_int());
-
-    // load the reference with an int
-    auto call =
-        cc.call(imm_ptr(_load_ref_int), FuncSignature2<void, ref *, i64>());
-    call->setArg(0, n);
-    call->setArg(1, arg);
-
-  } else if (obj.is_flt()) {
-    auto arg = cc.newXmmSd();
-    double d = obj.to_float();
-    uint64_t d_re = *(uint64_t *)&d;
-
-    auto itmp = cc.newGpz();
-    cc.mov(itmp, d_re);
-    cc.movq(arg, itmp);
-
-    // load a reference with a float (double)
-    auto call =
-        cc.call(imm_ptr(_load_ref_float), FuncSignature2<void, ref *, i64>());
-    call->setArg(0, n);
-    call->setArg(1, arg);
-  }
-  return n;
-}
-
-
-
-
-reg compiler::compile_list(ref obj) {
-  reg n = alloc_ref(cc);
-
-
-
-  return n;
-}
-
-static int _do_global_lookup(ref &r, uint64_t id, module *m) {
-  if (m == nullptr) {
-    r = nullptr;
-    return 0;
-  }
-
-  bool b;
-  r = m->find(id, &b, m);
-  return b;
-}
-
-
-
-reg compiler::compile_symbol(ref obj) {
-  reg n = alloc_ref(cc);
-  symbol *s = ref_cast<symbol>(obj);
-  auto id = s->id;
-  auto id_reg = cc.newGpz();
-  cc.mov(id_reg, (uint64_t)id);
-  auto mod = get_module(cc, cb);
-
-  cc.comment(";; do_global_lookup");
-
-  auto call = cc.call(imm_ptr(_do_global_lookup),
-                      FuncSignature3<void, ref *, i64, module *>());
-  call->setArg(0, n);
-  call->setArg(1, id_reg);
-  call->setArg(2, mod);
-  return n;
-}
-
-*/
-

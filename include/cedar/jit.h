@@ -53,6 +53,7 @@
 namespace cedar {
   namespace ast {
     struct node;
+    struct scope;
   };
   class lambda;
   class module;
@@ -141,6 +142,12 @@ namespace cedar {
       void compile_symbol(reg dst, ast::node *obj);
       void compile_call(reg dst, ast::node *obj);
       void compile_if(reg dst, ast::node *obj);
+
+      void compile_scope_init(ast::scope *);
+      void compile_function(reg dst, ast::node *obj);
+
+
+      void compile_string(reg dst, ast::node *obj);
 
       void dump_stack(void);
 

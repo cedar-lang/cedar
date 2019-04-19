@@ -39,6 +39,9 @@ using namespace cedar::ast;
 
 
 void ast::scope::finalize(void) {
+  stack_size = 0;
+  closure_size = 0;
+
   // finalize walks *down* the scope tree and decides on which variables go in
   // closures, and which dont. It also sets up closure indexes, instructions on
   // how to allocate closures, etc...
@@ -58,12 +61,16 @@ void ast::scope::finalize(void) {
 
 
 
+
   closure_size = 0;
   for (auto v : vars) {
     if (v->escapes) {
       allocate_closure = true;
       v->closure_index = closure_index + closure_size;
       closure_size += 1;
+    } else {
+      v->stack_index = stack_size;
+      stack_size+=1;
     }
   };
 

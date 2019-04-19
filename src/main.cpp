@@ -69,19 +69,6 @@ int main(int argc, char **argv) {
   module *repl_mod = new module("user");
 
 
-  /*
-
-  while (true) {
-    auto f = jit::compile("(if 1 (add 1 2) (add 2 3))", repl_mod);
-    call_context c;
-    c.mod = repl_mod;
-    call_function(f, 0, nullptr, &c);
-    // std::cout << v << std::endl;
-    GC_gcollect();
-  }
-  */
-
-  return 0;
 
 
 

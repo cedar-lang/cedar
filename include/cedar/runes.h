@@ -40,11 +40,11 @@ namespace cedar {
 
 			friend std::hash<cedar::runes>;
 
-			container buf;
 
 			void ingest_utf8(std::string const&);
 
 		public:
+			container buf;
 
 			typedef container::iterator iterator;
 			typedef container::const_iterator const_iterator;

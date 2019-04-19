@@ -60,13 +60,10 @@ namespace cedar {
 			public:
 				scope* m_parent = nullptr;
 				scope(scope*);
-
 				int find(uint64_t);
 				int find(ref &);
-
 				void set(ref &, int);
 				void set(uint64_t, int);
-
 		};
 
 
