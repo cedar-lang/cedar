@@ -27,7 +27,7 @@
 #ifndef _NATIVE_INTERFACE
 #define _NATIVE_INTERFACE
 
-
+#include <functional>
 #include <cedar/ref.h>
 #include <stdlib.h>
 

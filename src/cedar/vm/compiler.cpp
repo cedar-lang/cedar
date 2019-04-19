@@ -39,6 +39,7 @@
 #include <cedar/vm/machine.h>
 #include <cedar/vm/opcode.h>
 #include <cedar/jit.h>
+#include <cedar/ast.h>
 #include <memory>
 
 using namespace cedar;
@@ -73,17 +74,12 @@ vm::compiler::~compiler() {}
 
 ref vm::compiler::compile(ref obj, module *mod) {
 
-
-
   /*
-  // attempt to jit compile first
-  lambda *jit_func = jit::compile(obj, mod);
-  // if it succeeded...
-  if (jit_func != nullptr) {
-    jit_func->m_closure = nullptr;
-    return jit_func;
-  }
+  lambda *fn = jit::compile(obj, mod);
+  call_context c;
+  call_function(fn, 0, nullptr, &c);
   */
+
 
 
   // make a top level bytecode object
@@ -345,6 +341,7 @@ void vm::compiler::compile_list(ref obj, vm::bytecode &code, scope *sc,
 
 
   if (list_is_call_to("scope*", obj)) {
+
     ref rvars = obj.rest().first();
     ref rbody = obj.rest().rest().first();
 
@@ -820,7 +817,6 @@ void vm::compiler::compile_lambda_expression(ref expr, bytecode &code,
   static auto amp_sym = newsymbol("&");
   // static auto fn_sym = newsymbol("fn");
   // static auto gen_sym = newsymbol("gen");
-
   // ref func_sig_symbol = expr.first();
 
   ctx->lambda_depth++;

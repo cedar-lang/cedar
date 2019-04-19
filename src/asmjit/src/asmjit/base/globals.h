@@ -14,6 +14,9 @@
 // [Api-Begin]
 #include "../asmjit_apibegin.h"
 
+
+#include <gc/gc.h>
+
 namespace asmjit {
 
 //! \addtogroup asmjit_base

@@ -45,6 +45,7 @@
 #include "cedar/modules.h"
 #include "cedar/jit.h"
 #include "cedar/thread.h"
+#include "cedar/ast.h"
 #include "cedar/event_loop.h"
 #include "cedar/passes.h"
 #include "cedar/memory.h"

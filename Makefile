@@ -22,7 +22,7 @@ gen:
 	@python3 tools/scripts/generate_opcode_h.py
 
 install:
-	cd $(BINDIR); ninja install
+	cd $(BINDIR); make install
 	mkdir -p /usr/local/lib/cedar
 	@rm -rf /usr/local/lib/cedar
 	cp -r lib /usr/local/lib/cedar/

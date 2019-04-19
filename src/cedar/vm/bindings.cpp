@@ -524,6 +524,7 @@ void init_binding(cedar::vm::machine *m) {
   def_global("keys", cedar_dict_keys);
   def_global("size", cedar_size);
   def_global("+", cedar_add);
+  def_global("add", cedar_add);
   def_global("-", cedar_sub);
   def_global("*", cedar_mul);
   def_global("/", cedar_div);

@@ -12,13 +12,21 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 SET(CMAKE_ASM_FLAGS "${CFLAGS} -x assembler-with-cpp")
 
 set(CMAKE_CXX_FLAGS_DEBUG "-g -O0 -DBUILD_MODE=Debug -fno-omit-frame-pointer")
-set(CMAKE_CXX_FLAGS_RELEASE "-O3 -g -DBUILD_MODE=Release")
-
 set(CMAKE_C_FLAGS_DEBUG "-g -O0 -DBUILD_MODE=Debug -fno-omit-frame-pointer")
-set(CMAKE_C_FLAGS_RELEASE "-O3 -g -DBUILD_MODE=Release")
 
+set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DBUILD_MODE=Release")
+set(CMAKE_C_FLAGS_RELEASE   "-O3 -DBUILD_MODE=Release")
+
+
+set(ASMJIT_STATIC TRUE)
+
+set(ASMJIT_RELEASE TRUE)
 
 add_definitions(-DPOINTER_MASK=0x0007FFFFFFFFFFFF)
+
+add_definitions(-DASMJIT_CUSTOM_ALLOC=GC_MALLOC)
+add_definitions(-DASMJIT_CUSTOM_REALLOC=GC_REALLOC)
+add_definitions(-DASMJIT_CUSTOM_FREE=GC_FREE)
 
 
 
@@ -55,13 +63,7 @@ add_compile_options(-frtti)
 include_directories(${CMAKE_SOURCE_DIR}/include)
 
 include(${CMAKE_SOURCE_DIR}/src/cedar/CMakeLists.txt)
-# target_compile_options(cedar-lib PRIVATE -g -Wall -Wextra -Wno-unused-parameter -Wno-strict-aliasing)
-# target_compile_options(cedar-lib_a PRIVATE -g -Wall -Wextra -Wno-unused-parameter -Wno-strict-aliasing)
 
-# add_executable(cedar-bin src/main.cpp)
-
-# target_link_libraries(cedar-bin cedar-lib_a uv_a ${CMAKE_DL_LIBS} -pthread)
-# set_target_properties(cedar-bin PROPERTIES OUTPUT_NAME cedar)
 
 target_compile_options(cedar PRIVATE -Wall -Wextra -Wno-unused-parameter -Wno-strict-aliasing)
 

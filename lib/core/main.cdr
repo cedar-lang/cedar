@@ -1016,3 +1016,8 @@
 (defmacro defmethod (multifn dispatch-val & fn-tail)
   `(. ~multifn (set-method ~dispatch-val (fn ~@fn-tail))))
 
+
+
+
+
+(defmacro idmacro [x] x)

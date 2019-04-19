@@ -452,7 +452,7 @@ static char *stackalloc() {
 
 
 
-  stk = (char *)GC_MALLOC_UNCOLLECTABLE(get_stack_size());
+  stk = (char *)GC_MALLOC(get_stack_size());
 
   return stk;
 }

@@ -16,10 +16,18 @@ set_property(TARGET gc_static PROPERTY IMPORTED_LOCATION
 
 footer = """
 
+
+add_library(cedar-lib SHARED $<TARGET_OBJECTS:cedar-obj>)
+add_library(cedar-a   STATIC $<TARGET_OBJECTS:cedar-obj>)
+
 target_link_libraries(cedar-lib asmjit uv_a ${CMAKE_DL_LIBS} -lgc -lgccpp -pthread -lboost_system)
 set_target_properties(cedar-lib PROPERTIES OUTPUT_NAME cedar)
 
-target_link_libraries(cedar cedar-lib replxx uv_a ${CMAKE_DL_LIBS} -lgc -lgccpp -pthread -lboost_system)
+
+target_link_libraries(cedar-a asmjit uv_a ${CMAKE_DL_LIBS} -lgc -lgccpp -pthread -lboost_system)
+set_target_properties(cedar-a PROPERTIES OUTPUT_NAME cedar)
+
+target_link_libraries(cedar cedar-a replxx uv_a ${CMAKE_DL_LIBS} -lgc -lgccpp -pthread -lboost_system)
 set_target_properties(cedar PROPERTIES OUTPUT_NAME cedar)
 
 """
@@ -36,13 +44,15 @@ with open('src/cedar/CMakeLists.txt', 'w') as f:
 
 
 
-    f.write('add_library(cedar-lib SHARED\n')
+    f.write('add_library(cedar-obj OBJECT\n')
     for filename in itools.chain(glb('src/cedar/**/*.cpp'),
             glb('src/cedar/**/*.c'), glb('src/cedar/**/*.s')):
         f.write('\t%s\n' % (filename))
 
     f.write(")\n")
     f.write("\n");
+
+    f.write('set_property(TARGET cedar-obj PROPERTY POSITION_INDEPENDENT_CODE 1)\n')
 
     f.write('add_executable(cedar\n')
     for filename in itools.chain(glb('src/*.cpp', recursive=False)):

@@ -9,12 +9,12 @@ set_property(TARGET gc_static PROPERTY IMPORTED_LOCATION
     ${PROJECT_SOURCE_DIR}/src/bdwgc/.libs/libgccpp.a
     )
 
-add_library(cedar-lib SHARED
+add_library(cedar-obj OBJECT
 	src/cedar/serialize.cpp
 	src/cedar/thread.cpp
 	src/cedar/importutil.cpp
+	src/cedar/ast.cpp
 	src/cedar/ref.cpp
-	src/cedar/jit.cpp
 	src/cedar/object.cpp
 	src/cedar/modules.cpp
 	src/cedar/globals.cpp
@@ -44,6 +44,8 @@ add_library(cedar-lib SHARED
 	src/cedar/object/list.cpp
 	src/cedar/object/keyword.cpp
 	src/cedar/object/number.cpp
+	src/cedar/jit/compiler.cpp
+	src/cedar/jit/code_handle.cpp
 	src/cedar/lib/linenoise.cpp
 	src/cedar/bindings/linear.cpp
 	src/cedar/bindings/mutex.cpp
@@ -58,15 +60,24 @@ add_library(cedar-lib SHARED
 	src/cedar/add.s
 )
 
+set_property(TARGET cedar-obj PROPERTY POSITION_INDEPENDENT_CODE 1)
 add_executable(cedar
 	src/main.cpp
 )
 
 
 
+
+add_library(cedar-lib SHARED $<TARGET_OBJECTS:cedar-obj>)
+add_library(cedar-a   STATIC $<TARGET_OBJECTS:cedar-obj>)
+
 target_link_libraries(cedar-lib asmjit uv_a ${CMAKE_DL_LIBS} -lgc -lgccpp -pthread -lboost_system)
 set_target_properties(cedar-lib PROPERTIES OUTPUT_NAME cedar)
 
-target_link_libraries(cedar cedar-lib replxx uv_a ${CMAKE_DL_LIBS} -lgc -lgccpp -pthread -lboost_system)
+
+target_link_libraries(cedar-a asmjit uv_a ${CMAKE_DL_LIBS} -lgc -lgccpp -pthread -lboost_system)
+set_target_properties(cedar-a PROPERTIES OUTPUT_NAME cedar)
+
+target_link_libraries(cedar cedar-a replxx uv_a ${CMAKE_DL_LIBS} -lgc -lgccpp -pthread -lboost_system)
 set_target_properties(cedar PROPERTIES OUTPUT_NAME cedar)
 

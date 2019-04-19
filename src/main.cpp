@@ -63,16 +63,26 @@ module *repl_mod;
 
 
 int main(int argc, char **argv) {
-
-
   srand((unsigned int)time(nullptr));
   init();
   def_global("*cedar-version*", new cedar::string(CEDAR_VERSION));
   module *repl_mod = new module("user");
 
 
-  // basic jit
-  jit::compiler("map").run(repl_mod);
+  /*
+
+  while (true) {
+    auto f = jit::compile("(if 1 (add 1 2) (add 2 3))", repl_mod);
+    call_context c;
+    c.mod = repl_mod;
+    call_function(f, 0, nullptr, &c);
+    // std::cout << v << std::endl;
+    GC_gcollect();
+  }
+  */
+
+  return 0;
+
 
 
   try {
@@ -159,19 +169,40 @@ int main(int argc, char **argv) {
         rx.history_add(input);
 
         try {
-          // auto start = std::chrono::steady_clock::now();
+#define TIME_REPL
+
+#ifdef TIME_REPL
+          auto start = std::chrono::steady_clock::now();
+#endif
           cedar::runes r = input;
-          ref res = eval_string_in_module(r, repl_mod);
-          repl_mod->def("$$", res);
 
-          std::cout << "\x1B[33m" << res << "\x1B[0m" << std::endl;
 
-          /*
+          bool jit = true;
+
+          if (jit) {
+            auto f = jit::compile(r, repl_mod);
+            call_context c;
+            c.mod = repl_mod;
+            ref v = call_function(f, 0, nullptr, &c);
+            std::cout << v << std::endl;
+          } else {
+            ref res = eval_string_in_module(r, repl_mod);
+            repl_mod->def("$$", res);
+            std::cout << "\x1B[33m" << res << "\x1B[0m" << std::endl;
+          }
+
+#ifdef TIME_REPL
           auto end = std::chrono::steady_clock::now();
-          std::cout
-              << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
-              << "ms" << std::endl;
-          */
+          auto el =
+              std::chrono::duration_cast<std::chrono::microseconds>(end - start)
+                  .count();
+
+          printf("%fms\n", el / 1000.0);
+#endif
+
+          GC_gcollect();
+
+          continue;
 
         } catch (std::exception &e) {
           std::cerr << "Uncaught Exception: " << e.what() << std::endl;
