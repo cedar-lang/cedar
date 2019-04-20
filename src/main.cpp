@@ -62,15 +62,13 @@ void hook_color(std::string const &str, Replxx::colors_t &colors, module *mod);
 module *repl_mod;
 
 
+
+
 int main(int argc, char **argv) {
   srand((unsigned int)time(nullptr));
   init();
   def_global("*cedar-version*", new cedar::string(CEDAR_VERSION));
   module *repl_mod = new module("user");
-
-
-
-
 
   try {
     bool interactive = false;

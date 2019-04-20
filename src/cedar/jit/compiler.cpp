@@ -248,11 +248,8 @@ void *compiler::run(module *m, size_t *sz) {
   cc.lea(reta, qword_ptr(cb, offsetof(function_callback, return_value)));
 
   compile_node(reta, root);
-  printf("1\n");
   cc.ret();
-  printf("2\n");
   cc.finalize();
-  printf("3\n");
 
   size_t size = code.getCodeSize();
 
@@ -353,15 +350,10 @@ void compiler::compile_call(reg dst, ast::node *obj) {
   auto arg_dst = cc.newGpz("arg_dst");
 
   cc.lea(argv, qword_ptr(arg_mem.ptr));
-
-
   for (int i = 0; i < n->arguments.size(); i++) {
     cc.lea(arg_dst, qword_ptr(argv, sizeof(ref) * i));
     compile_node(arg_dst, n->arguments[i]);
   }
-
-
-
   auto call = cc.call(imm_ptr(jit_do_call),
                       FuncSignature4<void, ref *, ref *, int, ref *>());
   call->setArg(0, dst);
@@ -449,6 +441,18 @@ void compiler::compile_nil(reg dst) {
   // the nil reference is just all 0s:
   // copy 8 bytes of ref at a time
   COMMENT("NIL");
+
+
+  cc.mov(oword_ptr(dst), 0);
+  /*
+  auto xmm = cc.newXmmPs();
+  cc.xorps(xmm, xmm);
+
+  cc.movups(ptr(dst), xmm);
+  */
+
+  return;
+
   for (int i = 0; i < sizeof(ref); i += 8) {
     cc.mov(qword_ptr(dst, i), 0);
   }

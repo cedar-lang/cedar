@@ -218,9 +218,8 @@ bool cedar::all_work_done(void) {
 }
 
 
-
-
 static void init_scheduler(void) {
+
   // the number of worker threads is the number of cpus the host machine
   // has, minus one as the main thread does work
   ncpus = std::thread::hardware_concurrency();

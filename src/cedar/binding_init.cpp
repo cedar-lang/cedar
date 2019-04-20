@@ -5,27 +5,27 @@ namespace cedar { void bind_stdlib(void); }
 using namespace cedar;
 
 
+void bind_stringutil(void);
+void bind_importutil(void);
+void bind_tcp(void);
+void bind_bits(void);
+void bind_core(void);
+void bind_math(void);
+void bind_os(void);
 void bind_linear(void);
 void bind_mutex(void);
-void bind_os(void);
-void bind_importutil(void);
-void bind_core(void);
-void bind_tcp(void);
-void bind_math(void);
 void bind_uv(void);
-void bind_stringutil(void);
-void bind_bits(void);
 
 
 void cedar::bind_stdlib(void) {
+	bind_stringutil();
+	bind_importutil();
+	bind_tcp();
+	bind_bits();
+	bind_core();
+	bind_math();
+	bind_os();
 	bind_linear();
 	bind_mutex();
-	bind_os();
-	bind_importutil();
-	bind_core();
-	bind_tcp();
-	bind_math();
 	bind_uv();
-	bind_stringutil();
-	bind_bits();
 }

@@ -10,54 +10,54 @@ set_property(TARGET gc_static PROPERTY IMPORTED_LOCATION
     )
 
 add_library(cedar-obj OBJECT
-	src/cedar/serialize.cpp
-	src/cedar/thread.cpp
+	src/cedar/event_loop.cpp
+	src/cedar/gc.cpp
+	src/cedar/modules.cpp
+	src/cedar/binding_init.cpp
 	src/cedar/importutil.cpp
 	src/cedar/ast.cpp
-	src/cedar/ref.cpp
-	src/cedar/object.cpp
-	src/cedar/modules.cpp
-	src/cedar/globals.cpp
-	src/cedar/passes.cpp
 	src/cedar/scheduler.cpp
-	src/cedar/objtype.cpp
-	src/cedar/event_loop.cpp
-	src/cedar/binding_init.cpp
-	src/cedar/gc.cpp
-	src/cedar/runes.cpp
+	src/cedar/serialize.cpp
+	src/cedar/ref.cpp
+	src/cedar/thread.cpp
+	src/cedar/passes.cpp
 	src/cedar/parser.cpp
-	src/cedar/vm/bytecode.cpp
-	src/cedar/vm/compiler.cpp
-	src/cedar/vm/instruction.cpp
-	src/cedar/vm/machine.cpp
-	src/cedar/vm/bindings.cpp
-	src/cedar/object/symbol.cpp
-	src/cedar/object/module.cpp
-	src/cedar/object/dict.cpp
-	src/cedar/object/string.cpp
-	src/cedar/object/bytes.cpp
-	src/cedar/object/lambda.cpp
+	src/cedar/object.cpp
+	src/cedar/objtype.cpp
+	src/cedar/runes.cpp
+	src/cedar/globals.cpp
+	src/cedar/lib/linenoise.cpp
 	src/cedar/object/fiber.cpp
-	src/cedar/object/sequence.cpp
-	src/cedar/object/nil.cpp
 	src/cedar/object/vector.cpp
-	src/cedar/object/list.cpp
 	src/cedar/object/keyword.cpp
+	src/cedar/object/nil.cpp
+	src/cedar/object/string.cpp
+	src/cedar/object/lambda.cpp
 	src/cedar/object/number.cpp
+	src/cedar/object/module.cpp
+	src/cedar/object/symbol.cpp
+	src/cedar/object/bytes.cpp
+	src/cedar/object/sequence.cpp
+	src/cedar/object/dict.cpp
+	src/cedar/object/list.cpp
 	src/cedar/jit/compiler.cpp
 	src/cedar/jit/code_handle.cpp
-	src/cedar/lib/linenoise.cpp
+	src/cedar/vm/compiler.cpp
+	src/cedar/vm/machine.cpp
+	src/cedar/vm/bytecode.cpp
+	src/cedar/vm/bindings.cpp
+	src/cedar/vm/instruction.cpp
+	src/cedar/bindings/stringutil.cpp
+	src/cedar/bindings/importutil.cpp
+	src/cedar/bindings/tcp.cpp
+	src/cedar/bindings/bits.cpp
+	src/cedar/bindings/core.cpp
+	src/cedar/bindings/math.cpp
+	src/cedar/bindings/os.cpp
 	src/cedar/bindings/linear.cpp
 	src/cedar/bindings/mutex.cpp
-	src/cedar/bindings/os.cpp
-	src/cedar/bindings/importutil.cpp
-	src/cedar/bindings/core.cpp
-	src/cedar/bindings/tcp.cpp
-	src/cedar/bindings/math.cpp
 	src/cedar/bindings/uv.cpp
-	src/cedar/bindings/stringutil.cpp
-	src/cedar/bindings/bits.cpp
-	src/cedar/add.s
+	src/cedar/simd.s
 )
 
 set_property(TARGET cedar-obj PROPERTY POSITION_INDEPENDENT_CODE 1)

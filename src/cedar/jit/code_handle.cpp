@@ -59,13 +59,14 @@ void code_handle::apply(const function_callback &cb) {
 
   // the code is now compiled for sure
   calls++;
+  cb.get_return() = 1;
   return ptr_as_func<jit_function_handle>(code)(cb);
 }
 
 
 code_handle::~code_handle(void) {
   if (code != nullptr) {
-    int e = munmap(code, size);
+    munmap(code, size);
     printf("code handle deleted %zu %p. %d calls\n", size, code, calls.load());
   }
 }
